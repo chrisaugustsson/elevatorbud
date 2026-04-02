@@ -130,6 +130,11 @@ Started: tors  2 apr. 2026 14:51:49 CEST
 - Export UI pattern: Popover with CSV/Excel buttons, lazy-load export data via `useQuery` with "skip" sentinel until user clicks export
 - Shared filter args: extract common filter args schema into `filterArgs` const and `fetchAndFilter()` helper in convex/hissar.ts — reused by both `list` and `exportData` queries
 - Convex `db.get()` returns union of all table document types — cast to `{ namn: string } | null` when you know the table type
+- Apps using Recharts directly must add `recharts` as a direct dependency — it's not transitively available from `@elevatorbud/ui`
+- Recharts `ComposedChart` or `LineChart` with `<Bar>` + `<Line>` for combined bar/line charts (e.g., budget per year + cumulative curve)
+- For per-bar coloring in Recharts: set `fill` property in data array, render `<Bar>` children with `<rect fill={entry.fill}>` — or use `<Cell>` component
+- Navigation from data tables: use `<a href={...}>` instead of typed `<Link>` when route params cause TanStack Router type issues — simpler and avoids `params` type errors
+- Modernization urgency color coding: red (≤1 year), orange (2-4 years), yellow (5-9 years), green (10+ years) — based on `currentYear` diff
 
 ---
 
@@ -774,5 +779,43 @@ Started: tors  2 apr. 2026 14:51:49 CEST
   - Lazy export pattern: set state to trigger query, useEffect watches for data arrival + format state, triggers download, clears state
   - Refactoring shared filter logic into helper function avoids code duplication between list and export queries
   - `db.get()` in Convex with generated types returns a union of all document types — need explicit cast when you know the table
+  - Manual browser verification needed (no browser testing tools configured)
+---
+
+## 2026-04-02 - US-035
+- Implemented two new Convex queries for modernization planning views
+- `hissar.moderniseringTidslinje`: counts elevators per recommended modernization year, sorted chronologically. Returns `{ ar, antal }[]`
+- `hissar.moderniseringBudget`: aggregates budget in three dimensions — per year (`perAr`), per district (`perDistrikt`), per elevator type (`perTyp`). Returns `{ perAr: { ar, belopp }[], perDistrikt: { namn, belopp }[], perTyp: { namn, belopp }[] }`
+- Both queries support optional `organisation_id` filter for tenant isolation (uses `by_organisation_id` index when provided)
+- Both queries filter to `status === "aktiv"` only
+- Updated convex-api.d.ts in both admin and client apps with new query type declarations
+- Files changed: convex/hissar.ts, apps/admin/src/convex-api.d.ts, apps/client/src/convex-api.d.ts
+- **Learnings for future iterations:**
+  - Both queries follow the same org-filter + aktiv-filter pattern as `stats` and `chartData` — consider extracting a shared helper if more queries need this
+  - `moderniseringTidslinje` is a more focused version of the timeline data in `chartData` — the page-specific query returns `ar`/`antal` instead of `name`/`count` for clearer semantics
+  - `moderniseringBudget` only counts elevators with BOTH `rekommenderat_moderniserar` AND `budget_belopp` set — elevators missing either are excluded from budget calculations
+  - `parseInt(rekommenderat_moderniserar, 10)` handles string values like "2030-vinga" correctly — parseInt stops at the first non-numeric character
+  - No new codebase patterns discovered — this follows existing Convex query conventions
+---
+
+## 2026-04-02 - US-036
+- Implemented modernization planning page at /modernisering in both admin and client apps
+- Added two new Convex queries: `moderniseringPrioritetslista` (elevator list sorted by recommended year, filterable by year range) and `moderniseringAtgarder` (count per modernization action)
+- Timeline view: color-coded bar chart with per-year elevator counts (red ≤1yr, orange 2-4yr, yellow 5-9yr, green 10+yr)
+- Clickable period summary cards filter the priority list
+- Budget overview: 3 charts (per year with cumulative curve as LineChart, per district bar chart, per type bar chart) + total budget display
+- Priority list: table sorted by recommended year with urgency badges, hissnummer, adress, distrikt, budget, åtgärd columns — responsive with hidden columns on small screens
+- Action summary: list of most common modernization actions with counts
+- Admin app uses org selector filter, client app uses tenant isolation via user's organisation_id
+- Installed `recharts` as direct dependency in both admin and client apps
+- Files created: none (replaced existing stubs)
+- Files modified: convex/hissar.ts (added 2 queries), apps/admin/src/routes/_authenticated/modernisering.tsx, apps/client/src/routes/_authenticated/modernisering.tsx, apps/admin/src/convex-api.d.ts, apps/client/src/convex-api.d.ts, apps/admin/package.json, apps/client/package.json, pnpm-lock.yaml
+- **Learnings for future iterations:**
+  - Apps using Recharts directly (not via shared UI components) must have `recharts` as a direct dependency — workspace linking doesn't make it transitively available
+  - Recharts Tooltip `formatter` must NOT have explicit type annotations on `value`/`name` params — use `(value) =>` not `(value: number) =>` to match `ValueType | undefined`
+  - TanStack Router typed `<Link>` with dynamic params like `/hiss/$id` can cause type errors — use plain `<a href={...}>` for simpler navigation from data tables
+  - Recharts `<LineChart>` can contain both `<Bar>` and `<Line>` for combined visualizations (bar + cumulative line)
+  - Priority list query accepts optional `arFran`/`arTill` for year-range filtering — avoids re-fetching when user clicks period cards
+  - Period cards with `selectedPeriod` state provide a natural filter UX for the priority list below
   - Manual browser verification needed (no browser testing tools configured)
 ---

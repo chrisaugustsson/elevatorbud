@@ -29,6 +29,8 @@ declare module "@convex/_generated/api" {
       chartData: FunctionReference<"query", "public">;
       moderniseringTidslinje: FunctionReference<"query", "public">;
       moderniseringBudget: FunctionReference<"query", "public">;
+      moderniseringPrioritetslista: FunctionReference<"query", "public">;
+      moderniseringAtgarder: FunctionReference<"query", "public">;
       dagensHissar: FunctionReference<"query", "public">;
       get: FunctionReference<"query", "public">;
       checkHissnummer: FunctionReference<"query", "public">;

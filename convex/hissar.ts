@@ -544,6 +544,106 @@ export const moderniseringBudget = query({
   },
 });
 
+export const moderniseringPrioritetslista = query({
+  args: {
+    organisation_id: v.optional(v.id("organisationer")),
+    arFran: v.optional(v.number()),
+    arTill: v.optional(v.number()),
+  },
+  handler: async (ctx, { organisation_id, arFran, arTill }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+
+    let hissar;
+    if (organisation_id) {
+      hissar = await ctx.db
+        .query("hissar")
+        .withIndex("by_organisation_id", (q) =>
+          q.eq("organisation_id", organisation_id),
+        )
+        .collect();
+    } else {
+      hissar = await ctx.db.query("hissar").collect();
+    }
+
+    const aktiva = hissar.filter((h) => h.status === "aktiv");
+
+    // Filter to elevators with recommended modernization year
+    const withYear = aktiva
+      .filter((h) => {
+        if (!h.rekommenderat_moderniserar) return false;
+        const year = parseInt(h.rekommenderat_moderniserar, 10);
+        if (isNaN(year)) return false;
+        if (arFran !== undefined && year < arFran) return false;
+        if (arTill !== undefined && year > arTill) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const ya = parseInt(a.rekommenderat_moderniserar!, 10);
+        const yb = parseInt(b.rekommenderat_moderniserar!, 10);
+        return ya - yb;
+      });
+
+    // Enrich with org name
+    const orgCache = new Map<string, string>();
+    return await Promise.all(
+      withYear.map(async (h) => {
+        let orgNamn = orgCache.get(String(h.organisation_id));
+        if (orgNamn === undefined) {
+          const org = await ctx.db.get(h.organisation_id);
+          orgNamn = (org as { namn: string } | null)?.namn ?? "Okänd";
+          orgCache.set(String(h.organisation_id), orgNamn);
+        }
+        return {
+          _id: h._id,
+          hissnummer: h.hissnummer,
+          adress: h.adress,
+          distrikt: h.distrikt,
+          hisstyp: h.hisstyp,
+          rekommenderat_moderniserar: h.rekommenderat_moderniserar,
+          budget_belopp: h.budget_belopp,
+          atgarder_vid_modernisering: h.atgarder_vid_modernisering,
+          organisationsnamn: orgNamn,
+        };
+      }),
+    );
+  },
+});
+
+export const moderniseringAtgarder = query({
+  args: { organisation_id: v.optional(v.id("organisationer")) },
+  handler: async (ctx, { organisation_id }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+
+    let hissar;
+    if (organisation_id) {
+      hissar = await ctx.db
+        .query("hissar")
+        .withIndex("by_organisation_id", (q) =>
+          q.eq("organisation_id", organisation_id),
+        )
+        .collect();
+    } else {
+      hissar = await ctx.db.query("hissar").collect();
+    }
+
+    const aktiva = hissar.filter((h) => h.status === "aktiv");
+
+    // Count per modernization action
+    const counts: Record<string, number> = {};
+    for (const h of aktiva) {
+      if (!h.atgarder_vid_modernisering) continue;
+      const action = h.atgarder_vid_modernisering;
+      counts[action] = (counts[action] || 0) + 1;
+    }
+
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([atgard, antal]) => ({ atgard, antal }));
+  },
+});
+
 export const dagensHissar = query({
   args: { todayStart: v.number() },
   handler: async (ctx, { todayStart }) => {
