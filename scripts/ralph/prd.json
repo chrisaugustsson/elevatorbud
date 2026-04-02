@@ -49,7 +49,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Section types in the CMS: hero (order 0), features (order 1), stats (order 2), cta (order 3). Stats maps value→item.title, label→item.description. Use shadcn Card, Input, Textarea, Label, Select components."
     },
     {
@@ -66,7 +66,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Section types: hero (order 0), mission (order 1), values (order 2), story (order 3). Story content uses the 'content' field with \\n\\n paragraph separators."
     },
     {
@@ -81,7 +81,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Section types: hero (order 0), services (order 1). The hardcoded CTA at the bottom of the Tjänster page is NOT part of the CMS — do not add fields for it. Per-service feature bullet lists are also excluded from CMS."
     },
     {
@@ -97,7 +97,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "Section types: hero (order 0), contact (order 1), form (order 2). Contact items use text input (not textarea) for description since they are short values like email/phone."
     },
     {
@@ -115,7 +115,7 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Use useMutation from convex/react. The sections array must match sectionValidator: { id, type, title?, subtitle?, content?, items?, cta?, imageUrl?, order }. Determine create vs update by checking if the useQuery result for the current slug returned a document (has _id)."
     },
     {
@@ -130,7 +130,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "The published field is a boolean on the pages table. Include it in the createPage/updatePage payload alongside sections. Use shadcn Switch component."
     }
   ]

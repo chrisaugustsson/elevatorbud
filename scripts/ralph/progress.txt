@@ -14,6 +14,15 @@ Started: tors  2 apr. 2026 21:22:55 CEST
 - When a route has `validateSearch`, all `<Link to=...>` pointing to it must include `search` prop — TanStack Router enforces this at type level
 - shadcn components installed via `pnpm dlx shadcn@latest add <name>` from `packages/ui/` directory
 - Tabs component: `@elevatorbud/ui/components/ui/tabs` — Tabs, TabsList, TabsTrigger, TabsContent
+- CMS form types (CmsPage, CmsSection) defined in `apps/admin/src/components/cms/startsida-form.tsx` — reuse for other page forms
+- `@convex/_generated/dataModel` is NOT declared in `convex-api.d.ts` — define CMS types inline instead of importing `Doc<"pages">`
+- CMS sections accessed via `page.sections.find(s => s.type === "xxx")` — stats maps value→item.title, label→item.description
+- CMS page forms follow pattern: FormState type → emptyState() → pageToFormState(page) → update functions → Card-per-section JSX; import CmsPage from startsida-form.tsx
+- Webbplats route conditionally renders page forms by slug in PageTab component
+- Toast notifications: `sonner` package, `toast.success()`/`toast.error()`, Toaster in __root.tsx
+- Form save pattern: each form has `onSave: (sections: CmsSection[]) => void` + `isSaving: boolean` props; PageTab handles create/update mutation logic
+- Create vs update: check if `useQuery` result has `_id` — if page exists, call `updatePage` with `page._id`; if null, call `createPage` with slug
+- Page-level fields (like `published`) managed in PageTab with useEffect sync from query data, passed in mutation payloads alongside sections
 
 ## 2026-04-02 - US-001
 - Added 'Webbplats' sidebar group with Globe icon between mainNav and adminNav groups
@@ -43,4 +52,113 @@ Started: tors  2 apr. 2026 21:22:55 CEST
   - Adding `validateSearch` to a route makes `search` prop required on all `<Link>` pointing to it — must update sidebar Link too
   - Convex `useQuery` returns `undefined` while loading, `null` if document doesn't exist — use this to distinguish loading vs empty state
   - The tabs component uses Radix UI primitives via `radix-ui` package (not `@radix-ui/react-tabs`)
+---
+
+## 2026-04-02 - US-003
+- Created StartsidaForm component with 4 section Cards: Hero, Funktioner, Statistik, Call to Action
+- Hero: title (Input), subtitle (Textarea), CTA text (Input), CTA href (Input)
+- Features: section title (Input), section subtitle (Textarea), 6 item groups with icon selector (Select), title (Input), description (Textarea)
+- Stats: 4 item groups with value (Input) and label (Input)
+- CTA: title (Input), subtitle (Textarea), CTA text (Input), CTA href (Input)
+- Icon selector uses lucide-react icons: ClipboardCheck, Wrench, BarChart3, Shield, Building2, Phone
+- Form state initialized from CMS data (pageToFormState) or empty (emptyState)
+- Defined CmsPage and CmsSection types inline (since @convex/_generated/dataModel not declared)
+- Updated webbplats route to render StartsidaForm when slug === "startsida"
+- Files changed:
+  - `apps/admin/src/components/cms/startsida-form.tsx` (created)
+  - `apps/admin/src/routes/_authenticated/webbplats.tsx` (modified — import StartsidaForm, conditional render)
+- **Learnings for future iterations:**
+  - `@convex/_generated/dataModel` module not declared in admin's convex-api.d.ts — must define CMS types inline
+  - Vite alias resolves `@convex` to `../../convex` at runtime, but tsc uses the `.d.ts` declarations
+  - CmsPage/CmsSection types exported from startsida-form.tsx — reuse in other page forms and save logic (US-007)
+  - Stats section maps: value → item.title, label → item.description (as stored in CMS sections array)
+---
+
+## 2026-04-02 - US-004
+- Created OmOssForm component with 4 section Cards: Hero, Mission, Värderingar, Vår historia
+- Hero: title (Input), subtitle (Textarea)
+- Mission: title (Input), content (Textarea)
+- Values: section title (Input), 4 item groups with icon selector (Target, Eye, Users, Award), title (Input), description (Textarea)
+- Story: title (Input), content (Textarea with hint about paragraph separation via double newlines)
+- Reuses CmsPage type from startsida-form.tsx
+- Updated webbplats route to render OmOssForm when slug === "om-oss"
+- Files changed:
+  - `apps/admin/src/components/cms/om-oss-form.tsx` (created)
+  - `apps/admin/src/routes/_authenticated/webbplats.tsx` (modified — import OmOssForm, conditional render)
+- **Learnings for future iterations:**
+  - Page form components follow a consistent pattern: define FormState type, emptyState(), pageToFormState(), update functions, Card-per-section JSX
+  - Import `CmsPage` type from startsida-form.tsx — no need to redefine
+  - Story section uses `content` field (not title/subtitle) for long-form text with \n\n paragraph separators
+---
+
+## 2026-04-02 - US-005
+- Created TjansterForm component with 2 section Cards: Hero, Tjänster
+- Hero: title (Input), subtitle (Textarea)
+- Services: 6 fixed service groups each with icon selector (ClipboardCheck, Wrench, BarChart3, Shield, Building2, Phone), title (Input), description (Textarea)
+- No CTA section — the hardcoded CTA at bottom of Tjänster page is not part of CMS
+- Reuses CmsPage type from startsida-form.tsx
+- Updated webbplats route to render TjansterForm when slug === "tjanster"
+- Files changed:
+  - `apps/admin/src/components/cms/tjanster-form.tsx` (created)
+  - `apps/admin/src/routes/_authenticated/webbplats.tsx` (modified — import TjansterForm, conditional render)
+- **Learnings for future iterations:**
+  - Tjänster is the simplest page form — only 2 sections (hero + services), no section-level title/subtitle on services
+  - Services section uses `items` array directly (no section title/subtitle wrapper like features in startsida)
+  - Pattern is well-established: copy om-oss-form structure, adjust sections and icons
+---
+
+## 2026-04-02 - US-006
+- Created KontaktForm component with 3 section Cards: Hero, Kontaktuppgifter, Formulär
+- Hero: title (Input), subtitle (Textarea)
+- Contact: section title (Input), section subtitle (Textarea), 4 item groups with icon selector (Mail, Phone, MapPin, Clock), title (Input), description (Input — not Textarea, since values are short like email/phone)
+- Form: title (Input), subtitle (Textarea)
+- Reuses CmsPage type from startsida-form.tsx
+- Updated webbplats route to render KontaktForm when slug === "kontakt"
+- Files changed:
+  - `apps/admin/src/components/cms/kontakt-form.tsx` (created)
+  - `apps/admin/src/routes/_authenticated/webbplats.tsx` (modified — import KontaktForm, conditional render)
+- **Learnings for future iterations:**
+  - Contact items use Input (not Textarea) for description since values are short (email, phone number, address, hours)
+  - Kontakt page has 3 sections: hero (order 0), contact (order 1), form (order 2)
+  - All 4 page form components now complete — the fallback text in PageTab should never be reached for known slugs
+---
+
+## 2026-04-02 - US-007
+- Added save functionality to all 4 CMS page forms
+- Installed sonner for toast notifications, added Toaster to admin app root layout
+- Each form component now accepts `onSave` and `isSaving` props, with a "Spara" button at the bottom
+- Each form has a `formStateToSections()` function converting form state back to CmsSection[] format
+- PageTab handles create vs update: checks if `useQuery` returned a document (has `_id`), calls `createPage` or `updatePage` accordingly
+- Success/error toasts shown after mutation completes
+- Button shows Loader2 spinner while saving
+- Files changed:
+  - `packages/ui/src/components/ui/sonner.tsx` (created — shadcn sonner component, removed next-themes dependency)
+  - `packages/ui/package.json` (modified — sonner dependency added)
+  - `apps/admin/package.json` (modified — sonner dependency added)
+  - `apps/admin/src/routes/__root.tsx` (modified — added Toaster import and component)
+  - `apps/admin/src/routes/_authenticated/webbplats.tsx` (modified — added mutation logic, onSave/isSaving props)
+  - `apps/admin/src/components/cms/startsida-form.tsx` (modified — added formStateToSections, onSave/isSaving props, Spara button)
+  - `apps/admin/src/components/cms/om-oss-form.tsx` (modified — added formStateToSections, onSave/isSaving props, Spara button)
+  - `apps/admin/src/components/cms/tjanster-form.tsx` (modified — added formStateToSections, onSave/isSaving props, Spara button)
+  - `apps/admin/src/components/cms/kontakt-form.tsx` (modified — added formStateToSections, onSave/isSaving props, Spara button)
+  - `pnpm-lock.yaml` (modified)
+- **Learnings for future iterations:**
+  - shadcn sonner component defaults to using `next-themes` — strip that dependency since this project doesn't use it
+  - `sonner` must be added as a direct dependency to the admin app (not just packages/ui) for TypeScript to resolve the `toast` import
+  - Each form's `formStateToSections` must map form-specific field names back to the CmsSection schema (e.g., stats maps value→title, label→description)
+  - The `page` from `useQuery` is `null` for new pages (not yet created), use this to distinguish create vs update
+---
+
+## 2026-04-02 - US-008
+- Added publish/unpublish toggle to PageTab header in webbplats route
+- Switch component with "Publicerad" label + Badge showing current state (green "Publicerad" / gray "Utkast")
+- Toggle state synced from page data via useEffect, saved alongside sections in create/update mutations
+- Refactored PageTab form rendering to use switch/case pattern (cleaner than if-chain)
+- Files changed:
+  - `apps/admin/src/routes/_authenticated/webbplats.tsx` (modified — added Switch, Badge, Label imports; added published state + useEffect; included published in mutation payloads; added header with toggle and badge)
+- **Learnings for future iterations:**
+  - Both `createPage` and `updatePage` mutations already accept `published: v.optional(v.boolean())` — no backend changes needed
+  - CmsPage type already includes `published: boolean` — just need to wire it to UI
+  - useEffect to sync query data → local state is the pattern for fields managed outside the individual form components
+  - Badge component supports `variant="default"` and `variant="secondary"`, can override colors with className
 ---
