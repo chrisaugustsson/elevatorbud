@@ -1,0 +1,8 @@
+node_modules
+dist
+.turbo
+.vinxi
+.output
+.env
+.env.local
+*.tsbuildinfo
