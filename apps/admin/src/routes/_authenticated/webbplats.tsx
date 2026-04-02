@@ -9,6 +9,7 @@ import {
 } from "@elevatorbud/ui/components/ui/tabs";
 import { StartsidaForm } from "../../components/cms/startsida-form";
 import { OmOssForm } from "../../components/cms/om-oss-form";
+import { TjansterForm } from "../../components/cms/tjanster-form";
 
 const pages = [
   { slug: "startsida", label: "Startsida" },
@@ -82,6 +83,14 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
     return (
       <div className="py-4">
         <OmOssForm page={page} />
+      </div>
+    );
+  }
+
+  if (slug === "tjanster") {
+    return (
+      <div className="py-4">
+        <TjansterForm page={page} />
       </div>
     );
   }
