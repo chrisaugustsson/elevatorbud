@@ -810,6 +810,58 @@ export const nodtelefonstatus = query({
   },
 });
 
+export const besiktningslista = query({
+  args: {
+    organisation_id: v.optional(v.id("organisationer")),
+    manad: v.string(),
+  },
+  handler: async (ctx, { organisation_id, manad }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+
+    let hissar;
+    if (organisation_id) {
+      hissar = await ctx.db
+        .query("hissar")
+        .withIndex("by_organisation_id", (q) =>
+          q.eq("organisation_id", organisation_id),
+        )
+        .collect();
+    } else {
+      hissar = await ctx.db.query("hissar").collect();
+    }
+
+    const aktiva = hissar.filter(
+      (h) => h.status === "aktiv" && h.besiktningsmanad === manad,
+    );
+
+    const orgCache = new Map<string, string>();
+    const results = await Promise.all(
+      aktiva.map(async (h) => {
+        const orgKey = h.organisation_id.toString();
+        let orgNamn = orgCache.get(orgKey);
+        if (!orgNamn) {
+          const org = await ctx.db.get(h.organisation_id);
+          orgNamn = (org as { namn: string } | null)?.namn || "Okänd";
+          orgCache.set(orgKey, orgNamn);
+        }
+        return {
+          _id: h._id,
+          hissnummer: h.hissnummer,
+          adress: h.adress,
+          distrikt: h.distrikt,
+          besiktningsorgan: h.besiktningsorgan,
+          organisationsnamn: orgNamn,
+        };
+      }),
+    );
+
+    return results.sort((a, b) =>
+      a.hissnummer.localeCompare(b.hissnummer, "sv"),
+    );
+  },
+});
+
 export const dagensHissar = query({
   args: { todayStart: v.number() },
   handler: async (ctx, { todayStart }) => {

@@ -32,6 +32,7 @@ declare module "@convex/_generated/api" {
       moderniseringPrioritetslista: FunctionReference<"query", "public">;
       moderniseringAtgarder: FunctionReference<"query", "public">;
       besiktningskalender: FunctionReference<"query", "public">;
+      besiktningslista: FunctionReference<"query", "public">;
       skotselforetag: FunctionReference<"query", "public">;
       nodtelefonstatus: FunctionReference<"query", "public">;
       dagensHissar: FunctionReference<"query", "public">;
