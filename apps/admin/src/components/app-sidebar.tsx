@@ -3,6 +3,7 @@ import {
   Building2,
   ClipboardList,
   Database,
+  Globe,
   HardHat,
   Upload,
   Users,
@@ -29,6 +30,10 @@ const mainNav = [
   { title: "Register", href: "/register", icon: ClipboardList },
   { title: "Modernisering", href: "/modernisering", icon: HardHat },
   { title: "Underhåll", href: "/underhall", icon: Wrench },
+] as const;
+
+const webbplatsNav = [
+  { title: "Webbplats", href: "/webbplats", icon: Globe },
 ] as const;
 
 const adminNav = [
@@ -66,6 +71,27 @@ export function AppSidebar() {
                       pathname === item.href ||
                       (item.href === "/dashboard" && pathname === "/")
                     }
+                    tooltip={item.title}
+                  >
+                    <Link to={item.href}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Webbplats</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {webbplatsNav.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname.startsWith(item.href)}
                     tooltip={item.title}
                   >
                     <Link to={item.href}>
