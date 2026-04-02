@@ -94,7 +94,7 @@ export function AppSidebar() {
                     isActive={pathname.startsWith(item.href)}
                     tooltip={item.title}
                   >
-                    <Link to={item.href}>
+                    <Link to={item.href} search={{ sida: "startsida" }}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
