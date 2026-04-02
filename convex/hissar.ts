@@ -44,31 +44,134 @@ async function autoAddForslagsvarden(
   }
 }
 
+// Shared filter args schema for list and export queries
+const filterArgs = {
+  search: v.optional(v.string()),
+  distrikt: v.optional(v.array(v.string())),
+  hisstyp: v.optional(v.array(v.string())),
+  fabrikat: v.optional(v.array(v.string())),
+  skotselforetag: v.optional(v.array(v.string())),
+  besiktningsorgan: v.optional(v.array(v.string())),
+  byggarMin: v.optional(v.number()),
+  byggarMax: v.optional(v.number()),
+  moderniserad: v.optional(v.boolean()),
+  status: v.optional(
+    v.union(
+      v.literal("aktiv"),
+      v.literal("rivd"),
+      v.literal("arkiverad"),
+    ),
+  ),
+  organisation_id: v.optional(v.id("organisationer")),
+};
+
+// Shared filter logic used by both list and exportData queries
+async function fetchAndFilter(
+  ctx: any,
+  args: {
+    search?: string;
+    distrikt?: string[];
+    hisstyp?: string[];
+    fabrikat?: string[];
+    skotselforetag?: string[];
+    besiktningsorgan?: string[];
+    byggarMin?: number;
+    byggarMax?: number;
+    moderniserad?: boolean;
+    status?: "aktiv" | "rivd" | "arkiverad";
+    organisation_id?: any;
+  },
+) {
+  let allHissar;
+  if (args.organisation_id) {
+    allHissar = await ctx.db
+      .query("hissar")
+      .withIndex("by_organisation_id", (q: any) =>
+        q.eq("organisation_id", args.organisation_id!),
+      )
+      .collect();
+  } else {
+    allHissar = await ctx.db.query("hissar").collect();
+  }
+
+  const statusFilter = args.status ?? "aktiv";
+  let filtered = allHissar.filter((h: any) => h.status === statusFilter);
+
+  if (args.search) {
+    const s = args.search.toLowerCase().trim();
+    if (s) {
+      filtered = filtered.filter(
+        (h: any) =>
+          h.hissnummer.toLowerCase().includes(s) ||
+          (h.adress && h.adress.toLowerCase().includes(s)) ||
+          (h.distrikt && h.distrikt.toLowerCase().includes(s)) ||
+          (h.fabrikat && h.fabrikat.toLowerCase().includes(s)) ||
+          (h.hisstyp && h.hisstyp.toLowerCase().includes(s)),
+      );
+    }
+  }
+
+  if (args.distrikt && args.distrikt.length > 0) {
+    const set = new Set(args.distrikt.map((d) => d.toLowerCase()));
+    filtered = filtered.filter(
+      (h: any) => h.distrikt && set.has(h.distrikt.toLowerCase()),
+    );
+  }
+  if (args.hisstyp && args.hisstyp.length > 0) {
+    const set = new Set(args.hisstyp.map((d) => d.toLowerCase()));
+    filtered = filtered.filter(
+      (h: any) => h.hisstyp && set.has(h.hisstyp.toLowerCase()),
+    );
+  }
+  if (args.fabrikat && args.fabrikat.length > 0) {
+    const set = new Set(args.fabrikat.map((d) => d.toLowerCase()));
+    filtered = filtered.filter(
+      (h: any) => h.fabrikat && set.has(h.fabrikat.toLowerCase()),
+    );
+  }
+  if (args.skotselforetag && args.skotselforetag.length > 0) {
+    const set = new Set(args.skotselforetag.map((d) => d.toLowerCase()));
+    filtered = filtered.filter(
+      (h: any) => h.skotselforetag && set.has(h.skotselforetag.toLowerCase()),
+    );
+  }
+  if (args.besiktningsorgan && args.besiktningsorgan.length > 0) {
+    const set = new Set(args.besiktningsorgan.map((d) => d.toLowerCase()));
+    filtered = filtered.filter(
+      (h: any) =>
+        h.besiktningsorgan && set.has(h.besiktningsorgan.toLowerCase()),
+    );
+  }
+
+  if (args.byggarMin !== undefined) {
+    filtered = filtered.filter(
+      (h: any) => h.byggar !== undefined && h.byggar >= args.byggarMin!,
+    );
+  }
+  if (args.byggarMax !== undefined) {
+    filtered = filtered.filter(
+      (h: any) => h.byggar !== undefined && h.byggar <= args.byggarMax!,
+    );
+  }
+
+  if (args.moderniserad !== undefined) {
+    if (args.moderniserad) {
+      filtered = filtered.filter(
+        (h: any) => h.moderniserar && h.moderniserar !== "Ej ombyggd",
+      );
+    } else {
+      filtered = filtered.filter(
+        (h: any) => !h.moderniserar || h.moderniserar === "Ej ombyggd",
+      );
+    }
+  }
+
+  return filtered;
+}
+
 export const list = query({
   args: {
-    // Free text search across hissnummer, adress, distrikt, fabrikat, hisstyp
-    search: v.optional(v.string()),
-    // Multi-select filters
-    distrikt: v.optional(v.array(v.string())),
-    hisstyp: v.optional(v.array(v.string())),
-    fabrikat: v.optional(v.array(v.string())),
-    skotselforetag: v.optional(v.array(v.string())),
-    besiktningsorgan: v.optional(v.array(v.string())),
-    // Range filter
-    byggarMin: v.optional(v.number()),
-    byggarMax: v.optional(v.number()),
-    // Boolean filter
-    moderniserad: v.optional(v.boolean()),
-    // Status filter (defaults to "aktiv" if not provided)
-    status: v.optional(
-      v.union(
-        v.literal("aktiv"),
-        v.literal("rivd"),
-        v.literal("arkiverad"),
-      ),
-    ),
-    // Tenant isolation
-    organisation_id: v.optional(v.id("organisationer")),
+    ...filterArgs,
     // Sorting
     sort: v.optional(v.string()),
     order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
@@ -80,104 +183,13 @@ export const list = query({
     const user = await getCurrentUser(ctx);
     if (!user) throw new Error("Ej autentiserad");
 
-    // Fetch base data — use org index when filtering by organisation
-    let allHissar;
-    if (args.organisation_id) {
-      allHissar = await ctx.db
-        .query("hissar")
-        .withIndex("by_organisation_id", (q) =>
-          q.eq("organisation_id", args.organisation_id!),
-        )
-        .collect();
-    } else {
-      allHissar = await ctx.db.query("hissar").collect();
-    }
-
-    // Apply status filter (default to aktiv)
-    const statusFilter = args.status ?? "aktiv";
-    let filtered = allHissar.filter((h) => h.status === statusFilter);
-
-    // Free text search
-    if (args.search) {
-      const s = args.search.toLowerCase().trim();
-      if (s) {
-        filtered = filtered.filter(
-          (h) =>
-            h.hissnummer.toLowerCase().includes(s) ||
-            (h.adress && h.adress.toLowerCase().includes(s)) ||
-            (h.distrikt && h.distrikt.toLowerCase().includes(s)) ||
-            (h.fabrikat && h.fabrikat.toLowerCase().includes(s)) ||
-            (h.hisstyp && h.hisstyp.toLowerCase().includes(s)),
-        );
-      }
-    }
-
-    // Multi-select filters
-    if (args.distrikt && args.distrikt.length > 0) {
-      const set = new Set(args.distrikt.map((d) => d.toLowerCase()));
-      filtered = filtered.filter(
-        (h) => h.distrikt && set.has(h.distrikt.toLowerCase()),
-      );
-    }
-    if (args.hisstyp && args.hisstyp.length > 0) {
-      const set = new Set(args.hisstyp.map((d) => d.toLowerCase()));
-      filtered = filtered.filter(
-        (h) => h.hisstyp && set.has(h.hisstyp.toLowerCase()),
-      );
-    }
-    if (args.fabrikat && args.fabrikat.length > 0) {
-      const set = new Set(args.fabrikat.map((d) => d.toLowerCase()));
-      filtered = filtered.filter(
-        (h) => h.fabrikat && set.has(h.fabrikat.toLowerCase()),
-      );
-    }
-    if (args.skotselforetag && args.skotselforetag.length > 0) {
-      const set = new Set(args.skotselforetag.map((d) => d.toLowerCase()));
-      filtered = filtered.filter(
-        (h) => h.skotselforetag && set.has(h.skotselforetag.toLowerCase()),
-      );
-    }
-    if (args.besiktningsorgan && args.besiktningsorgan.length > 0) {
-      const set = new Set(args.besiktningsorgan.map((d) => d.toLowerCase()));
-      filtered = filtered.filter(
-        (h) =>
-          h.besiktningsorgan && set.has(h.besiktningsorgan.toLowerCase()),
-      );
-    }
-
-    // Range filter for byggar
-    if (args.byggarMin !== undefined) {
-      filtered = filtered.filter(
-        (h) => h.byggar !== undefined && h.byggar >= args.byggarMin!,
-      );
-    }
-    if (args.byggarMax !== undefined) {
-      filtered = filtered.filter(
-        (h) => h.byggar !== undefined && h.byggar <= args.byggarMax!,
-      );
-    }
-
-    // Boolean filter for moderniserad
-    if (args.moderniserad !== undefined) {
-      if (args.moderniserad) {
-        // Has been modernized (has a value that is not "Ej ombyggd")
-        filtered = filtered.filter(
-          (h) => h.moderniserar && h.moderniserar !== "Ej ombyggd",
-        );
-      } else {
-        // Not modernized
-        filtered = filtered.filter(
-          (h) => !h.moderniserar || h.moderniserar === "Ej ombyggd",
-        );
-      }
-    }
-
+    const filtered = await fetchAndFilter(ctx, args);
     const totalCount = filtered.length;
 
     // Sorting
     const sortField = args.sort || "hissnummer";
     const sortOrder = args.order || "asc";
-    filtered.sort((a, b) => {
+    filtered.sort((a: any, b: any) => {
       const aVal = (a as Record<string, unknown>)[sortField];
       const bVal = (b as Record<string, unknown>)[sortField];
 
@@ -205,12 +217,12 @@ export const list = query({
     // Enrich with organisation name
     const orgCache = new Map<string, string>();
     const results = await Promise.all(
-      pageData.map(async (h) => {
+      pageData.map(async (h: any) => {
         let orgNamn = orgCache.get(h.organisation_id);
         if (orgNamn === undefined) {
-          const org = await ctx.db.get(h.organisation_id);
+          const org = await ctx.db.get(h.organisation_id) as { namn: string } | null;
           orgNamn = org?.namn ?? "Okänd";
-          orgCache.set(h.organisation_id, orgNamn);
+          orgCache.set(h.organisation_id, orgNamn!);
         }
         return {
           ...h,
@@ -226,6 +238,40 @@ export const list = query({
       limit,
       totalPages: Math.ceil(totalCount / limit),
     };
+  },
+});
+
+export const exportData = query({
+  args: filterArgs,
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+
+    const filtered = await fetchAndFilter(ctx, args);
+
+    // Sort by hissnummer for consistent export order
+    filtered.sort((a: any, b: any) =>
+      String(a.hissnummer).localeCompare(String(b.hissnummer), "sv"),
+    );
+
+    // Enrich with organisation name
+    const orgCache = new Map<string, string>();
+    const results = await Promise.all(
+      filtered.map(async (h: any) => {
+        let orgNamn = orgCache.get(h.organisation_id);
+        if (orgNamn === undefined) {
+          const org = await ctx.db.get(h.organisation_id) as { namn: string } | null;
+          orgNamn = org?.namn ?? "Okänd";
+          orgCache.set(h.organisation_id, orgNamn!);
+        }
+        return {
+          ...h,
+          organisationsnamn: orgNamn,
+        };
+      }),
+    );
+
+    return results;
   },
 });
 

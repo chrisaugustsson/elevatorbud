@@ -122,6 +122,14 @@ Started: tors  2 apr. 2026 14:51:49 CEST
 - TanStack Table server-side mode: `manualSorting: true` + `manualPagination: true` — table tracks UI state, query does actual sort/page
 - Multi-select filter UI: Popover + Checkbox list + Badge count — use for category filters in table views
 - `forslagsvarden.list` with `{}` returns all categories — group by `kategori` client-side for filter option lists
+- Detail view route: admin uses `hiss.$id.index.tsx` (index sibling to `hiss.$id.redigera.tsx`), client uses `hiss.$id.tsx` (no edit route)
+- Detail view pattern: `DetailSection` (Card) + `DetailField` (dt/dd) — handles string, number, boolean, undefined values with Swedish formatting
+- Export pattern: `hissar.exportData` query returns all filtered records (no pagination), client-side CSV/Excel generation via `@elevatorbud/utils/export`
+- xlsx 0.18.5 installed in packages/utils — `XLSX.utils.aoa_to_sheet()` for array-of-arrays → sheet, `XLSX.write(wb, { type: "array" })` for ArrayBuffer output
+- CSV with BOM: prepend `\uFEFF` to CSV string for Excel to correctly detect UTF-8 encoding
+- Export UI pattern: Popover with CSV/Excel buttons, lazy-load export data via `useQuery` with "skip" sentinel until user clicks export
+- Shared filter args: extract common filter args schema into `filterArgs` const and `fetchAndFilter()` helper in convex/hissar.ts — reused by both `list` and `exportData` queries
+- Convex `db.get()` returns union of all table document types — cast to `{ namn: string } | null` when you know the table type
 
 ---
 
@@ -718,5 +726,53 @@ Started: tors  2 apr. 2026 14:51:49 CEST
   - Cycling sort: click once = asc, click again = desc, click again = clear — implemented via toggle function checking existing state
   - Admin register uses `window.location.href` for row click navigation (simpler than using router navigate in table row onClick)
   - Client register uses `"skip"` sentinel for query args until user's organisation_id is loaded — prevents query with missing org filter
+  - Manual browser verification needed (no browser testing tools configured)
+---
+
+## 2026-04-02 - US-033
+- Implemented elevator detail view at /hiss/:id in both admin and client apps
+- Admin detail view: all elevator info in 8 sections (Card components) + edit button navigating to /hiss/:id/redigera
+- Client detail view: read-only, no edit button — same section layout
+- Updated admin registry: row click now navigates to detail view (not edit form); edit icon button preserved for direct edit access
+- Updated client registry: rows now clickable, navigating to detail view
+- Detail sections: Identifiering, Teknisk specifikation, Dörrar och korg, Maskineri, Besiktning och underhåll, Modernisering, Nödtelefon, Kommentarer
+- Metadata footer shows skapad_datum and senast_uppdaterad dates
+- Admin header includes org name (fetched via organisationer.get query)
+- Status badge (Aktiv/Rivd/Arkiverad) shown next to hissnummer
+- Back button navigates to /register
+- Files created: apps/admin/src/routes/_authenticated/hiss.$id.index.tsx, apps/client/src/routes/_authenticated/hiss.$id.tsx
+- Files modified: apps/admin/src/routes/_authenticated/register.tsx (row click → detail), apps/client/src/routes/_authenticated/register.tsx (rows clickable), routeTree.gen.ts (x2, gitignored)
+- **Learnings for future iterations:**
+  - Admin app uses `hiss.$id.index.tsx` for the detail view at `/hiss/$id/` (index route) alongside existing `hiss.$id.redigera.tsx`
+  - Client app uses `hiss.$id.tsx` since there's no redigera route — simpler naming
+  - `organisationer.get` with requireTenantAccess works for both admin and client apps — admin can view any org, client restricted to own org
+  - `DetailField` component handles all value types: undefined→"—", boolean→"Ja"/"Nej", number/string→String()
+  - Budget/price formatting: `toLocaleString("sv-SE") + " kr"` for Swedish number formatting
+  - No backend changes needed — `hissar.get` query already existed from US-026
+  - Manual browser verification needed (no browser testing tools configured)
+---
+
+## 2026-04-02 - US-034
+- Implemented registry export (CSV and Excel) for both admin and client apps
+- Created `hissar.exportData` Convex query: same filtering as `hissar.list` but returns all matching records without pagination, enriched with org name
+- Refactored common filter logic into shared `filterArgs` schema and `fetchAndFilter()` helper in convex/hissar.ts
+- Created `packages/utils/src/export.ts` with CSV/Excel generation utilities: `generateCSV`, `generateExcel`, `downloadCSV`, `downloadExcel`
+- Installed xlsx 0.18.5 in packages/utils for Excel generation (SheetJS)
+- Added `@elevatorbud/utils` workspace dependency to admin and client apps
+- Export button (Popover dropdown with CSV and Excel options) added to registry page header in both apps
+- Lazy-loading pattern: export data query uses "skip" sentinel until user clicks export, then fetches all matching records
+- Exports respect current filter state (search, multi-select filters, range filters, org isolation)
+- Tenant isolation: client exports automatically scoped to user's organisation_id
+- CSV includes BOM for correct UTF-8 detection in Excel
+- Excel export includes auto-sized columns and Swedish headers for all 41 elevator fields
+- Files created: packages/utils/src/export.ts
+- Files modified: convex/hissar.ts (refactored filters + added exportData query), apps/admin/src/routes/_authenticated/register.tsx (export UI), apps/client/src/routes/_authenticated/register.tsx (export UI), apps/admin/src/convex-api.d.ts, apps/client/src/convex-api.d.ts, packages/utils/package.json, apps/admin/package.json, apps/client/package.json, pnpm-lock.yaml
+- **Learnings for future iterations:**
+  - TypeScript 6 `Uint8Array` is not assignable to `BlobPart` — use `ArrayBuffer` return type from XLSX.write instead
+  - xlsx `XLSX.write(wb, { type: "array" })` returns ArrayBuffer (not Uint8Array) — compatible with Blob constructor
+  - CSV BOM (`\uFEFF`) is essential for Swedish characters (å, ä, ö) to display correctly when opening in Excel
+  - Lazy export pattern: set state to trigger query, useEffect watches for data arrival + format state, triggers download, clears state
+  - Refactoring shared filter logic into helper function avoids code duplication between list and export queries
+  - `db.get()` in Convex with generated types returns a union of all document types — need explicit cast when you know the table
   - Manual browser verification needed (no browser testing tools configured)
 ---

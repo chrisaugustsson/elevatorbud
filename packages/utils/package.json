@@ -12,5 +12,8 @@
   },
   "devDependencies": {
     "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
   }
 }

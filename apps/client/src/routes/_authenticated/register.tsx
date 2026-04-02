@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
+import { downloadCSV, downloadExcel } from "@elevatorbud/utils/export";
 import {
   useReactTable,
   getCoreRowModel,
@@ -43,6 +44,9 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
+  Download,
+  FileSpreadsheet,
+  FileText,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/register")({
@@ -241,8 +245,8 @@ function RegisterPage() {
   const sortOrder =
     sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : undefined;
 
-  const queryArgs = user?.organisation_id
-    ? ({
+  const filterBaseArgs = user?.organisation_id
+    ? {
         ...(debouncedSearch ? { search: debouncedSearch } : {}),
         ...(filterDistrikt.length > 0 ? { distrikt: filterDistrikt } : {}),
         ...(filterHisstyp.length > 0 ? { hisstyp: filterHisstyp } : {}),
@@ -253,9 +257,15 @@ function RegisterPage() {
         ...(byggarMax && !isNaN(parseInt(byggarMax))
           ? { byggarMax: parseInt(byggarMax) }
           : {}),
+        organisation_id: user.organisation_id,
+      }
+    : null;
+
+  const queryArgs = filterBaseArgs
+    ? ({
+        ...filterBaseArgs,
         ...(sortField ? { sort: sortField } : {}),
         ...(sortOrder ? { order: sortOrder } : {}),
-        organisation_id: user.organisation_id,
         page,
         limit,
       } as never)
@@ -265,6 +275,36 @@ function RegisterPage() {
     api.hissar.list,
     queryArgs as never,
   ) as ListResult | undefined;
+
+  // Export data query — fetches all matching records (no pagination)
+  const [exportRequested, setExportRequested] = useState<
+    "csv" | "xlsx" | null
+  >(null);
+  const exportArgs =
+    exportRequested && filterBaseArgs ? (filterBaseArgs as never) : "skip";
+  const exportData = useQuery(
+    api.hissar.exportData,
+    exportArgs as never,
+  ) as Record<string, unknown>[] | undefined;
+
+  const handleExport = useCallback(
+    (format: "csv" | "xlsx") => {
+      setExportRequested(format);
+    },
+    [],
+  );
+
+  // Trigger download when export data arrives
+  useEffect(() => {
+    if (!exportRequested || !exportData) return;
+    const timestamp = new Date().toISOString().slice(0, 10);
+    if (exportRequested === "csv") {
+      downloadCSV(exportData, `hissar-${timestamp}.csv`);
+    } else {
+      downloadExcel(exportData, `hissar-${timestamp}.xlsx`);
+    }
+    setExportRequested(null);
+  }, [exportData, exportRequested]);
 
   const hasActiveFilters =
     filterDistrikt.length > 0 ||
@@ -426,11 +466,43 @@ function RegisterPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Register</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {totalCount} hissar i registret
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Register</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {totalCount} hissar i registret
+          </p>
+        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" disabled={totalCount === 0}>
+              <Download className="mr-1.5 size-4" />
+              Exportera
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-44 p-1" align="end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start"
+              disabled={exportRequested === "csv"}
+              onClick={() => handleExport("csv")}
+            >
+              <FileText className="mr-2 size-4" />
+              {exportRequested === "csv" ? "Laddar..." : "CSV"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start"
+              disabled={exportRequested === "xlsx"}
+              onClick={() => handleExport("xlsx")}
+            >
+              <FileSpreadsheet className="mr-2 size-4" />
+              {exportRequested === "xlsx" ? "Laddar..." : "Excel (.xlsx)"}
+            </Button>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Search bar */}
