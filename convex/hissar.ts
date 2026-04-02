@@ -644,6 +644,172 @@ export const moderniseringAtgarder = query({
   },
 });
 
+export const besiktningskalender = query({
+  args: { organisation_id: v.optional(v.id("organisationer")) },
+  handler: async (ctx, { organisation_id }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+
+    let hissar;
+    if (organisation_id) {
+      hissar = await ctx.db
+        .query("hissar")
+        .withIndex("by_organisation_id", (q) =>
+          q.eq("organisation_id", organisation_id),
+        )
+        .collect();
+    } else {
+      hissar = await ctx.db.query("hissar").collect();
+    }
+
+    const aktiva = hissar.filter((h) => h.status === "aktiv");
+
+    // Count per inspection month
+    const MANADER = [
+      "Januari", "Februari", "Mars", "April", "Maj", "Juni",
+      "Juli", "Augusti", "September", "Oktober", "November", "December",
+    ];
+
+    const perManad: Record<string, number> = {};
+    for (const m of MANADER) {
+      perManad[m] = 0;
+    }
+
+    for (const h of aktiva) {
+      if (!h.besiktningsmanad) continue;
+      const key = h.besiktningsmanad;
+      if (key in perManad) {
+        perManad[key] = perManad[key] + 1;
+      }
+    }
+
+    return MANADER.map((manad) => ({ manad, antal: perManad[manad] }));
+  },
+});
+
+export const skotselforetag = query({
+  args: { organisation_id: v.optional(v.id("organisationer")) },
+  handler: async (ctx, { organisation_id }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+
+    let hissar;
+    if (organisation_id) {
+      hissar = await ctx.db
+        .query("hissar")
+        .withIndex("by_organisation_id", (q) =>
+          q.eq("organisation_id", organisation_id),
+        )
+        .collect();
+    } else {
+      hissar = await ctx.db.query("hissar").collect();
+    }
+
+    const aktiva = hissar.filter((h) => h.status === "aktiv");
+
+    // Count per company
+    const perForetag: Record<string, number> = {};
+    // Matrix: company x district
+    const matrix: Record<string, Record<string, number>> = {};
+    const allDistrikt = new Set<string>();
+
+    for (const h of aktiva) {
+      const foretag = h.skotselforetag || "Okänt";
+      const dist = h.distrikt || "Okänt";
+      allDistrikt.add(dist);
+
+      perForetag[foretag] = (perForetag[foretag] || 0) + 1;
+
+      if (!matrix[foretag]) matrix[foretag] = {};
+      matrix[foretag][dist] = (matrix[foretag][dist] || 0) + 1;
+    }
+
+    const distrikt = Array.from(allDistrikt).sort((a, b) =>
+      a.localeCompare(b, "sv"),
+    );
+
+    const foretag = Object.entries(perForetag)
+      .sort((a, b) => b[1] - a[1])
+      .map(([namn, antal]) => ({
+        namn,
+        antal,
+        perDistrikt: distrikt.map((d) => ({
+          distrikt: d,
+          antal: matrix[namn]?.[d] || 0,
+        })),
+      }));
+
+    return { foretag, distrikt };
+  },
+});
+
+export const nodtelefonstatus = query({
+  args: { organisation_id: v.optional(v.id("organisationer")) },
+  handler: async (ctx, { organisation_id }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+
+    let hissar;
+    if (organisation_id) {
+      hissar = await ctx.db
+        .query("hissar")
+        .withIndex("by_organisation_id", (q) =>
+          q.eq("organisation_id", organisation_id),
+        )
+        .collect();
+    } else {
+      hissar = await ctx.db.query("hissar").collect();
+    }
+
+    const aktiva = hissar.filter((h) => h.status === "aktiv");
+
+    let medNodtelefon = 0;
+    let utanNodtelefon = 0;
+    let behoverUppgradering = 0;
+    let totalUppgraderingskostnad = 0;
+    const perDistrikt: Record<string, { med: number; utan: number; uppgradering: number; kostnad: number }> = {};
+
+    for (const h of aktiva) {
+      const dist = h.distrikt || "Okänt";
+      if (!perDistrikt[dist]) {
+        perDistrikt[dist] = { med: 0, utan: 0, uppgradering: 0, kostnad: 0 };
+      }
+
+      if (h.har_nodtelefon) {
+        medNodtelefon++;
+        perDistrikt[dist].med++;
+
+        if (h.behover_uppgradering) {
+          behoverUppgradering++;
+          perDistrikt[dist].uppgradering++;
+          if (h.nodtelefon_pris) {
+            totalUppgraderingskostnad += h.nodtelefon_pris;
+            perDistrikt[dist].kostnad += h.nodtelefon_pris;
+          }
+        }
+      } else {
+        utanNodtelefon++;
+        perDistrikt[dist].utan++;
+      }
+    }
+
+    const distriktLista = Object.entries(perDistrikt)
+      .sort((a, b) => a[0].localeCompare(b[0], "sv"))
+      .map(([distrikt, data]) => ({
+        distrikt,
+        ...data,
+      }));
+
+    return {
+      medNodtelefon,
+      utanNodtelefon,
+      behoverUppgradering,
+      totalUppgraderingskostnad,
+      perDistrikt: distriktLista,
+    };
+  },
+});
+
 export const dagensHissar = query({
   args: { todayStart: v.number() },
   handler: async (ctx, { todayStart }) => {
