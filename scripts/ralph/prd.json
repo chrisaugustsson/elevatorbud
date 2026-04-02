@@ -1,804 +1,137 @@
 {
   "project": "Hisskompetens",
-  "branchName": "ralph/hisshantering",
-  "description": "Elevator inspection management system — mobile field app, admin portal, customer portal, and landing page in a pnpm monorepo with TanStack Start, Convex, Clerk, and Cloudflare Workers",
+  "branchName": "ralph/cms-admin",
+  "description": "CMS admin UI for editing the 4 landing pages (Startsida, Om oss, Tjänster, Kontakt) — tab-based editor with fixed form fields per page, save, and publish toggle",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Initialize pnpm monorepo with Turborepo",
-      "description": "As a developer, I need the root monorepo structure so that all apps and packages can be managed together.",
+      "title": "Ny sidebar-länk Webbplats",
+      "description": "As an admin, I want a 'Webbplats' link in the sidebar so that I can navigate to the CMS editor.",
       "acceptanceCriteria": [
-        "Root package.json with pnpm workspaces configured",
-        "pnpm-workspace.yaml listing apps/* and packages/*",
-        "turbo.json with build/dev/lint pipelines",
-        ".gitignore with node_modules, dist, .turbo, .vinxi, .output",
-        "All packages at latest stable versions — verify each before installing",
-        "Typecheck passes"
+        "New sidebar group 'Webbplats' with a Globe icon added below the main nav group",
+        "Links to /webbplats route",
+        "Active state highlights correctly when on /webbplats",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 1,
       "passes": true,
-      "notes": "This is the foundation. Keep it minimal — just root configs, no apps or packages yet."
+      "notes": "Follow existing sidebar patterns in the admin app. The route does not need to exist yet — just the sidebar link."
     },
     {
       "id": "US-002",
-      "title": "Scaffold TanStack Start apps (admin, client, landing)",
-      "description": "As a developer, I need the three TanStack Start applications scaffolded so that each can be developed independently.",
+      "title": "CMS-sida med flikar för de 4 sidorna",
+      "description": "As an admin, I want to see tabs for Startsida, Om oss, Tjänster, and Kontakt so that I can switch between pages to edit.",
       "acceptanceCriteria": [
-        "apps/admin/ — TanStack Start app (React 19 + Vite + Nitro targeting Cloudflare Workers)",
-        "apps/client/ — TanStack Start app (same stack)",
-        "apps/landing/ — TanStack Start app (same stack)",
-        "Each app has wrangler.toml for Cloudflare Workers",
-        "Each app has its own package.json with correct dependencies",
-        "All packages at latest stable versions — verify with npm info before installing",
-        "pnpm dev starts all three apps concurrently",
-        "Typecheck passes"
+        "Route /webbplats created at apps/admin/src/routes/_authenticated/webbplats.tsx",
+        "4 tabs rendered: Startsida, Om oss, Tjänster, Kontakt",
+        "Each tab loads the corresponding page data from api.cms.getPage using the slug (startsida, om-oss, tjanster, kontakt)",
+        "When no CMS data exists yet, the form fields are empty (not pre-filled with fallback content)",
+        "Active tab persists via URL search param (e.g. ?sida=om-oss)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 2,
       "passes": true,
-      "notes": "Use TanStack Start latest with Nitro adapter for Cloudflare Workers. Verify latest versions via context7 MCP or npm info."
+      "notes": "Use shadcn/ui Tabs component. Use TanStack Router search params for active tab. Each tab should render a placeholder for now — the actual form content comes in US-003 through US-006."
     },
     {
       "id": "US-003",
-      "title": "Create packages/ui with shadcn/ui and Tailwind CSS v4",
-      "description": "As a developer, I need a shared UI package so that all apps use consistent components.",
+      "title": "Formulär för Startsida",
+      "description": "As an admin, I want a form with fields matching the Startsida sections so that I can edit its content.",
       "acceptanceCriteria": [
-        "packages/ui/ with package.json, tsconfig.json",
-        "Tailwind CSS v4 setup (CSS-based configuration, NOT tailwind.config.js)",
-        "shadcn/ui initialized with Button, Input, Card components as starting point",
-        "Shared package importable from all three apps",
-        "All packages at latest stable versions",
-        "Typecheck passes"
+        "Hero section: text input for title, textarea for subtitle, text input for CTA text, text input for CTA href",
+        "Features section: text input for section title, textarea for section subtitle, plus 6 fixed item groups each with text input for title, textarea for description, icon selector dropdown (ClipboardCheck, Wrench, BarChart3, Shield, Building2, Phone)",
+        "Stats section: 4 fixed item groups each with text input for value (mapped to item title), text input for label (mapped to item description)",
+        "CTA section: text input for title, textarea for subtitle, text input for CTA text, text input for CTA href",
+        "Each section is a visually distinct Card with a section heading",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 3,
       "passes": true,
-      "notes": "Tailwind v4 uses CSS-based config (@theme, @import), NOT JS config files. Check latest docs."
+      "notes": "Section types in the CMS: hero (order 0), features (order 1), stats (order 2), cta (order 3). Stats maps value→item.title, label→item.description. Use shadcn Card, Input, Textarea, Label, Select components."
     },
     {
       "id": "US-004",
-      "title": "Create stub packages (types, auth, utils, email)",
-      "description": "As a developer, I need shared package stubs so that cross-app code can be organized.",
+      "title": "Formulär för Om oss",
+      "description": "As an admin, I want a form with fields matching the Om oss sections so that I can edit its content.",
       "acceptanceCriteria": [
-        "packages/types/ with package.json, tsconfig.json, index.ts stub",
-        "packages/auth/ with package.json, tsconfig.json, index.ts stub",
-        "packages/utils/ with package.json, tsconfig.json, index.ts stub",
-        "packages/email/ with package.json, tsconfig.json, index.ts stub",
-        "All packages importable from apps",
-        "Typecheck passes"
+        "Hero section: text input for title, textarea for subtitle",
+        "Mission section: text input for title, textarea for content",
+        "Values section: text input for section title, plus 4 fixed item groups each with text input for title, textarea for description, icon selector (Target, Eye, Users, Award)",
+        "Story section: text input for title, textarea for content (paragraphs separated by blank lines \\n\\n)",
+        "Each section is a visually distinct Card with a section heading",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 4,
       "passes": true,
-      "notes": "Just stubs with basic exports. Real implementation comes in later stories."
+      "notes": "Section types: hero (order 0), mission (order 1), values (order 2), story (order 3). Story content uses the 'content' field with \\n\\n paragraph separators."
     },
     {
       "id": "US-005",
-      "title": "Set up Convex with schema stub and dev server",
-      "description": "As a developer, I need Convex configured so that the backend is ready for schema and function development.",
+      "title": "Formulär för Tjänster",
+      "description": "As an admin, I want a form with fields matching the Tjänster sections so that I can edit its content.",
       "acceptanceCriteria": [
-        "convex/ directory at elevatorbud root with schema.ts stub (empty schema)",
-        "convex.json or convex config pointing to the convex/ directory",
-        "Convex dev dependency installed at latest version",
-        "pnpm dev starts Convex dev server alongside the apps",
-        "pnpm build succeeds across the entire monorepo",
-        "Typecheck passes across the entire monorepo"
+        "Hero section: text input for title, textarea for subtitle",
+        "Services section: 6 fixed service groups each with text input for title, textarea for description, icon selector (ClipboardCheck, Wrench, BarChart3, Shield, Building2, Phone)",
+        "Each section is a visually distinct Card with a section heading",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 5,
       "passes": true,
-      "notes": "Verify Convex latest version. The convex/ directory lives at elevatorbud root, not inside an app."
+      "notes": "Section types: hero (order 0), services (order 1). The hardcoded CTA at the bottom of the Tjänster page is NOT part of the CMS — do not add fields for it. Per-service feature bullet lists are also excluded from CMS."
     },
     {
       "id": "US-006",
-      "title": "Define Convex schema for all tables",
-      "description": "As a developer, I need the database schema defined so that all tables and indexes are ready for use.",
+      "title": "Formulär för Kontakt",
+      "description": "As an admin, I want a form with fields matching the Kontakt sections so that I can edit its content.",
       "acceptanceCriteria": [
-        "convex/schema.ts defines hissar table with all fields (identification, technical spec, inspection, modernization, emergency phone, metadata)",
-        "organisationer table: id, namn, organisationsnummer, kontaktperson, telefonnummer, email",
-        "anvandare table: clerk_user_id, email, namn, roll ('admin' | 'kund'), organisation_id (nullable), aktiv, skapad_datum, senaste_login",
-        "forslagsvarden table: kategori, varde, aktiv, skapad_datum",
-        "Indexes: hissar by organisation_id, by hissnummer; anvandare by clerk_user_id; forslagsvarden by kategori",
-        "Typecheck passes"
+        "Hero section: text input for title, textarea for subtitle",
+        "Contact section: text input for section title, textarea for section subtitle, plus 4 fixed item groups each with text input for title, text input for description, icon selector (Mail, Phone, MapPin, Clock)",
+        "Form section: text input for title, textarea for subtitle",
+        "Each section is a visually distinct Card with a section heading",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 6,
       "passes": true,
-      "notes": "The hissar table is large — all fields from the PRD data model. Include status field with 'aktiv' | 'rivd' | 'arkiverad'."
+      "notes": "Section types: hero (order 0), contact (order 1), form (order 2). Contact items use text input (not textarea) for description since they are short values like email/phone."
     },
     {
       "id": "US-007",
-      "title": "Create Convex auth helpers and Clerk webhook",
-      "description": "As a developer, I need auth helpers and a Clerk webhook so that user authentication and sync work correctly.",
+      "title": "Spara innehåll",
+      "description": "As an admin, I want to save my edits so that the landing page reflects the new content.",
       "acceptanceCriteria": [
-        "convex/auth.ts exports getCurrentUser(ctx), requireAdmin(ctx), requireTenantAccess(ctx, organisationId)",
-        "getCurrentUser returns the anvandare document for the authenticated Clerk user",
-        "requireAdmin throws if user is not admin role",
-        "requireTenantAccess throws if user doesn't have access to the given organization",
-        "Clerk webhook HTTP action handles user.created, user.updated, user.deleted events",
-        "Webhook syncs changes to anvandare table",
-        "Follow official docs: https://docs.convex.dev/auth/clerk",
+        "Spara button at the bottom of the form",
+        "If no page exists in the database for this slug, calls api.cms.createPage with the form data",
+        "If a page already exists, calls api.cms.updatePage with the changed data",
+        "Form data is converted to the correct sections array format (each section has id, type, order, and relevant fields matching sectionValidator in convex/cms.ts)",
+        "Shows a success toast after successful save",
+        "Shows an error toast if save fails",
+        "Button shows loading state while saving",
         "Typecheck passes"
       ],
       "priority": 7,
       "passes": true,
-      "notes": "Read Clerk + Convex integration docs via context7 MCP before implementing."
+      "notes": "Use useMutation from convex/react. The sections array must match sectionValidator: { id, type, title?, subtitle?, content?, items?, cta?, imageUrl?, order }. Determine create vs update by checking if the useQuery result for the current slug returned a document (has _id)."
     },
     {
       "id": "US-008",
-      "title": "Set up packages/auth with ConvexProviderWithClerk",
-      "description": "As a developer, I need the auth package configured so that apps can use Clerk + Convex authentication.",
+      "title": "Publicera/avpublicera toggle",
+      "description": "As an admin, I want to toggle whether a page is published so that I can prepare content before making it live.",
       "acceptanceCriteria": [
-        "packages/auth/ exports ConvexProviderWithClerk wrapper component",
-        "Clerk client setup compatible with TanStack Start",
-        "Follow https://clerk.com/docs/tanstack-react-start/getting-started/quickstart",
-        "Follow https://clerk.com/docs/guides/development/integrations/databases/convex",
-        "Provider component usable in both admin and client apps",
-        "Typecheck passes"
+        "Switch/toggle labeled 'Publicerad' in the form header area next to the page title",
+        "Toggle state is saved together with the page content when clicking Spara",
+        "Visual indicator showing current publish state (green badge 'Publicerad' / gray badge 'Utkast')",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 8,
       "passes": true,
-      "notes": "Fetch and follow official Clerk + TanStack Start docs. Do NOT rely on training data for API shape."
-    },
-    {
-      "id": "US-009",
-      "title": "Add Clerk login pages to admin and client apps",
-      "description": "As a user, I need login pages so that I can authenticate and access the system with my assigned role.",
-      "acceptanceCriteria": [
-        "Admin app: login page using Clerk <SignIn /> component, only admin role users can access app routes",
-        "Client app: login page using Clerk <SignIn />, only kund role users can access app routes",
-        "Unauthenticated users redirected to login page",
-        "After login, user role and organisation_id available via Convex getCurrentUser()",
-        "Session persists across page reloads (Clerk JWT)",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 9,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-010",
-      "title": "Admin desktop sidebar layout with org selector",
-      "description": "As an admin on desktop, I need a sidebar navigation layout so that I can access all features.",
-      "acceptanceCriteria": [
-        "Desktop layout with sidebar: Dashboard, Register, Modernisering, Underhall, Admin section (Organisationer, Anvandare, Import, Referensdata)",
-        "Organisation selector dropdown in header (filter all views by selected org, or 'Alla')",
-        "Responsive: sidebar collapses on smaller screens",
-        "Logo and 'Hisskompetens' branding in header",
-        "Active page highlighted in sidebar",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 10,
-      "passes": true,
-      "notes": "Mobile users see the field app (daily overview) instead of sidebar layout."
-    },
-    {
-      "id": "US-011",
-      "title": "Client app sidebar layout with route protection",
-      "description": "As a customer, I need a clean portal layout so that I can access my organization's elevator data.",
-      "acceptanceCriteria": [
-        "Client app layout with sidebar: Dashboard, Register, Modernisering, Underhall",
-        "Organization name displayed as static text in header (no dropdown — customers see only their own org)",
-        "No admin routes, no edit buttons, no user management in client app",
-        "If a customer tries to access admin app, access denied at login",
-        "Unauthenticated users redirected to Clerk login",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 11,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-012",
-      "title": "Convex mutations and queries for organisationer",
-      "description": "As a developer, I need backend functions for organization management.",
-      "acceptanceCriteria": [
-        "Convex mutation organisationer.create (namn, organisationsnummer, kontaktperson, telefonnummer, email)",
-        "Convex mutation organisationer.update",
-        "Convex query organisationer.list (returns all orgs with elevator count)",
-        "Convex query organisationer.get (single org by id)",
-        "All functions require admin role via requireAdmin(ctx)",
-        "Typecheck passes"
-      ],
-      "priority": 12,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-013",
-      "title": "Admin page for organization management",
-      "description": "As an admin, I want to create and manage customer organizations from a dedicated page.",
-      "acceptanceCriteria": [
-        "Admin app page /admin/organisationer with TanStack Table listing all organizations",
-        "Table columns: namn, organisationsnummer, kontaktperson, email, antal hissar",
-        "'Create organization' form using TanStack Form (namn required, organisationsnummer format check)",
-        "Click on organization opens edit view",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 13,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-014",
-      "title": "Convex actions and queries for anvandare with Clerk sync",
-      "description": "As a developer, I need backend functions for user management that sync with Clerk.",
-      "acceptanceCriteria": [
-        "Convex action anvandare.create: creates user in Clerk API + creates anvandare document with roll and organisation_id",
-        "Convex action anvandare.update: updates name, email, roll, organisation — syncs to Clerk metadata",
-        "Convex action anvandare.inaktivera: blocks user in Clerk + sets aktiv=false",
-        "Convex action anvandare.remove: deletes from Clerk + Convex, historical references set to 'Borttagen anvandare'",
-        "Convex queries: anvandare.list (filterable by roll, organisation), anvandare.get, anvandare.listByOrganisation",
-        "All functions require admin role",
-        "Typecheck passes"
-      ],
-      "priority": 14,
-      "passes": true,
-      "notes": "Clerk sends invitation email — user sets password via Clerk UI."
-    },
-    {
-      "id": "US-015",
-      "title": "Admin page for user management",
-      "description": "As an admin, I want to manage user accounts from a dedicated page.",
-      "acceptanceCriteria": [
-        "Admin app page /admin/anvandare with TanStack Table (namn, email, roll, organisation, status, senaste inloggning)",
-        "Filter by roll and organisation, search by name/email",
-        "'Create user' form with TanStack Form: namn, email, roll (admin/kund), organisation (required if kund)",
-        "Quick-action from organization view: add customer user directly",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 15,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-016",
-      "title": "Convex functions for forslagsvarden (suggestion values)",
-      "description": "As a developer, I need backend functions for managing reference data used in combobox fields.",
-      "acceptanceCriteria": [
-        "Convex query forslagsvarden.list: returns values filtered by kategori",
-        "Convex mutation forslagsvarden.create (kategori, varde)",
-        "Convex mutation forslagsvarden.update: rename value — updates all elevators with old value",
-        "Convex mutation forslagsvarden.merge: merge duplicate values",
-        "Convex mutation forslagsvarden.deactivate: mark inactive (no longer suggested, existing data preserved)",
-        "Mutations require admin role; query accessible to all authenticated users",
-        "Categories: hisstyp, fabrikat, distrikt, skotselforetag, besiktningsorgan, hissbeteckning, typ_dorrar, kollektiv, drivsystem, maskinplacering, atgarder_vid_modernisering",
-        "Typecheck passes"
-      ],
-      "priority": 16,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-017",
-      "title": "Admin page for reference data management",
-      "description": "As an admin, I want to manage suggestion values used in combobox fields.",
-      "acceptanceCriteria": [
-        "Admin app page /admin/referensdata showing all categories with their values",
-        "Rename a value (propagates to all elevators via forslagsvarden.update)",
-        "Merge duplicate values",
-        "Deactivate a value",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 17,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-018",
-      "title": "Convex mutation hissar.create with all fields",
-      "description": "As a developer, I need the backend mutation for creating elevator records.",
-      "acceptanceCriteria": [
-        "Convex mutation hissar.create accepts all fields from the schema",
-        "Requires admin role via requireAdmin(ctx)",
-        "Auto-sets skapad_av (current user) and skapad_datum (now)",
-        "Auto-sets status to 'aktiv'",
-        "Validates hissnummer is unique",
-        "New category values auto-added to forslagsvarden table",
-        "Typecheck passes"
-      ],
-      "priority": 18,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-019",
-      "title": "Combobox component with suggestion values and free text",
-      "description": "As a developer, I need a reusable combobox that filters suggestions and allows free text entry.",
-      "acceptanceCriteria": [
-        "Shared combobox component in packages/ui/",
-        "Filters existing suggestion values from forslagsvarden as user types",
-        "Allows free text entry (not limited to existing values)",
-        "New values auto-added to forslagsvarden on form submit",
-        "Touch-optimized: minimum 44x44px touch targets",
-        "Swedish placeholder text",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 19,
-      "passes": true,
-      "notes": "This component is used by the elevator wizard and edit form for all category fields."
-    },
-    {
-      "id": "US-020",
-      "title": "Elevator wizard shell with step navigation",
-      "description": "As an admin in the field, I need the wizard framework with step navigation so that I can fill in elevator data step by step.",
-      "acceptanceCriteria": [
-        "Admin app page /ny with mobile-optimized wizard layout",
-        "Built with TanStack Form for form state and validation",
-        "9 steps with progress indicator showing current step",
-        "Next/Previous navigation between steps",
-        "Touch-optimized: minimum 44x44px touch targets, large buttons",
-        "Portrait mode optimized, no horizontal scrolling",
-        "Organisation selector (admin can assign elevator to any org)",
-        "Steps are empty shells at this point — content added in next stories",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 20,
-      "passes": true,
-      "notes": "Just the wizard framework and navigation. Step content comes in US-021, US-022, US-023."
-    },
-    {
-      "id": "US-021",
-      "title": "Wizard steps 1-3: Identifiering, Teknisk spec, Dorrar",
-      "description": "As an admin, I need the first three wizard steps filled in with their fields.",
-      "acceptanceCriteria": [
-        "Step 1 - Identifiering: hissnummer (validated unique in real-time), adress, hissbeteckning (combobox), distrikt (combobox)",
-        "Step 2 - Teknisk specifikation: hisstyp (combobox), fabrikat (combobox), byggar, hastighet, lyfthojd, marklast, antal plan, antal dorrar",
-        "Step 3 - Dorrar och korg: typ_dorrar (combobox), genomgang (toggle), kollektiv (combobox), korgstorlek, dagoppning, barbeslag, dorrmaskin",
-        "All category fields use the combobox component from US-019",
-        "Boolean fields use toggle switches",
-        "Besiktningsmanad uses fixed enum (Jan-Dec) if present in these steps",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 21,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-022",
-      "title": "Wizard steps 4-6: Maskineri, Besiktning, Modernisering",
-      "description": "As an admin, I need wizard steps 4 through 6 filled in with their fields.",
-      "acceptanceCriteria": [
-        "Step 4 - Maskineri: drivsystem (combobox), upphangning, maskinplacering (combobox), typ_maskin, typ_styrsystem",
-        "Step 5 - Besiktning och underhall: besiktningsorgan (combobox), besiktningsmanad (fixed enum Jan-Dec), skotselforetag (combobox), schaktbelysning",
-        "Step 6 - Modernisering: moderniserar, garanti (toggle), rekommenderat_moderniserar, budget_belopp, atgarder_vid_modernisering (combobox)",
-        "All category fields use combobox component",
-        "Boolean fields use toggle switches",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 22,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-023",
-      "title": "Wizard steps 7-9: Nodtelefon, Kommentarer, Granska",
-      "description": "As an admin, I need the final wizard steps including review and submit.",
-      "acceptanceCriteria": [
-        "Step 7 - Nodtelefon: har_nodtelefon (toggle), modell, typ, behover_uppgradering (toggle), pris",
-        "Step 8 - Kommentarer: fritext textarea",
-        "Step 9 - Granska och spara: summary of all entered fields grouped by section, ability to navigate back to any step to correct",
-        "'Save' button sends Convex mutation hissar.create",
-        "Clear error message if offline: 'Ingen uppkoppling - forsok igen nar du har nat'",
-        "On successful save, clear form and show confirmation",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 23,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-024",
-      "title": "Form persistence with localStorage drafts",
-      "description": "As an admin in the field, I need form data auto-saved so that I never lose work.",
-      "acceptanceCriteria": [
-        "lib/form-persistence.ts in admin app: helpers for saving/loading/clearing drafts",
-        "Form state auto-saved to localStorage on every field change (debounced ~500ms)",
-        "Key format: draft-ny-hiss for new, draft-hiss-{id} for edit",
-        "On page load, if draft exists: prompt 'Du har ett sparat utkast. Vill du fortsatta dar du slutade?'",
-        "On successful submit: draft cleared from localStorage",
-        "Visual indicator 'Utkast sparat' shown after each auto-save",
-        "Integrated with the creation wizard (US-020)",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 24,
-      "passes": true,
-      "notes": "Pure localStorage — no Service Worker, no IndexedDB, no sync queue."
-    },
-    {
-      "id": "US-025",
-      "title": "Convex mutation hissar.update and search page",
-      "description": "As a developer, I need the update mutation and search functionality for editing existing elevators.",
-      "acceptanceCriteria": [
-        "Convex mutation hissar.update with all fields, requires admin role",
-        "Auto-sets senast_uppdaterad_av and senast_uppdaterad",
-        "Search page at /sok: search by hissnummer or adress (debounced ~300ms)",
-        "Search results list with hissnummer + adress + organisation",
-        "Tapping a result navigates to /hiss/:id/redigera",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 25,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-026",
-      "title": "Edit elevator form with diff highlighting",
-      "description": "As an admin, I want to edit an existing elevator's data with visual change tracking.",
-      "acceptanceCriteria": [
-        "Edit form at /hiss/:id/redigera built with TanStack Form",
-        "Shows current data organized in same sections as creation wizard",
-        "Clear marking of what has changed (diff highlight)",
-        "Same combobox behavior for category fields",
-        "Same localStorage draft persistence (key: draft-hiss-{id})",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 26,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-027",
-      "title": "Daily overview home page (field app)",
-      "description": "As an admin, I want to see my daily progress on the mobile home page.",
-      "acceptanceCriteria": [
-        "Home page at / (mobile view) shows: 'Ny hiss' button (prominent), 'Dagens hissar' list, 'Sok befintlig hiss' button",
-        "'Dagens hissar': elevators the current admin has created or updated today",
-        "Status per elevator: saved (checkmark) or draft in localStorage (pending icon)",
-        "Convex query for elevators by skapad_av/senast_uppdaterad_av + date filter",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 27,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-028",
-      "title": "Convex query hissar.stats for dashboard KPIs",
-      "description": "As a developer, I need an aggregated stats query for the dashboard.",
-      "acceptanceCriteria": [
-        "Convex query hissar.stats returns: total count, average age, modernization within 3 years count, total budget current year, count without modernization, latest inventory date",
-        "Accepts optional organisation_id filter for tenant isolation",
-        "When no org filter: returns stats for all orgs (admin view)",
-        "When org filter: returns stats for that org only (client view)",
-        "Typecheck passes"
-      ],
-      "priority": 28,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-029",
-      "title": "Dashboard page with KPI cards and charts",
-      "description": "As an admin or customer, I want a dashboard with key metrics and visualizations.",
-      "acceptanceCriteria": [
-        "KPI cards displayed at top of dashboard using hissar.stats query",
-        "Recharts visualizations: elevators per district (bar), age distribution (histogram), elevator types (pie), top-10 manufacturers (bar), modernization timeline 2026-2045+ (bar), maintenance companies (donut)",
-        "Admin dashboard at /dashboard: shows all orgs or filtered by selected org",
-        "Shared dashboard components in packages/ui/",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 29,
-      "passes": true,
-      "notes": "Install Recharts at latest version."
-    },
-    {
-      "id": "US-030",
-      "title": "Client dashboard reusing shared components",
-      "description": "As a customer, I want my own dashboard showing only my organization's data.",
-      "acceptanceCriteria": [
-        "Client dashboard at / (client app) uses shared dashboard components from packages/ui/",
-        "Shows only the customer's own organization data (tenant isolation via organisation_id)",
-        "No org selector — customer sees only their org",
-        "Same KPI cards and charts as admin dashboard",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 30,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-031",
-      "title": "Convex query hissar.list with filtering and pagination",
-      "description": "As a developer, I need a flexible list query for the elevator registry.",
-      "acceptanceCriteria": [
-        "Convex query hissar.list with args: search (free text on hissnummer, adress, distrikt, fabrikat, hisstyp), distrikt[], hisstyp[], fabrikat[], skotselforetag[], byggarMin/Max, moderniserad (boolean), besiktningsorgan[], status, sort, order, page, limit",
-        "Supports pagination (25/50/100 per page)",
-        "Supports sorting by any column",
-        "Tenant isolation: filters by organisation_id when provided",
-        "Typecheck passes"
-      ],
-      "priority": 31,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-032",
-      "title": "Elevator registry page with table and filters",
-      "description": "As an admin or customer, I want to search, filter, and browse the elevator registry.",
-      "acceptanceCriteria": [
-        "Registry page at /register using TanStack Table",
-        "Table columns: hissnummer, adress, distrikt, hisstyp, fabrikat, byggar, moderniserar, rekommenderat_moderniserar, budget_belopp",
-        "Filter panel with multi-select dropdowns and range slider for byggar",
-        "Free text search with real-time results (debounced ~300ms)",
-        "Sortable columns, pagination (25/50/100 per page)",
-        "Admin app: full read/write (click edit navigates to edit form)",
-        "Client app: read-only, no edit buttons",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 32,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-033",
-      "title": "Elevator detail view",
-      "description": "As an admin or customer, I want to see all details for a single elevator.",
-      "acceptanceCriteria": [
-        "Click on row in registry opens detail view",
-        "All elevator info grouped in sections: Identifiering, Teknisk specifikation, Besiktning & underhall, Modernisering, Nodtelefon, Kommentarer",
-        "Admin view: edit button navigates to edit form",
-        "Client view: read-only, no edit button",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 33,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-034",
-      "title": "Registry export (CSV and Excel)",
-      "description": "As an admin or customer, I want to export elevator data to CSV or Excel.",
-      "acceptanceCriteria": [
-        "Convex action hissar.exportera: generates CSV/Excel from current filter state",
-        "Export button on registry page",
-        "Exports respect current filters and search",
-        "Tenant isolation for client exports",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 34,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-035",
-      "title": "Convex queries for modernization timeline and budget",
-      "description": "As a developer, I need backend queries for modernization planning views.",
-      "acceptanceCriteria": [
-        "Convex query hissar.moderniseringTidslinje: count per recommended year",
-        "Convex query hissar.moderniseringBudget: budget per year, per district, per type",
-        "Both queries support organisation_id filter for tenant isolation",
-        "Typecheck passes"
-      ],
-      "priority": 35,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-036",
-      "title": "Modernization planning page",
-      "description": "As an admin or customer, I want to see modernization timelines, budgets, and priority lists.",
-      "acceptanceCriteria": [
-        "Modernization page at /modernisering in both admin and client apps",
-        "Timeline view: current year to 2050 with elevator counts per recommended year",
-        "Color coding: red (<=1 year), orange (2-4 years), yellow (5-9 years), green (10+ years)",
-        "Clickable time periods filter the priority list",
-        "Budget overview: total per year (bar chart), cumulative curve, per district, per type",
-        "Priority list: table sorted by recommended year with visual indicators",
-        "Action summary: most common modernization actions with counts",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 36,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-037",
-      "title": "Convex queries for maintenance and inspection data",
-      "description": "As a developer, I need backend queries for maintenance views.",
-      "acceptanceCriteria": [
-        "Convex query hissar.besiktningskalender: count per inspection month",
-        "Convex query hissar.skotselforetag: count per company, matrix by district",
-        "Convex query hissar.nodtelefonstatus: with/without count, upgrade needs, total cost",
-        "All queries support organisation_id filter for tenant isolation",
-        "Typecheck passes"
-      ],
-      "priority": 37,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-038",
-      "title": "Maintenance and inspection page",
-      "description": "As an admin or customer, I want to see inspection schedules, maintenance overview, and phone status.",
-      "acceptanceCriteria": [
-        "Maintenance page at /underhall in both admin and client apps",
-        "Inspection calendar: monthly view with elevator count per inspection month, list of elevators with upcoming inspection",
-        "Maintenance company overview: count per company, matrix of company x district",
-        "Emergency phone status: count with/without, count needing upgrade, total upgrade cost, list per district",
-        "Tenant isolation for client views",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 38,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-039",
-      "title": "Excel parser for Hissar sheet with compound fields",
-      "description": "As a developer, I need parsing logic for the main elevator sheet in Excel imports.",
-      "acceptanceCriteria": [
-        "packages/utils/ contains Excel import helpers",
-        "Reads column headers from row 2 in 'Hissar' sheet",
-        "Validates mandatory columns (C, J, L, AB)",
-        "Parses compound fields: marklast ('500*6'), antal plan/dorrar ('10*10'), korgstorlek ('1000*2050*2300'), dagoppning ('900*2000')",
-        "Parses nodtelefon status from compound cell",
-        "Parses byggar (handles 'Okant')",
-        "Parses moderniserar (handles 'Ej ombyggd', suffixes like '2007-vinga')",
-        "Returns structured elevator objects ready for Convex mutation",
-        "Typecheck passes"
-      ],
-      "priority": 39,
-      "passes": true,
-      "notes": "Use a library like xlsx or exceljs for parsing. Verify latest version."
-    },
-    {
-      "id": "US-040",
-      "title": "Excel parser for Nodtelefoner and Rivna hissar sheets",
-      "description": "As a developer, I need parsing for the additional Excel sheets and sheet joining logic.",
-      "acceptanceCriteria": [
-        "'Nodtelefoner' sheet parsed and joined via hissnummer (column G)",
-        "'Rivna hissar' sheet parsed: same structure minus column AH (one column offset), status set to 'rivd', no column headers",
-        "Validates file contains expected sheets ('Hissar' required, 'Nodtelefoner' and 'Rivna hissar' optional)",
-        "Case-insensitive district matching during join",
-        "Returns combined results with sheet source metadata",
-        "Typecheck passes"
-      ],
-      "priority": 40,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-041",
-      "title": "Import preview and confirmation page",
-      "description": "As an admin, I want to preview and confirm Excel imports before execution.",
-      "acceptanceCriteria": [
-        "Upload .xlsx file at /admin/import",
-        "Convex action importera.upload: parse Excel and return preview",
-        "Convex query importera.preview: count per sheet, new vs updated elevators, parsing warnings, invalid rows",
-        "Preview screen shows all validation information clearly",
-        "Admin confirms import; Convex action importera.confirm executes mutations",
-        "New organization auto-created if customer name doesn't match existing",
-        "New suggestion values auto-added to forslagsvarden",
-        "Validation report generated post-import",
-        "Supports ongoing imports (not just initial migration)",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 41,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-042",
-      "title": "Convex CMS schema and functions for landing page",
-      "description": "As a developer, I need CMS backend functions for the landing page content.",
-      "acceptanceCriteria": [
-        "convex/cms.ts with queries: cms.getPage, cms.listPages",
-        "convex/cms.ts with mutations: cms.updatePage, cms.createPage (admin-only)",
-        "Page schema stores content for each landing page section",
-        "Typecheck passes"
-      ],
-      "priority": 42,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-043",
-      "title": "Landing page with four pages",
-      "description": "As a visitor, I want to see Hisskompetens' public website.",
-      "acceptanceCriteria": [
-        "apps/landing/ deployed to Cloudflare Workers",
-        "Pages: Startsida (/), Tjanster (/tjanster), Om oss (/om-oss), Kontakt (/kontakt)",
-        "Content driven by Convex CMS queries",
-        "Responsive design, Swedish language throughout",
-        "Professional look matching Hisskompetens brand",
-        "Use /ui-ux-pro-max skill for design guidance before implementing UI",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 43,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-044",
-      "title": "React Email import report template and Resend integration",
-      "description": "As an admin, I want email reports after data imports.",
-      "acceptanceCriteria": [
-        "packages/email/ contains React Email templates",
-        "Import report template: successful/failed row counts, warnings, summary",
-        "Resend integration in Convex action: sends email after import completion",
-        "Sender domain: noreply@hisskompetens.se",
-        "Typecheck passes"
-      ],
-      "priority": 44,
-      "passes": true,
-      "notes": "Clerk handles auth-related emails. This is only for import reports."
-    },
-    {
-      "id": "US-045",
-      "title": "Elevator archive (demolished elevators)",
-      "description": "As an admin or customer, I want demolished elevators hidden from default views but still searchable.",
-      "acceptanceCriteria": [
-        "Convex mutation hissar.archive: sets status to 'rivd' or 'arkiverad', requires admin role",
-        "Default views filter to status === 'aktiv' only",
-        "Filter option in registry to show demolished elevators",
-        "Archived elevators excluded from KPIs, budgets, and modernization planning",
-        "Data preserved in database for historical reference",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 45,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-046",
-      "title": "GitHub Actions CI/CD pipeline",
-      "description": "As a developer, I need automated build and deploy pipelines.",
-      "acceptanceCriteria": [
-        ".github/workflows/ with CI/CD pipeline",
-        "On push to main: typecheck all packages, build all apps",
-        "Deploy to Cloudflare Workers via Wrangler",
-        "Deploy Convex functions via npx convex deploy",
-        "Domain routing: hisskompetens.se (landing), admin.hisskompetens.se (admin), app.hisskompetens.se (client)",
-        "Environment variables/secrets configured for Clerk, Convex, Resend, Cloudflare",
-        "Pipeline passes on a clean checkout",
-        "Typecheck passes"
-      ],
-      "priority": 46,
-      "passes": false,
-      "notes": ""
+      "notes": "The published field is a boolean on the pages table. Include it in the createPage/updatePage payload alongside sections. Use shadcn Switch component."
     }
   ]
 }
