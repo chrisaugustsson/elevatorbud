@@ -1,4 +1,12 @@
-// Auth package — Clerk + Convex authentication helpers
-// Real implementation will be added in US-008
-
-export type Placeholder = Record<string, unknown>;
+export { ConvexClerkProvider } from "./provider";
+export {
+  SignIn,
+  SignUp,
+  UserButton,
+  SignInButton,
+  SignOutButton,
+  SignUpButton,
+  RedirectToSignIn,
+  RedirectToSignUp,
+} from "@clerk/tanstack-react-start";
+export { useAuth, useUser, useSession } from "@clerk/tanstack-react-start";
