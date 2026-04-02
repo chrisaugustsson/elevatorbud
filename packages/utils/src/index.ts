@@ -5,6 +5,9 @@ export type { ExportColumn } from "./export";
 
 export {
   parseHissarSheet,
+  parseNodtelefonerSheet,
+  parseRivnaHissarSheet,
+  parseExcelImport,
   readWorkbook,
   validateWorkbookSheets,
   HISSAR_COLUMNS,
@@ -13,5 +16,7 @@ export type {
   ParsedHiss,
   ImportWarning,
   HissarParseResult,
+  NodtelefonerParseResult,
+  FullImportResult,
   ColumnDef,
 } from "./excel-import";

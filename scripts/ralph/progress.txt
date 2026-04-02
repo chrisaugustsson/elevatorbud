@@ -135,6 +135,11 @@ Started: tors  2 apr. 2026 14:51:49 CEST
 - For per-bar coloring in Recharts: set `fill` property in data array, render `<Bar>` children with `<rect fill={entry.fill}>` — or use `<Cell>` component
 - Navigation from data tables: use `<a href={...}>` instead of typed `<Link>` when route params cause TanStack Router type issues — simpler and avoids `params` type errors
 - Modernization urgency color coding: red (≤1 year), orange (2-4 years), yellow (5-9 years), green (10+ years) — based on `currentYear` diff
+- Recharts BarChart `onClick` handler: use `(data: any) =>` to avoid TypeScript `MouseHandlerDataParam` type errors — access `data.activePayload[0].payload` for clicked bar data
+- Recharts `<Cell>` component inside `<Bar>` for per-bar coloring and opacity — import from `recharts`
+- Excel import: `XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false })` for positional string[][] access — `raw: false` forces all values to strings
+- Excel import types: `ParsedHiss` includes `_source_row`, `_source_sheet`, `_organisation_namn` metadata for import processing (not stored in DB)
+- HISSAR_COLUMNS exported from excel-import.ts — reuse for Rivna hissar parser (same structure minus column AH)
 
 ---
 
@@ -818,4 +823,79 @@ Started: tors  2 apr. 2026 14:51:49 CEST
   - Priority list query accepts optional `arFran`/`arTill` for year-range filtering — avoids re-fetching when user clicks period cards
   - Period cards with `selectedPeriod` state provide a natural filter UX for the priority list below
   - Manual browser verification needed (no browser testing tools configured)
+---
+
+## 2026-04-02 - US-037
+- Implemented three Convex queries for maintenance and inspection views
+- `hissar.besiktningskalender`: counts elevators per inspection month (returns all 12 months with counts, preserving month order)
+- `hissar.skotselforetag`: counts per maintenance company + matrix of company × district with Swedish locale sorting
+- `hissar.nodtelefonstatus`: with/without emergency phone counts, upgrade needs count, total upgrade cost, all broken down per district
+- All three queries support optional `organisation_id` filter for tenant isolation (uses `by_organisation_id` index when provided)
+- All three filter to `status === "aktiv"` only
+- Updated convex-api.d.ts in both admin and client apps with new query type declarations
+- Files changed: convex/hissar.ts, apps/admin/src/convex-api.d.ts, apps/client/src/convex-api.d.ts
+- **Learnings for future iterations:**
+  - `besiktningskalender` pre-initializes all 12 months to 0 so UI always gets a complete monthly dataset (no gaps)
+  - `skotselforetag` returns both a flat `foretag` list (sorted by count desc) and a `distrikt` array for matrix column headers
+  - Each foretag entry has `perDistrikt` array matching the `distrikt` order — ready for table rendering
+  - `nodtelefonstatus` aggregates at both global and per-district level — efficient since it's a single pass over aktiva
+  - These queries follow the same org-filter + aktiv-filter pattern as stats/chartData — no new patterns discovered
+---
+
+## 2026-04-02 - US-038
+- Implemented maintenance and inspection page at /underhall in both admin and client apps
+- Added `hissar.besiktningslista` Convex query: returns elevators for a selected inspection month, enriched with org name
+- Section 1 — Besiktningskalender: 3 KPI cards (this month, yearly total, monthly average), bar chart with clickable months (current month highlighted in blue, selected in red), elevator list table for selected month
+- Section 2 — Skötselföretag: horizontal bar chart showing count per maintenance company, company × district matrix table with sticky first column
+- Section 3 — Nödtelefonstatus: 4 KPI cards (with/without, needs upgrade, total cost), per-district table with colored badges and totals row
+- Admin version uses org selector filter from OrgProvider context
+- Client version uses tenant isolation via user's organisation_id (from api.users.me)
+- Files created: none (replaced existing stubs)
+- Files modified: convex/hissar.ts (added besiktningslista query), apps/admin/src/routes/_authenticated/underhall.tsx, apps/client/src/routes/_authenticated/underhall.tsx, apps/admin/src/convex-api.d.ts, apps/client/src/convex-api.d.ts
+- **Learnings for future iterations:**
+  - Recharts BarChart `onClick` handler parameter is typed as `MouseHandlerDataParam` which doesn't include `activePayload` — use `(data: any)` to avoid TS errors
+  - Recharts `<Cell>` component inside `<Bar>` allows per-bar coloring and opacity — useful for highlighting selected/current items
+  - `layout="vertical"` on BarChart rotates the chart for horizontal bars — useful for company names that need more space
+  - Sticky column in scrollable table: `sticky left-0 bg-background` on TableHead and TableCell for the first column
+  - Client underhall page uses same "skip" sentinel pattern as other client pages: `useQuery(api.x, user?.org_id ? {org: user.org_id} : "skip")`
+  - Manual browser verification needed (no browser testing tools configured)
+---
+
+## 2026-04-02 - US-039
+- Implemented Excel parser for Hissar sheet with compound fields in packages/utils/src/excel-import.ts
+- Column mapping: 34 columns (A-AH) with standard Hisskompetens Excel format
+- Mandatory columns validated: C (hissnummer), J (byggar), L (plan/dorrar), AB (moderniserar)
+- Compound field parsers: marklast (stored as string), plan/dorrar (split to antal_plan + antal_dorrar as numbers), korgstorlek (string), dagoppning (string), nodtelefon (parsed to 5 fields)
+- Special value handling: byggar handles "Okant"/"Okänt" → undefined; moderniserar keeps "Ej ombyggd" and suffixed years as-is
+- Budget parser strips currency markers ("kr", "sek") and whitespace
+- Boolean parser handles Swedish (Ja/Nej) and English (Yes/No) variants
+- Updated packages/utils/src/index.ts with real exports replacing placeholder
+- Exported HISSAR_COLUMNS and ColumnDef for reuse by US-040 (Nodtelefoner/Rivna hissar parsers)
+- Files created: packages/utils/src/excel-import.ts
+- Files modified: packages/utils/src/index.ts
+- **Learnings for future iterations:**
+  - xlsx library `sheet_to_json` with `{ header: 1, raw: false }` returns string[][] for positional column access
+  - `raw: false` ensures all values are strings (not auto-parsed numbers) — needed for compound field parsing
+  - HISSAR_COLUMNS is exported for reuse by the Rivna hissar parser (US-040) which has same structure minus column AH
+  - ParsedHiss type includes `_source_row` and `_source_sheet` metadata for error reporting during import
+  - `_organisation_namn` field stores the raw org name from Excel column A — used for org matching during import (not stored in DB)
+  - validateWorkbookSheets() checks for required "Hissar" sheet and optional "Nodtelefoner"/"Rivna hissar" sheets
+---
+
+## 2026-04-02 - US-040
+- Implemented Excel parsers for Nodtelefoner and Rivna hissar sheets in packages/utils/src/excel-import.ts
+- Added `status` field to ParsedHiss type ('aktiv' | 'rivd' | 'arkiverad') for import-time status assignment
+- `parseNodtelefonerSheet()`: parses Nodtelefoner sheet with column G as hissnummer join key, extracts har_nodtelefon, modell, typ, behover_uppgradering, pris
+- `parseRivnaHissarSheet()`: uses RIVNA_HISSAR_COLUMNS (HISSAR_COLUMNS minus column AH), no headers (data from row 1), sets status='rivd' on all records
+- `joinNodtelefoner()`: merges nodtelefon data into Hissar elevators by hissnummer (case-insensitive), uses case-insensitive district matching when multiple elevators share same hissnummer
+- `parseExcelImport()`: orchestrates all three parsers, joins Nodtelefoner into Hissar, combines Hissar + Rivna results, returns FullImportResult with per-sheet metadata
+- Exported new functions and types: parseNodtelefonerSheet, parseRivnaHissarSheet, parseExcelImport, NodtelefonerParseResult, FullImportResult
+- Files modified: packages/utils/src/excel-import.ts, packages/utils/src/index.ts
+- **Learnings for future iterations:**
+  - Rivna hissar reuses HISSAR_COLUMNS with `.filter(col => col.letter !== "AH")` — no need to duplicate the column mapping
+  - Nodtelefoner sheet column G (index 6) is the join key — other columns hold expanded emergency phone fields
+  - `joinNodtelefoner` builds a Map<lowercaseHissnummer, ParsedHiss[]> for O(1) lookup, handles ambiguity with case-insensitive district matching
+  - Rivna hissar has NO column headers — data starts at row 1 (0-indexed row 0), unlike Hissar which has headers at row 2
+  - `parseRivnaRow` duplicates the switch/case parsing logic from `parseHissarRow` — could be refactored into a shared helper but kept separate for clarity since Rivna excludes compound_nodtelefon
+  - `FullImportResult.sheets` object tracks found/count/joined metadata per sheet — useful for import preview UI (US-041)
 ---

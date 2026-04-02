@@ -658,7 +658,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 38,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -677,7 +677,7 @@
         "Typecheck passes"
       ],
       "priority": 39,
-      "passes": false,
+      "passes": true,
       "notes": "Use a library like xlsx or exceljs for parsing. Verify latest version."
     },
     {
@@ -693,7 +693,7 @@
         "Typecheck passes"
       ],
       "priority": 40,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
