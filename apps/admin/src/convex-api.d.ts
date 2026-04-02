@@ -10,6 +10,8 @@ declare module "@convex/_generated/api" {
     organisationer: {
       list: FunctionReference<"query", "public">;
       get: FunctionReference<"query", "public">;
+      create: FunctionReference<"mutation", "public">;
+      update: FunctionReference<"mutation", "public">;
     };
   };
 
