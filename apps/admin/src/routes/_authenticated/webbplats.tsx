@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -8,6 +8,9 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@elevatorbud/ui/components/ui/tabs";
+import { Switch } from "@elevatorbud/ui/components/ui/switch";
+import { Label } from "@elevatorbud/ui/components/ui/label";
+import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { toast } from "sonner";
 import { StartsidaForm } from "../../components/cms/startsida-form";
 import { OmOssForm } from "../../components/cms/om-oss-form";
@@ -71,6 +74,13 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
   const createPage = useMutation(api.cms.createPage);
   const updatePage = useMutation(api.cms.updatePage);
   const [isSaving, setIsSaving] = useState(false);
+  const [published, setPublished] = useState(false);
+
+  useEffect(() => {
+    if (page) {
+      setPublished(page.published);
+    }
+  }, [page]);
 
   async function handleSave(sections: CmsSection[]) {
     setIsSaving(true);
@@ -80,12 +90,14 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
           id: page._id,
           title: label,
           sections,
+          published,
         });
       } else {
         await createPage({
           slug,
           title: label,
           sections,
+          published,
         });
       }
       toast.success("Sidan har sparats");
@@ -104,43 +116,48 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
     );
   }
 
-  if (slug === "startsida") {
-    return (
-      <div className="py-4">
-        <StartsidaForm page={page} onSave={handleSave} isSaving={isSaving} />
-      </div>
-    );
-  }
-
-  if (slug === "om-oss") {
-    return (
-      <div className="py-4">
-        <OmOssForm page={page} onSave={handleSave} isSaving={isSaving} />
-      </div>
-    );
-  }
-
-  if (slug === "tjanster") {
-    return (
-      <div className="py-4">
-        <TjansterForm page={page} onSave={handleSave} isSaving={isSaving} />
-      </div>
-    );
-  }
-
-  if (slug === "kontakt") {
-    return (
-      <div className="py-4">
-        <KontaktForm page={page} onSave={handleSave} isSaving={isSaving} />
-      </div>
-    );
-  }
+  const formContent = (() => {
+    switch (slug) {
+      case "startsida":
+        return <StartsidaForm page={page} onSave={handleSave} isSaving={isSaving} />;
+      case "om-oss":
+        return <OmOssForm page={page} onSave={handleSave} isSaving={isSaving} />;
+      case "tjanster":
+        return <TjansterForm page={page} onSave={handleSave} isSaving={isSaving} />;
+      case "kontakt":
+        return <KontaktForm page={page} onSave={handleSave} isSaving={isSaving} />;
+      default:
+        return (
+          <p className="text-muted-foreground">
+            Formulär för <strong>{label}</strong> kommer här.
+          </p>
+        );
+    }
+  })();
 
   return (
     <div className="py-4">
-      <p className="text-muted-foreground">
-        Formulär för <strong>{label}</strong> kommer här.
-      </p>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold">{label}</h2>
+        <div className="flex items-center gap-3">
+          {published ? (
+            <Badge variant="default" className="bg-green-600 hover:bg-green-600">
+              Publicerad
+            </Badge>
+          ) : (
+            <Badge variant="secondary">Utkast</Badge>
+          )}
+          <div className="flex items-center gap-2">
+            <Switch
+              id={`published-${slug}`}
+              checked={published}
+              onCheckedChange={setPublished}
+            />
+            <Label htmlFor={`published-${slug}`}>Publicerad</Label>
+          </div>
+        </div>
+      </div>
+      {formContent}
     </div>
   );
 }
