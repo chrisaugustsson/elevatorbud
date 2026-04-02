@@ -295,6 +295,12 @@ function StepContent({ step, form }: { step: number; form: HissForm }) {
       return <Step2TekniskSpec form={form} />;
     case 3:
       return <Step3DorrarOchKorg form={form} />;
+    case 4:
+      return <Step4Maskineri form={form} />;
+    case 5:
+      return <Step5Besiktning form={form} />;
+    case 6:
+      return <Step6Modernisering form={form} />;
     default: {
       const stepInfo = STEPS[step - 1];
       return (
@@ -674,6 +680,285 @@ function Step3DorrarOchKorg({ form }: { form: HissForm }) {
           )}
         </form.Field>
       </div>
+    </div>
+  );
+}
+
+// --- Step 4: Maskineri ---
+
+const BESIKTNINGSMANADER = [
+  "Januari",
+  "Februari",
+  "Mars",
+  "April",
+  "Maj",
+  "Juni",
+  "Juli",
+  "Augusti",
+  "September",
+  "Oktober",
+  "November",
+  "December",
+] as const;
+
+function Step4Maskineri({ form }: { form: HissForm }) {
+  const drivsystemSuggestions = useSuggestions("drivsystem");
+  const maskinplaceringSuggestions = useSuggestions("maskinplacering");
+
+  return (
+    <div className="space-y-5">
+      {/* Drivsystem (combobox) */}
+      <form.Field name="drivsystem">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label>Drivsystem</Label>
+            <Combobox
+              value={field.state.value}
+              onChange={(val) => field.handleChange(val)}
+              suggestions={drivsystemSuggestions}
+              placeholder="Välj eller ange drivsystem..."
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Upphängning */}
+      <form.Field name="upphangning">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="upphangning">Upphängning</Label>
+            <Input
+              id="upphangning"
+              className="h-11"
+              placeholder="Ange upphängning..."
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Maskinplacering (combobox) */}
+      <form.Field name="maskinplacering">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label>Maskinplacering</Label>
+            <Combobox
+              value={field.state.value}
+              onChange={(val) => field.handleChange(val)}
+              suggestions={maskinplaceringSuggestions}
+              placeholder="Välj eller ange maskinplacering..."
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Typ maskin & Typ styrsystem — side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        <form.Field name="typ_maskin">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor="typ_maskin">Typ maskin</Label>
+              <Input
+                id="typ_maskin"
+                className="h-11"
+                placeholder="Typ..."
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field name="typ_styrsystem">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor="typ_styrsystem">Typ styrsystem</Label>
+              <Input
+                id="typ_styrsystem"
+                className="h-11"
+                placeholder="Typ..."
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        </form.Field>
+      </div>
+    </div>
+  );
+}
+
+// --- Step 5: Besiktning och underhåll ---
+
+function Step5Besiktning({ form }: { form: HissForm }) {
+  const besiktningsorganSuggestions = useSuggestions("besiktningsorgan");
+  const skotselforetagSuggestions = useSuggestions("skotselforetag");
+
+  return (
+    <div className="space-y-5">
+      {/* Besiktningsorgan (combobox) */}
+      <form.Field name="besiktningsorgan">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label>Besiktningsorgan</Label>
+            <Combobox
+              value={field.state.value}
+              onChange={(val) => field.handleChange(val)}
+              suggestions={besiktningsorganSuggestions}
+              placeholder="Välj eller ange besiktningsorgan..."
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Besiktningsmånad (fixed enum) */}
+      <form.Field name="besiktningsmanad">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label>Besiktningsmånad</Label>
+            <Select
+              value={field.state.value}
+              onValueChange={(val) => field.handleChange(val)}
+            >
+              <SelectTrigger className="h-11 w-full">
+                <SelectValue placeholder="Välj månad..." />
+              </SelectTrigger>
+              <SelectContent>
+                {BESIKTNINGSMANADER.map((manad) => (
+                  <SelectItem key={manad} value={manad}>
+                    {manad}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </form.Field>
+
+      {/* Skötselföretag (combobox) */}
+      <form.Field name="skotselforetag">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label>Skötselföretag</Label>
+            <Combobox
+              value={field.state.value}
+              onChange={(val) => field.handleChange(val)}
+              suggestions={skotselforetagSuggestions}
+              placeholder="Välj eller ange skötselföretag..."
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Schaktbelysning */}
+      <form.Field name="schaktbelysning">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="schaktbelysning">Schaktbelysning</Label>
+            <Input
+              id="schaktbelysning"
+              className="h-11"
+              placeholder="Ange schaktbelysning..."
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+    </div>
+  );
+}
+
+// --- Step 6: Modernisering ---
+
+function Step6Modernisering({ form }: { form: HissForm }) {
+  const atgarderSuggestions = useSuggestions("atgarder_vid_modernisering");
+
+  return (
+    <div className="space-y-5">
+      {/* Moderniseringsår */}
+      <form.Field name="moderniserar">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="moderniserar">Moderniseringsår</Label>
+            <Input
+              id="moderniserar"
+              className="h-11"
+              placeholder="t.ex. 2007 eller Ej ombyggd"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Garanti (toggle) */}
+      <form.Field name="garanti">
+        {(field) => (
+          <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
+            <Label htmlFor="garanti" className="cursor-pointer">
+              Garanti
+            </Label>
+            <Switch
+              id="garanti"
+              checked={field.state.value}
+              onCheckedChange={(val) => field.handleChange(val)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Rekommenderat moderniseringsår */}
+      <form.Field name="rekommenderat_moderniserar">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="rekommenderat_moderniserar">
+              Rekommenderat moderniseringsår
+            </Label>
+            <Input
+              id="rekommenderat_moderniserar"
+              className="h-11"
+              placeholder="t.ex. 2030"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Budget belopp */}
+      <form.Field name="budget_belopp">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="budget_belopp">Budget belopp</Label>
+            <Input
+              id="budget_belopp"
+              className="h-11"
+              type="number"
+              inputMode="numeric"
+              placeholder="SEK"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Åtgärder vid modernisering (combobox) */}
+      <form.Field name="atgarder_vid_modernisering">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label>Åtgärder vid modernisering</Label>
+            <Combobox
+              value={field.state.value}
+              onChange={(val) => field.handleChange(val)}
+              suggestions={atgarderSuggestions}
+              placeholder="Välj eller ange åtgärder..."
+            />
+          </div>
+        )}
+      </form.Field>
     </div>
   );
 }
