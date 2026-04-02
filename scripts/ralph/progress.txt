@@ -140,6 +140,14 @@ Started: tors  2 apr. 2026 14:51:49 CEST
 - Excel import: `XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false })` for positional string[][] access — `raw: false` forces all values to strings
 - Excel import types: `ParsedHiss` includes `_source_row`, `_source_sheet`, `_organisation_namn` metadata for import processing (not stored in DB)
 - HISSAR_COLUMNS exported from excel-import.ts — reuse for Rivna hissar parser (same structure minus column AH)
+- Import architecture: client-side Excel parsing (readWorkbook + parseExcelImport from @elevatorbud/utils) → server analyze query → server confirm action with batched internal mutations
+- Convex action + internalMutation pattern for import: `importera.confirm` action calls `importeraInternal.importBatch` in batches of 25 — avoids mutation time limits
+- `autoAddForslagsvarden` is exported from convex/hissar.ts — reusable by import batch mutation for auto-adding new category values
+- Convex `v.any()` validator for internal mutations receiving dynamically-shaped data — cast at usage site with `as any` or typed casts
+- Import org matching: case-insensitive org name lookup, new orgs auto-created during confirm action
+- `anyApi` pattern for internal references in actions: avoids circular type dependency between public and internal modules (same pattern as anvandare/anvandareInternal)
+- CMS pages table: `pages` with slug index — `cms.getPage`/`cms.listPages` are public (no auth), `cms.createPage`/`cms.updatePage` require admin
+- CMS section schema: flexible `type` field + optional title/subtitle/content/items/cta/imageUrl + order — landing page components switch on `type`
 
 ---
 
@@ -898,4 +906,48 @@ Started: tors  2 apr. 2026 14:51:49 CEST
   - Rivna hissar has NO column headers — data starts at row 1 (0-indexed row 0), unlike Hissar which has headers at row 2
   - `parseRivnaRow` duplicates the switch/case parsing logic from `parseHissarRow` — could be refactored into a shared helper but kept separate for clarity since Rivna excludes compound_nodtelefon
   - `FullImportResult.sheets` object tracks found/count/joined metadata per sheet — useful for import preview UI (US-041)
+---
+
+## 2026-04-02 - US-041
+- Implemented import preview and confirmation page at /admin/import
+- Created convex/importera.ts with `analyze` query (checks new vs existing hissnummer, matches org names) and `confirm` action (creates new orgs, imports elevators in batches of 25)
+- Created convex/importeraInternal.ts with `checkAdmin`, `createOrg`, `importBatch` internal mutations
+- Exported `autoAddForslagsvarden` from convex/hissar.ts for reuse by import batch mutation
+- Import UI features: drag-and-drop file upload zone, client-side Excel parsing (reuses parseExcelImport from packages/utils), sheet summary cards, server-side analysis (new/updated counts, org matching), warnings/invalid rows collapsible lists, new org auto-creation info, confirm button, results page with created/updated/error counts
+- Architecture: client-side parsing → reactive analyze query → confirm action with batched internal mutations
+- Updated convex-api.d.ts in both admin and client apps with importera types
+- Updated convex/_generated/api.ts stub with importera and importeraInternal modules
+- Files created: convex/importera.ts, convex/importeraInternal.ts
+- Files modified: convex/hissar.ts (export autoAddForslagsvarden), apps/admin/src/routes/_authenticated/admin.import.tsx (full implementation), apps/admin/src/convex-api.d.ts, apps/client/src/convex-api.d.ts, convex/_generated/api.ts
+- **Learnings for future iterations:**
+  - Client-side Excel parsing avoids Convex file upload limitations — xlsx library works in browser via Vite bundling
+  - Convex action → internal mutation pattern avoids both mutation time limits (action has 10min) and action db access limits (internal mutations have direct db)
+  - `v.any()` is useful for internal mutations receiving complex dynamic data — but requires careful casting at usage site
+  - Convex `db.insert` with spread from `v.any()` needs `as any` cast since TypeScript can't verify the shape
+  - Import batch size of 25 balances between too many round trips and mutation time limits
+  - `Id<"table">` type casting needed when passing IDs from `v.any()` args to typed Convex operations
+  - Manual browser verification needed (no browser testing tools configured)
+---
+
+## 2026-04-02 - US-042
+- Implemented Convex CMS schema and functions for the landing page
+- Added `pages` table to convex/schema.ts with: slug, title, sections (array of typed section objects), published, updatedAt
+- Section schema supports: id, type, title, subtitle, content (markdown/text), items array (title/description/icon), CTA (text/href), imageUrl, order
+- Index: `by_slug` for fast page lookup by slug
+- Created convex/cms.ts with 4 functions:
+  - `getPage` query: fetches single page by slug (public, no auth required — landing page is public)
+  - `listPages` query: returns all pages (public)
+  - `createPage` mutation: admin-only, validates slug uniqueness, auto-sets updatedAt
+  - `updatePage` mutation: admin-only, partial update via db.patch, auto-sets updatedAt
+- Updated convex/_generated/api.ts stub with cms module import
+- Updated convex-api.d.ts in both admin and client apps with cms type declarations
+- Files created: convex/cms.ts
+- Files modified: convex/schema.ts, convex/_generated/api.ts (gitignored), apps/admin/src/convex-api.d.ts, apps/client/src/convex-api.d.ts
+- **Learnings for future iterations:**
+  - CMS queries (getPage, listPages) are public with no auth — landing page content must be accessible to unauthenticated visitors
+  - CMS mutations (createPage, updatePage) require admin role — only admins can edit landing page content
+  - Section schema uses flexible `type` string field — landing page components will switch on type to render different section layouts (hero, features, text, contact, etc.)
+  - `items` array within sections supports service/feature lists (title + description + optional icon name)
+  - convex/_generated/api.ts is gitignored — cannot be committed, but must be updated locally for typecheck
+  - No new codebase patterns discovered — follows existing Convex query/mutation conventions
 ---
