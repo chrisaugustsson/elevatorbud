@@ -7,6 +7,9 @@ declare module "@convex/_generated/api" {
     users: {
       me: FunctionReference<"query", "public">;
     };
+    organisationer: {
+      list: FunctionReference<"query", "public">;
+    };
   };
 
   export const internal: {
