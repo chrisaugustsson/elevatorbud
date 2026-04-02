@@ -4,6 +4,7 @@ import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useForm } from "@tanstack/react-form";
 import { Button } from "@elevatorbud/ui/components/ui/button";
+import { Input } from "@elevatorbud/ui/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -12,11 +13,14 @@ import {
   SelectValue,
 } from "@elevatorbud/ui/components/ui/select";
 import { Label } from "@elevatorbud/ui/components/ui/label";
+import { Switch } from "@elevatorbud/ui/components/ui/switch";
+import { Combobox } from "@elevatorbud/ui/components/ui/combobox";
 import {
   Building2,
   ChevronLeft,
   ChevronRight,
   Check,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@elevatorbud/ui/lib/utils";
 
@@ -130,6 +134,21 @@ const defaultValues: HissFormValues = {
   kommentarer: "",
 };
 
+// Helper to extract the form instance type from useForm
+function _hissFormTypeHelper() {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return useForm({ defaultValues });
+}
+type HissForm = ReturnType<typeof _hissFormTypeHelper>;
+
+function useSuggestions(kategori: string): string[] {
+  const data = useQuery(api.forslagsvarden.list, { kategori });
+  if (!data) return [];
+  return data
+    .filter((d: { aktiv: boolean }) => d.aktiv)
+    .map((d: { varde: string }) => d.varde);
+}
+
 function NyHiss() {
   const [currentStep, setCurrentStep] = useState(1);
   const orgs = useQuery(api.organisationer.list);
@@ -225,7 +244,7 @@ function NyHiss() {
 
       {/* Step content area */}
       <div className="flex-1 overflow-auto px-4 py-4">
-        <StepContent step={currentStep} />
+        <StepContent step={currentStep} form={form} />
       </div>
 
       {/* Navigation buttons */}
@@ -268,18 +287,393 @@ function NyHiss() {
   );
 }
 
-function StepContent({ step }: { step: number }) {
-  const stepInfo = STEPS[step - 1];
+function StepContent({ step, form }: { step: number; form: HissForm }) {
+  switch (step) {
+    case 1:
+      return <Step1Identifiering form={form} />;
+    case 2:
+      return <Step2TekniskSpec form={form} />;
+    case 3:
+      return <Step3DorrarOchKorg form={form} />;
+    default: {
+      const stepInfo = STEPS[step - 1];
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="flex size-16 items-center justify-center rounded-full bg-muted text-2xl font-bold text-muted-foreground">
+            {stepInfo.number}
+          </div>
+          <h2 className="mt-4 text-lg font-semibold">{stepInfo.title}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Fälten för detta steg läggs till i kommande steg.
+          </p>
+        </div>
+      );
+    }
+  }
+}
+
+// --- Step 1: Identifiering ---
+
+function Step1Identifiering({ form }: { form: HissForm }) {
+  const hissbeteckningSuggestions = useSuggestions("hissbeteckning");
+  const distriktSuggestions = useSuggestions("distrikt");
 
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <div className="flex size-16 items-center justify-center rounded-full bg-muted text-2xl font-bold text-muted-foreground">
-        {stepInfo.number}
+    <div className="space-y-5">
+      {/* Hissnummer with real-time uniqueness check */}
+      <form.Field name="hissnummer">
+        {(field) => <HissnummerField field={field} />}
+      </form.Field>
+
+      {/* Adress */}
+      <form.Field name="adress">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="adress">Adress</Label>
+            <Input
+              id="adress"
+              className="h-11"
+              placeholder="Gatuadress..."
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Hissbeteckning (combobox) */}
+      <form.Field name="hissbeteckning">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label>Hissbeteckning</Label>
+            <Combobox
+              value={field.state.value}
+              onChange={(val) => field.handleChange(val)}
+              suggestions={hissbeteckningSuggestions}
+              placeholder="Välj eller ange beteckning..."
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Distrikt (combobox) */}
+      <form.Field name="distrikt">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label>Distrikt</Label>
+            <Combobox
+              value={field.state.value}
+              onChange={(val) => field.handleChange(val)}
+              suggestions={distriktSuggestions}
+              placeholder="Välj eller ange distrikt..."
+            />
+          </div>
+        )}
+      </form.Field>
+    </div>
+  );
+}
+
+function HissnummerField({
+  field,
+}: {
+  field: {
+    state: { value: string };
+    handleChange: (value: string) => void;
+  };
+}) {
+  const hissnummer = field.state.value;
+  const checkResult = useQuery(
+    api.hissar.checkHissnummer,
+    hissnummer ? { hissnummer } : "skip",
+  );
+  const isDuplicate = checkResult?.exists === true;
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor="hissnummer">
+        Hissnummer <span className="text-destructive">*</span>
+      </Label>
+      <Input
+        id="hissnummer"
+        className={cn("h-11", isDuplicate && "border-destructive")}
+        placeholder="Ange hissnummer..."
+        value={hissnummer}
+        onChange={(e) => field.handleChange(e.target.value)}
+      />
+      {isDuplicate && (
+        <p className="flex items-center gap-1 text-sm text-destructive">
+          <AlertCircle className="size-4" />
+          Hissnumret finns redan i registret
+        </p>
+      )}
+    </div>
+  );
+}
+
+// --- Step 2: Teknisk specifikation ---
+
+function Step2TekniskSpec({ form }: { form: HissForm }) {
+  const hisstypSuggestions = useSuggestions("hisstyp");
+  const fabrikatSuggestions = useSuggestions("fabrikat");
+
+  return (
+    <div className="space-y-5">
+      {/* Hisstyp (combobox) */}
+      <form.Field name="hisstyp">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label>Hisstyp</Label>
+            <Combobox
+              value={field.state.value}
+              onChange={(val) => field.handleChange(val)}
+              suggestions={hisstypSuggestions}
+              placeholder="Välj eller ange hisstyp..."
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Fabrikat (combobox) */}
+      <form.Field name="fabrikat">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label>Fabrikat</Label>
+            <Combobox
+              value={field.state.value}
+              onChange={(val) => field.handleChange(val)}
+              suggestions={fabrikatSuggestions}
+              placeholder="Välj eller ange fabrikat..."
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Byggår */}
+      <form.Field name="byggar">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="byggar">Byggår</Label>
+            <Input
+              id="byggar"
+              className="h-11"
+              type="number"
+              inputMode="numeric"
+              placeholder="t.ex. 1985"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Hastighet & Lyfthöjd — side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        <form.Field name="hastighet">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor="hastighet">Hastighet</Label>
+              <Input
+                id="hastighet"
+                className="h-11"
+                placeholder="m/s"
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field name="lyfthojd">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor="lyfthojd">Lyfthöjd</Label>
+              <Input
+                id="lyfthojd"
+                className="h-11"
+                placeholder="meter"
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        </form.Field>
       </div>
-      <h2 className="mt-4 text-lg font-semibold">{stepInfo.title}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Fälten för detta steg läggs till i kommande steg.
-      </p>
+
+      {/* Marklast */}
+      <form.Field name="marklast">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="marklast">Marklast</Label>
+            <Input
+              id="marklast"
+              className="h-11"
+              placeholder="t.ex. 500*6 (kg*personer)"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Antal plan & Antal dörrar — side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        <form.Field name="antal_plan">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor="antal_plan">Antal plan</Label>
+              <Input
+                id="antal_plan"
+                className="h-11"
+                type="number"
+                inputMode="numeric"
+                placeholder="Antal"
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field name="antal_dorrar">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor="antal_dorrar">Antal dörrar</Label>
+              <Input
+                id="antal_dorrar"
+                className="h-11"
+                type="number"
+                inputMode="numeric"
+                placeholder="Antal"
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        </form.Field>
+      </div>
+    </div>
+  );
+}
+
+// --- Step 3: Dörrar och korg ---
+
+function Step3DorrarOchKorg({ form }: { form: HissForm }) {
+  const typDorrarSuggestions = useSuggestions("typ_dorrar");
+  const kollektivSuggestions = useSuggestions("kollektiv");
+
+  return (
+    <div className="space-y-5">
+      {/* Typ dörrar (combobox) */}
+      <form.Field name="typ_dorrar">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label>Typ dörrar</Label>
+            <Combobox
+              value={field.state.value}
+              onChange={(val) => field.handleChange(val)}
+              suggestions={typDorrarSuggestions}
+              placeholder="Välj eller ange dörrtyp..."
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Genomgång (toggle) */}
+      <form.Field name="genomgang">
+        {(field) => (
+          <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
+            <Label htmlFor="genomgang" className="cursor-pointer">
+              Genomgång
+            </Label>
+            <Switch
+              id="genomgang"
+              checked={field.state.value}
+              onCheckedChange={(val) => field.handleChange(val)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Kollektiv (combobox) */}
+      <form.Field name="kollektiv">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label>Kollektiv</Label>
+            <Combobox
+              value={field.state.value}
+              onChange={(val) => field.handleChange(val)}
+              suggestions={kollektivSuggestions}
+              placeholder="Välj eller ange kollektiv..."
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Korgstorlek */}
+      <form.Field name="korgstorlek">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="korgstorlek">Korgstorlek</Label>
+            <Input
+              id="korgstorlek"
+              className="h-11"
+              placeholder="t.ex. 1000*2050*2300 (B*D*H mm)"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Dagöppning */}
+      <form.Field name="dagoppning">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="dagoppning">Dagöppning</Label>
+            <Input
+              id="dagoppning"
+              className="h-11"
+              placeholder="t.ex. 900*2000 (B*H mm)"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Bärbeslag & Dörrmaskin — side by side */}
+      <div className="grid grid-cols-2 gap-3">
+        <form.Field name="barbeslag">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor="barbeslag">Bärbeslag</Label>
+              <Input
+                id="barbeslag"
+                className="h-11"
+                placeholder="Typ..."
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        </form.Field>
+
+        <form.Field name="dorrmaskin">
+          {(field) => (
+            <div className="space-y-1.5">
+              <Label htmlFor="dorrmaskin">Dörrmaskin</Label>
+              <Input
+                id="dorrmaskin"
+                className="h-11"
+                placeholder="Typ..."
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            </div>
+          )}
+        </form.Field>
+      </div>
     </div>
   );
 }

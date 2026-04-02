@@ -1,6 +1,6 @@
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { requireAdmin } from "./auth";
+import { requireAdmin, getCurrentUser } from "./auth";
 
 const KATEGORI_FALT = [
   "hisstyp",
@@ -43,6 +43,20 @@ async function autoAddForslagsvarden(
     }
   }
 }
+
+export const checkHissnummer = query({
+  args: { hissnummer: v.string() },
+  handler: async (ctx, { hissnummer }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+    if (!hissnummer) return { exists: false };
+    const existing = await ctx.db
+      .query("hissar")
+      .withIndex("by_hissnummer", (q) => q.eq("hissnummer", hissnummer))
+      .unique();
+    return { exists: !!existing };
+  },
+});
 
 export const create = mutation({
   args: {
