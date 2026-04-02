@@ -7,6 +7,7 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@elevatorbud/ui/components/ui/tabs";
+import { StartsidaForm } from "../../components/cms/startsida-form";
 
 const pages = [
   { slug: "startsida", label: "Startsida" },
@@ -65,6 +66,14 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
   if (page === undefined) {
     return (
       <div className="py-8 text-center text-muted-foreground">Laddar…</div>
+    );
+  }
+
+  if (slug === "startsida") {
+    return (
+      <div className="py-4">
+        <StartsidaForm page={page} />
+      </div>
     );
   }
 
