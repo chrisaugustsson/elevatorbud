@@ -1,0 +1,65 @@
+import { createFileRoute, Navigate, Outlet } from "@tanstack/react-router";
+import { useAuth } from "@elevatorbud/auth";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+
+export const Route = createFileRoute("/_authenticated")({
+  component: AuthenticatedLayout,
+});
+
+function AuthenticatedLayout() {
+  const { isSignedIn, isLoaded } = useAuth();
+  const user = useQuery(api.users.me);
+
+  if (!isLoaded) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-muted-foreground">Laddar...</div>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return <Navigate to="/login" />;
+  }
+
+  // Convex query loading
+  if (user === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-muted-foreground">Laddar användare...</div>
+      </div>
+    );
+  }
+
+  // User not found in database (webhook may not have fired yet)
+  if (user === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <p className="text-muted-foreground">
+            Ditt konto konfigureras. Vänta ett ögonblick...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Admin role check
+  if (user.roll !== "admin") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-foreground">
+            Åtkomst nekad
+          </h2>
+          <p className="mt-2 text-muted-foreground">
+            Du har inte behörighet att komma åt adminportalen.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return <Outlet />;
+}

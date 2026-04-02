@@ -6,7 +6,10 @@ import {
   createRootRoute,
 } from "@tanstack/react-router";
 import * as React from "react";
+import { ConvexClerkProvider } from "@elevatorbud/auth";
 import appCss from "../styles/app.css?url";
+
+const convexUrl = import.meta.env.VITE_CONVEX_URL as string;
 
 export const Route = createRootRoute({
   head: () => ({
@@ -23,7 +26,9 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <RootDocument>
-      <Outlet />
+      <ConvexClerkProvider convexUrl={convexUrl}>
+        <Outlet />
+      </ConvexClerkProvider>
     </RootDocument>
   );
 }
