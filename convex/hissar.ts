@@ -452,6 +452,98 @@ export const chartData = query({
   },
 });
 
+export const moderniseringTidslinje = query({
+  args: { organisation_id: v.optional(v.id("organisationer")) },
+  handler: async (ctx, { organisation_id }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+
+    let hissar;
+    if (organisation_id) {
+      hissar = await ctx.db
+        .query("hissar")
+        .withIndex("by_organisation_id", (q) =>
+          q.eq("organisation_id", organisation_id),
+        )
+        .collect();
+    } else {
+      hissar = await ctx.db.query("hissar").collect();
+    }
+
+    const aktiva = hissar.filter((h) => h.status === "aktiv");
+
+    // Count per recommended modernization year
+    const perAr: Record<string, number> = {};
+    for (const h of aktiva) {
+      if (!h.rekommenderat_moderniserar) continue;
+      const year = parseInt(h.rekommenderat_moderniserar, 10);
+      if (isNaN(year)) continue;
+      const key = String(year);
+      perAr[key] = (perAr[key] || 0) + 1;
+    }
+
+    return Object.entries(perAr)
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([ar, antal]) => ({ ar, antal }));
+  },
+});
+
+export const moderniseringBudget = query({
+  args: { organisation_id: v.optional(v.id("organisationer")) },
+  handler: async (ctx, { organisation_id }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+
+    let hissar;
+    if (organisation_id) {
+      hissar = await ctx.db
+        .query("hissar")
+        .withIndex("by_organisation_id", (q) =>
+          q.eq("organisation_id", organisation_id),
+        )
+        .collect();
+    } else {
+      hissar = await ctx.db.query("hissar").collect();
+    }
+
+    const aktiva = hissar.filter((h) => h.status === "aktiv");
+
+    // Budget per year
+    const perAr: Record<string, number> = {};
+    // Budget per district
+    const perDistrikt: Record<string, number> = {};
+    // Budget per elevator type
+    const perTyp: Record<string, number> = {};
+
+    for (const h of aktiva) {
+      if (!h.rekommenderat_moderniserar || !h.budget_belopp) continue;
+      const year = parseInt(h.rekommenderat_moderniserar, 10);
+      if (isNaN(year)) continue;
+
+      const yearKey = String(year);
+      perAr[yearKey] = (perAr[yearKey] || 0) + h.budget_belopp;
+
+      const districtKey = h.distrikt || "Okänt";
+      perDistrikt[districtKey] = (perDistrikt[districtKey] || 0) + h.budget_belopp;
+
+      const typeKey = h.hisstyp || "Okänt";
+      perTyp[typeKey] = (perTyp[typeKey] || 0) + h.budget_belopp;
+    }
+
+    return {
+      perAr: Object.entries(perAr)
+        .sort((a, b) => Number(a[0]) - Number(b[0]))
+        .map(([ar, belopp]) => ({ ar, belopp })),
+      perDistrikt: Object.entries(perDistrikt)
+        .sort((a, b) => b[1] - a[1])
+        .map(([namn, belopp]) => ({ namn, belopp })),
+      perTyp: Object.entries(perTyp)
+        .sort((a, b) => b[1] - a[1])
+        .map(([namn, belopp]) => ({ namn, belopp })),
+    };
+  },
+});
+
 export const dagensHissar = query({
   args: { todayStart: v.number() },
   handler: async (ctx, { todayStart }) => {
