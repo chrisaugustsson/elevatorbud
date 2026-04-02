@@ -201,6 +201,9 @@ function RegisterPage() {
   const [filterHisstyp, setFilterHisstyp] = useState<string[]>([]);
   const [filterFabrikat, setFilterFabrikat] = useState<string[]>([]);
 
+  // Status filter
+  const [statusFilter, setStatusFilter] = useState<string>("aktiv");
+
   // Range filter
   const [byggarMin, setByggarMin] = useState("");
   const [byggarMax, setByggarMax] = useState("");
@@ -221,6 +224,7 @@ function RegisterPage() {
     filterFabrikat,
     byggarMin,
     byggarMax,
+    statusFilter,
   ]);
 
   // Get filter options from forslagsvarden
@@ -258,6 +262,7 @@ function RegisterPage() {
           ? { byggarMax: parseInt(byggarMax) }
           : {}),
         organisation_id: user.organisation_id,
+        ...(statusFilter !== "alla" ? { status: statusFilter } : {}),
       }
     : null;
 
@@ -311,7 +316,8 @@ function RegisterPage() {
     filterHisstyp.length > 0 ||
     filterFabrikat.length > 0 ||
     byggarMin !== "" ||
-    byggarMax !== "";
+    byggarMax !== "" ||
+    statusFilter !== "aktiv";
 
   function clearAllFilters() {
     setFilterDistrikt([]);
@@ -319,6 +325,7 @@ function RegisterPage() {
     setFilterFabrikat([]);
     setByggarMin("");
     setByggarMax("");
+    setStatusFilter("aktiv");
   }
 
   function handleSort(field: string) {
@@ -550,6 +557,18 @@ function RegisterPage() {
             />
           </>
         )}
+
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
+          <SelectTrigger className="h-9 w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="aktiv">Aktiva</SelectItem>
+            <SelectItem value="rivd">Rivda</SelectItem>
+            <SelectItem value="arkiverad">Arkiverade</SelectItem>
+            <SelectItem value="alla">Alla</SelectItem>
+          </SelectContent>
+        </Select>
 
         <div className="flex items-center gap-1">
           <span className="text-sm text-muted-foreground">Bygg\u00e5r:</span>

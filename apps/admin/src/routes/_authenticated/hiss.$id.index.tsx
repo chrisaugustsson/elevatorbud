@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import {
   Card,
@@ -12,11 +13,28 @@ import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import { Separator } from "@elevatorbud/ui/components/ui/separator";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@elevatorbud/ui/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@elevatorbud/ui/components/ui/select";
+import {
   ArrowLeft,
   Pencil,
   Building2,
   Phone,
   MessageSquare,
+  Archive,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/hiss/$id/")({
@@ -127,6 +145,7 @@ function DetailSection({
 
 function HissDetail() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
   const hiss = useQuery(api.hissar.get, { id } as never) as
     | HissDoc
     | undefined;
@@ -134,6 +153,10 @@ function HissDetail() {
     api.organisationer.get,
     hiss ? ({ id: hiss.organisation_id } as never) : "skip",
   ) as OrgDoc | undefined;
+  const archiveMutation = useMutation(api.hissar.archive);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [archiveStatus, setArchiveStatus] = useState<"rivd" | "arkiverad">("rivd");
+  const [isArchiving, setIsArchiving] = useState(false);
 
   if (hiss === undefined) {
     return <DetailSkeleton />;
@@ -146,6 +169,17 @@ function HissDetail() {
   };
 
   const statusVariant = hiss.status === "aktiv" ? "default" : "secondary";
+
+  async function handleArchive() {
+    setIsArchiving(true);
+    try {
+      await archiveMutation({ id: id as never, status: archiveStatus });
+      setArchiveDialogOpen(false);
+      navigate({ to: "/register" });
+    } catch {
+      setIsArchiving(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -172,12 +206,53 @@ function HissDetail() {
             </p>
           )}
         </div>
-        <Link to="/hiss/$id/redigera" params={{ id }}>
-          <Button>
-            <Pencil className="mr-2 size-4" />
-            Redigera
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {hiss.status === "aktiv" && (
+            <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Archive className="mr-2 size-4" />
+                  Arkivera
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Arkivera hiss {hiss.hissnummer}</DialogTitle>
+                  <DialogDescription>
+                    Hissen tas bort från aktiva vyer, KPI:er och budgetberäkningar.
+                    Data bevaras i databasen för historisk referens.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Ny status</label>
+                  <Select value={archiveStatus} onValueChange={(v) => setArchiveStatus(v as "rivd" | "arkiverad")}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="rivd">Rivd</SelectItem>
+                      <SelectItem value="arkiverad">Arkiverad</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setArchiveDialogOpen(false)}>
+                    Avbryt
+                  </Button>
+                  <Button onClick={handleArchive} disabled={isArchiving}>
+                    {isArchiving ? "Arkiverar..." : "Bekräfta"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          <Link to="/hiss/$id/redigera" params={{ id }}>
+            <Button>
+              <Pencil className="mr-2 size-4" />
+              Redigera
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Separator />

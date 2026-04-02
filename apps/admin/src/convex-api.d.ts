@@ -41,6 +41,7 @@ declare module "@convex/_generated/api" {
       search: FunctionReference<"query", "public">;
       create: FunctionReference<"mutation", "public">;
       update: FunctionReference<"mutation", "public">;
+      archive: FunctionReference<"mutation", "public">;
     };
     importera: {
       analyze: FunctionReference<"query", "public">;

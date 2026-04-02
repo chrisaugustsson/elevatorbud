@@ -60,6 +60,7 @@ const filterArgs = {
       v.literal("aktiv"),
       v.literal("rivd"),
       v.literal("arkiverad"),
+      v.literal("alla"),
     ),
   ),
   organisation_id: v.optional(v.id("organisationer")),
@@ -78,7 +79,7 @@ async function fetchAndFilter(
     byggarMin?: number;
     byggarMax?: number;
     moderniserad?: boolean;
-    status?: "aktiv" | "rivd" | "arkiverad";
+    status?: "aktiv" | "rivd" | "arkiverad" | "alla";
     organisation_id?: any;
   },
 ) {
@@ -95,7 +96,9 @@ async function fetchAndFilter(
   }
 
   const statusFilter = args.status ?? "aktiv";
-  let filtered = allHissar.filter((h: any) => h.status === statusFilter);
+  let filtered = statusFilter === "alla"
+    ? allHissar
+    : allHissar.filter((h: any) => h.status === statusFilter);
 
   if (args.search) {
     const s = args.search.toLowerCase().trim();
@@ -1152,5 +1155,26 @@ export const create = mutation({
       skapad_av: admin._id,
       skapad_datum: Date.now(),
     });
+  },
+});
+
+export const archive = mutation({
+  args: {
+    id: v.id("hissar"),
+    status: v.union(v.literal("rivd"), v.literal("arkiverad")),
+  },
+  handler: async (ctx, { id, status }) => {
+    const admin = await requireAdmin(ctx);
+
+    const existing = await ctx.db.get(id);
+    if (!existing) throw new Error("Hissen hittades inte");
+
+    await ctx.db.patch(id, {
+      status,
+      senast_uppdaterad_av: admin._id,
+      senast_uppdaterad: Date.now(),
+    });
+
+    return id;
   },
 });
