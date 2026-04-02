@@ -44,6 +44,76 @@ async function autoAddForslagsvarden(
   }
 }
 
+export const stats = query({
+  args: { organisation_id: v.optional(v.id("organisationer")) },
+  handler: async (ctx, { organisation_id }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+
+    let hissar;
+    if (organisation_id) {
+      hissar = await ctx.db
+        .query("hissar")
+        .withIndex("by_organisation_id", (q) =>
+          q.eq("organisation_id", organisation_id),
+        )
+        .collect();
+    } else {
+      hissar = await ctx.db.query("hissar").collect();
+    }
+
+    // Only count active elevators
+    const aktiva = hissar.filter((h) => h.status === "aktiv");
+
+    const currentYear = new Date().getFullYear();
+
+    // Average age (only elevators with byggar set)
+    const withByggar = aktiva.filter((h) => h.byggar !== undefined);
+    const averageAge =
+      withByggar.length > 0
+        ? withByggar.reduce((sum, h) => sum + (currentYear - h.byggar!), 0) /
+          withByggar.length
+        : 0;
+
+    // Modernization within 3 years
+    const moderniseringInom3Ar = aktiva.filter((h) => {
+      if (!h.rekommenderat_moderniserar) return false;
+      const year = parseInt(h.rekommenderat_moderniserar, 10);
+      if (isNaN(year)) return false;
+      return year >= currentYear && year <= currentYear + 3;
+    }).length;
+
+    // Total budget current year
+    const totalBudgetInnevarandeAr = aktiva
+      .filter((h) => {
+        if (!h.rekommenderat_moderniserar || !h.budget_belopp) return false;
+        const year = parseInt(h.rekommenderat_moderniserar, 10);
+        return year === currentYear;
+      })
+      .reduce((sum, h) => sum + (h.budget_belopp ?? 0), 0);
+
+    // Count without modernization
+    const utanModernisering = aktiva.filter((h) => {
+      return !h.moderniserar || h.moderniserar === "Ej ombyggd";
+    }).length;
+
+    // Latest inventory date (most recent skapad_datum)
+    const senastInventering =
+      aktiva.length > 0
+        ? Math.max(...aktiva.map((h) => h.skapad_datum))
+        : null;
+
+    return {
+      totalAntal: aktiva.length,
+      medelAlder: Math.round(averageAge * 10) / 10,
+      moderniseringInom3Ar,
+      totalBudgetInnevarandeAr,
+      utanModernisering,
+      senastInventering,
+    };
+  },
+});
+
 export const dagensHissar = query({
   args: { todayStart: v.number() },
   handler: async (ctx, { todayStart }) => {
