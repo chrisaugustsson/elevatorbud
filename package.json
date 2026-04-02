@@ -10,7 +10,10 @@
     "typecheck": "turbo run typecheck && tsc --noEmit -p convex/tsconfig.json"
   },
   "devDependencies": {
+    "@clerk/backend": "^3.2.4",
+    "@types/node": "^25.5.0",
     "convex": "^1.34.1",
+    "svix": "^1.89.0",
     "turbo": "^2.9.3",
     "typescript": "^6.0.2"
   },
