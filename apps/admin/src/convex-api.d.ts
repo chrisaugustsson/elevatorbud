@@ -53,6 +53,12 @@ declare module "@convex/_generated/api" {
       merge: FunctionReference<"mutation", "public">;
       deactivate: FunctionReference<"mutation", "public">;
     };
+    cms: {
+      getPage: FunctionReference<"query", "public">;
+      listPages: FunctionReference<"query", "public">;
+      createPage: FunctionReference<"mutation", "public">;
+      updatePage: FunctionReference<"mutation", "public">;
+    };
   };
 
   export const internal: {

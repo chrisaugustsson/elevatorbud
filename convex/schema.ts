@@ -98,4 +98,37 @@ export default defineSchema({
     aktiv: v.boolean(),
     skapad_datum: v.number(),
   }).index("by_kategori", ["kategori"]),
+
+  pages: defineTable({
+    slug: v.string(),
+    title: v.string(),
+    sections: v.array(
+      v.object({
+        id: v.string(),
+        type: v.string(),
+        title: v.optional(v.string()),
+        subtitle: v.optional(v.string()),
+        content: v.optional(v.string()),
+        items: v.optional(
+          v.array(
+            v.object({
+              title: v.optional(v.string()),
+              description: v.optional(v.string()),
+              icon: v.optional(v.string()),
+            }),
+          ),
+        ),
+        cta: v.optional(
+          v.object({
+            text: v.string(),
+            href: v.string(),
+          }),
+        ),
+        imageUrl: v.optional(v.string()),
+        order: v.number(),
+      }),
+    ),
+    published: v.boolean(),
+    updatedAt: v.optional(v.number()),
+  }).index("by_slug", ["slug"]),
 });
