@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -29,8 +29,16 @@ import {
   Phone,
   MessageSquare,
   ClipboardList,
+  Save,
 } from "lucide-react";
 import { cn } from "@elevatorbud/ui/lib/utils";
+import {
+  getDraftKey,
+  saveDraft,
+  loadDraft,
+  clearDraft,
+  hasDraft,
+} from "../../lib/form-persistence";
 
 export const Route = createFileRoute("/_authenticated/ny")({
   component: NyHiss,
@@ -173,8 +181,19 @@ function NyHiss() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [draftPromptVisible, setDraftPromptVisible] = useState(false);
+  const [draftSavedVisible, setDraftSavedVisible] = useState(false);
+  const draftSavedTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const draftKey = getDraftKey();
   const orgs = useQuery(api.organisationer.list);
   const createHiss = useMutation(api.hissar.create);
+
+  // Check for existing draft on mount
+  useEffect(() => {
+    if (hasDraft(draftKey)) {
+      setDraftPromptVisible(true);
+    }
+  }, [draftKey]);
 
   const form = useForm({
     defaultValues,
@@ -231,6 +250,7 @@ function NyHiss() {
           nodtelefon_pris: toOptionalNumber(value.nodtelefon_pris),
           kommentarer: toOptionalString(value.kommentarer),
         });
+        clearDraft(draftKey);
         setSubmitSuccess(true);
       } catch (err: unknown) {
         if (
@@ -256,6 +276,7 @@ function NyHiss() {
   };
 
   const resetForm = () => {
+    clearDraft(draftKey);
     form.reset();
     setCurrentStep(1);
     setSubmitSuccess(false);
@@ -279,6 +300,53 @@ function NyHiss() {
       setCurrentStep(step);
     }
   };
+
+  // Restore draft
+  const restoreDraft = useCallback(() => {
+    const draft = loadDraft<HissFormValues>(draftKey);
+    if (draft) {
+      for (const [key, value] of Object.entries(draft.values)) {
+        form.setFieldValue(key as keyof HissFormValues, value as never);
+      }
+      if (draft.currentStep) {
+        setCurrentStep(draft.currentStep);
+      }
+    }
+    setDraftPromptVisible(false);
+  }, [draftKey, form]);
+
+  const dismissDraft = useCallback(() => {
+    clearDraft(draftKey);
+    setDraftPromptVisible(false);
+  }, [draftKey]);
+
+  // Auto-save form state to localStorage (debounced 500ms)
+  const formValues = form.state.values;
+  useEffect(() => {
+    if (submitSuccess || draftPromptVisible) return;
+    const timer = setTimeout(() => {
+      // Only save if there's something worth saving
+      const hasContent = Object.entries(formValues).some(([key, val]) => {
+        if (key === "organisation_id") return false;
+        if (typeof val === "boolean") return val;
+        return typeof val === "string" && val.trim() !== "";
+      });
+      if (hasContent) {
+        saveDraft(draftKey, formValues, currentStep);
+        setDraftSavedVisible(true);
+        if (draftSavedTimerRef.current) clearTimeout(draftSavedTimerRef.current);
+        draftSavedTimerRef.current = setTimeout(() => setDraftSavedVisible(false), 2000);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formValues, currentStep, draftKey, submitSuccess, draftPromptVisible]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (draftSavedTimerRef.current) clearTimeout(draftSavedTimerRef.current);
+    };
+  }, []);
 
   // Success confirmation view
   if (submitSuccess) {
@@ -305,9 +373,43 @@ function NyHiss() {
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+      {/* Draft restore prompt */}
+      {draftPromptVisible && (
+        <div className="border-b border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-800 dark:bg-blue-950">
+          <p className="mb-2 text-sm font-medium text-blue-900 dark:text-blue-100">
+            Du har ett sparat utkast. Vill du fortsätta där du slutade?
+          </p>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="h-9"
+              onClick={restoreDraft}
+            >
+              Återställ utkast
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9"
+              onClick={dismissDraft}
+            >
+              Börja om
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Header with org selector */}
       <div className="border-b bg-background px-4 py-3">
-        <h1 className="text-lg font-semibold">Ny hiss</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-semibold">Ny hiss</h1>
+          {draftSavedVisible && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground animate-in fade-in">
+              <Save className="size-3" />
+              Utkast sparat
+            </span>
+          )}
+        </div>
         <div className="mt-2">
           <form.Field name="organisation_id">
             {(field) => (
