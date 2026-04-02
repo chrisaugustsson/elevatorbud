@@ -44,9 +44,20 @@ async function autoAddForslagsvarden(
   }
 }
 
+export const get = query({
+  args: { id: v.id("hissar") },
+  handler: async (ctx, { id }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+    const hiss = await ctx.db.get(id);
+    if (!hiss) throw new Error("Hissen hittades inte");
+    return hiss;
+  },
+});
+
 export const checkHissnummer = query({
-  args: { hissnummer: v.string() },
-  handler: async (ctx, { hissnummer }) => {
+  args: { hissnummer: v.string(), excludeId: v.optional(v.id("hissar")) },
+  handler: async (ctx, { hissnummer, excludeId }) => {
     const user = await getCurrentUser(ctx);
     if (!user) throw new Error("Ej autentiserad");
     if (!hissnummer) return { exists: false };
@@ -54,7 +65,10 @@ export const checkHissnummer = query({
       .query("hissar")
       .withIndex("by_hissnummer", (q) => q.eq("hissnummer", hissnummer))
       .unique();
-    return { exists: !!existing };
+    if (!existing) return { exists: false };
+    // When editing, exclude the current hiss from the duplicate check
+    if (excludeId && existing._id === excludeId) return { exists: false };
+    return { exists: true };
   },
 });
 
