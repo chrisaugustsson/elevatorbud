@@ -546,7 +546,7 @@ function Register() {
                   key={row.id}
                   className="cursor-pointer"
                   onClick={() => {
-                    window.location.href = `/hiss/${row.original._id}/redigera`;
+                    window.location.href = `/hiss/${row.original._id}`;
                   }}
                 >
                   {row.getVisibleCells().map((cell) => (
