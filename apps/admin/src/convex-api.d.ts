@@ -24,6 +24,7 @@ declare module "@convex/_generated/api" {
     };
     hissar: {
       stats: FunctionReference<"query", "public">;
+      chartData: FunctionReference<"query", "public">;
       dagensHissar: FunctionReference<"query", "public">;
       get: FunctionReference<"query", "public">;
       checkHissnummer: FunctionReference<"query", "public">;

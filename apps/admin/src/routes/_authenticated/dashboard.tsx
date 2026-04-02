@@ -1,16 +1,144 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
+import { useSelectedOrg } from "../../lib/org-context";
+import { KpiCards } from "@elevatorbud/ui/components/dashboard/kpi-cards";
+import type { KpiItem } from "@elevatorbud/ui/components/dashboard/kpi-cards";
+import {
+  DashboardBarChart,
+  DashboardPieChart,
+} from "@elevatorbud/ui/components/dashboard/charts";
+import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
+import {
+  Building2,
+  Calendar,
+  Clock,
+  Hammer,
+  TrendingUp,
+  AlertTriangle,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
 function Dashboard() {
+  const { selectedOrgId } = useSelectedOrg();
+  const orgFilter = selectedOrgId
+    ? ({ organisation_id: selectedOrgId } as never)
+    : {};
+
+  const stats = useQuery(api.hissar.stats, orgFilter);
+  const chartData = useQuery(api.hissar.chartData, orgFilter);
+
+  if (stats === undefined || chartData === undefined) {
+    return <DashboardSkeleton />;
+  }
+
+  const kpiItems: KpiItem[] = [
+    {
+      title: "Totalt antal hissar",
+      value: stats.totalAntal,
+      icon: <Building2 className="h-4 w-4" />,
+    },
+    {
+      title: "Medelålder",
+      value: `${stats.medelAlder} år`,
+      icon: <Clock className="h-4 w-4" />,
+    },
+    {
+      title: "Modernisering inom 3 år",
+      value: stats.moderniseringInom3Ar,
+      description: "Rekommenderad modernisering",
+      icon: <Hammer className="h-4 w-4" />,
+    },
+    {
+      title: "Budget innevarande år",
+      value: `${(stats.totalBudgetInnevarandeAr / 1000).toFixed(0)} tkr`,
+      icon: <TrendingUp className="h-4 w-4" />,
+    },
+    {
+      title: "Utan modernisering",
+      value: stats.utanModernisering,
+      description: "Ej ombyggda",
+      icon: <AlertTriangle className="h-4 w-4" />,
+    },
+    {
+      title: "Senaste inventering",
+      value: stats.senastInventering
+        ? new Date(stats.senastInventering).toLocaleDateString("sv-SE")
+        : "–",
+      icon: <Calendar className="h-4 w-4" />,
+    },
+  ];
+
   return (
-    <div>
+    <div className="space-y-6">
       <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-      <p className="mt-2 text-muted-foreground">
-        Översikt kommer i en framtida version.
-      </p>
+
+      <KpiCards items={kpiItems} />
+
+      {stats.totalAntal === 0 ? (
+        <div className="py-12 text-center text-muted-foreground">
+          Inga hissar registrerade ännu. Skapa en hiss via &quot;Ny hiss&quot;
+          för att se statistik.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <DashboardBarChart
+            title="Hissar per distrikt"
+            data={chartData.perDistrikt}
+            color="var(--color-chart-1, #2563eb)"
+          />
+
+          <DashboardBarChart
+            title="Åldersfördelning"
+            data={chartData.ageDistribution}
+            color="var(--color-chart-2, #16a34a)"
+          />
+
+          <DashboardPieChart
+            title="Hisstyper"
+            data={chartData.perHisstyp}
+          />
+
+          <DashboardBarChart
+            title="Topp 10 fabrikat"
+            data={chartData.topFabrikat}
+            color="var(--color-chart-3, #d97706)"
+          />
+
+          <DashboardBarChart
+            title="Moderniseringstidslinje"
+            data={chartData.moderniseringTidslinje}
+            color="var(--color-chart-4, #dc2626)"
+          />
+
+          <DashboardPieChart
+            title="Skötselföretag"
+            data={chartData.perSkotselforetag}
+            innerRadius={60}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-8 w-48" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 rounded-xl" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-[380px] rounded-xl" />
+        ))}
+      </div>
     </div>
   );
 }

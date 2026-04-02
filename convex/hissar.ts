@@ -114,6 +114,113 @@ export const stats = query({
   },
 });
 
+export const chartData = query({
+  args: { organisation_id: v.optional(v.id("organisationer")) },
+  handler: async (ctx, { organisation_id }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+
+    let hissar;
+    if (organisation_id) {
+      hissar = await ctx.db
+        .query("hissar")
+        .withIndex("by_organisation_id", (q) =>
+          q.eq("organisation_id", organisation_id),
+        )
+        .collect();
+    } else {
+      hissar = await ctx.db.query("hissar").collect();
+    }
+
+    const aktiva = hissar.filter((h) => h.status === "aktiv");
+    const currentYear = new Date().getFullYear();
+
+    // Elevators per district
+    const perDistrikt: Record<string, number> = {};
+    for (const h of aktiva) {
+      const key = h.distrikt || "Okänt";
+      perDistrikt[key] = (perDistrikt[key] || 0) + 1;
+    }
+
+    // Age distribution (decade buckets)
+    const ageDistribution: Record<string, number> = {};
+    for (const h of aktiva) {
+      if (h.byggar === undefined) {
+        ageDistribution["Okänt"] = (ageDistribution["Okänt"] || 0) + 1;
+      } else {
+        const age = currentYear - h.byggar;
+        let bucket: string;
+        if (age < 10) bucket = "0-9 år";
+        else if (age < 20) bucket = "10-19 år";
+        else if (age < 30) bucket = "20-29 år";
+        else if (age < 40) bucket = "30-39 år";
+        else if (age < 50) bucket = "40-49 år";
+        else bucket = "50+ år";
+        ageDistribution[bucket] = (ageDistribution[bucket] || 0) + 1;
+      }
+    }
+
+    // Elevator types
+    const perHisstyp: Record<string, number> = {};
+    for (const h of aktiva) {
+      const key = h.hisstyp || "Okänt";
+      perHisstyp[key] = (perHisstyp[key] || 0) + 1;
+    }
+
+    // Top-10 manufacturers
+    const perFabrikat: Record<string, number> = {};
+    for (const h of aktiva) {
+      const key = h.fabrikat || "Okänt";
+      perFabrikat[key] = (perFabrikat[key] || 0) + 1;
+    }
+    const topFabrikat = Object.entries(perFabrikat)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    // Modernization timeline (2026-2045+)
+    const moderniseringTidslinje: Record<string, number> = {};
+    for (const h of aktiva) {
+      if (!h.rekommenderat_moderniserar) continue;
+      const year = parseInt(h.rekommenderat_moderniserar, 10);
+      if (isNaN(year)) continue;
+      const key = year >= 2045 ? "2045+" : String(year);
+      moderniseringTidslinje[key] = (moderniseringTidslinje[key] || 0) + 1;
+    }
+
+    // Maintenance companies
+    const perSkotselforetag: Record<string, number> = {};
+    for (const h of aktiva) {
+      const key = h.skotselforetag || "Okänt";
+      perSkotselforetag[key] = (perSkotselforetag[key] || 0) + 1;
+    }
+
+    return {
+      perDistrikt: Object.entries(perDistrikt).map(([name, count]) => ({
+        name,
+        count,
+      })),
+      ageDistribution: Object.entries(ageDistribution).map(
+        ([name, count]) => ({ name, count }),
+      ),
+      perHisstyp: Object.entries(perHisstyp).map(([name, count]) => ({
+        name,
+        count,
+      })),
+      topFabrikat: topFabrikat.map(([name, count]) => ({ name, count })),
+      moderniseringTidslinje: Object.entries(moderniseringTidslinje)
+        .sort((a, b) => {
+          if (a[0] === "2045+") return 1;
+          if (b[0] === "2045+") return -1;
+          return Number(a[0]) - Number(b[0]);
+        })
+        .map(([name, count]) => ({ name, count })),
+      perSkotselforetag: Object.entries(perSkotselforetag).map(
+        ([name, count]) => ({ name, count }),
+      ),
+    };
+  },
+});
+
 export const dagensHissar = query({
   args: { todayStart: v.number() },
   handler: async (ctx, { todayStart }) => {
