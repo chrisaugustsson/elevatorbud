@@ -24,7 +24,9 @@ declare module "@convex/_generated/api" {
     };
     hissar: {
       checkHissnummer: FunctionReference<"query", "public">;
+      search: FunctionReference<"query", "public">;
       create: FunctionReference<"mutation", "public">;
+      update: FunctionReference<"mutation", "public">;
     };
     forslagsvarden: {
       list: FunctionReference<"query", "public">;
