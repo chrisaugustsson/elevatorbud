@@ -2,6 +2,14 @@ import { createFileRoute, Navigate, Outlet } from "@tanstack/react-router";
 import { useAuth } from "@elevatorbud/auth";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
+import {
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+} from "@elevatorbud/ui/components/ui/sidebar";
+import { Separator } from "@elevatorbud/ui/components/ui/separator";
+import { AppSidebar } from "../components/app-sidebar";
+import { OrgDisplay } from "../components/org-display";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -23,7 +31,6 @@ function AuthenticatedLayout() {
     return <Navigate to="/login" />;
   }
 
-  // Convex query loading
   if (user === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -32,7 +39,6 @@ function AuthenticatedLayout() {
     );
   }
 
-  // User not found in database (webhook may not have fired yet)
   if (user === null) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -45,7 +51,6 @@ function AuthenticatedLayout() {
     );
   }
 
-  // Customer role check
   if (user.roll !== "kund") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -61,5 +66,21 @@ function AuthenticatedLayout() {
     );
   }
 
-  return <Outlet />;
+  return (
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="mr-2 h-4" />
+          {user.organisation_id && (
+            <OrgDisplay organisationId={user.organisation_id} />
+          )}
+        </header>
+        <div className="flex-1 overflow-auto p-6">
+          <Outlet />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  );
 }

@@ -1,18 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/")({
   component: Home,
 });
 
 function Home() {
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-foreground">
-        Hisskompetens Kundportal
-      </h1>
-      <p className="mt-2 text-muted-foreground">
-        Välkommen till kundportalen.
-      </p>
-    </div>
-  );
+  return <Navigate to="/dashboard" />;
 }

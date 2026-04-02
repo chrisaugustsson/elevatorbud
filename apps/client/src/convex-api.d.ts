@@ -7,6 +7,10 @@ declare module "@convex/_generated/api" {
     users: {
       me: FunctionReference<"query", "public">;
     };
+    organisationer: {
+      list: FunctionReference<"query", "public">;
+      get: FunctionReference<"query", "public">;
+    };
   };
 
   export const internal: {
@@ -15,4 +19,8 @@ declare module "@convex/_generated/api" {
       deleteFromClerk: FunctionReference<"mutation", "internal">;
     };
   };
+}
+
+declare module "@convex/_generated/dataModel" {
+  export type Id<T extends string> = string & { __tableName: T };
 }
