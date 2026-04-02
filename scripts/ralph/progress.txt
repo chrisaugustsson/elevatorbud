@@ -148,6 +148,13 @@ Started: tors  2 apr. 2026 14:51:49 CEST
 - `anyApi` pattern for internal references in actions: avoids circular type dependency between public and internal modules (same pattern as anvandare/anvandareInternal)
 - CMS pages table: `pages` with slug index — `cms.getPage`/`cms.listPages` are public (no auth), `cms.createPage`/`cms.updatePage` require admin
 - CMS section schema: flexible `type` field + optional title/subtitle/content/items/cta/imageUrl + order — landing page components switch on `type`
+- Landing app uses `ConvexProvider` + `ConvexReactClient` directly (no Clerk) — CMS queries are public, no auth needed
+- Landing page pattern: each route queries CMS via `useQuery(api.cms.getPage, { slug })` with static fallback content when CMS data is absent
+- Landing nav links typed `as const` in __root.tsx `navLinks` array — reused in header + mobile menu + footer
+- Convex actions can call external APIs via `fetch()` — use Resend REST API directly since workspace packages (@elevatorbud/*) can't be imported in convex/
+- Email sending from Convex: build HTML inline in convex/email.ts helper, call `fetch("https://api.resend.com/emails")` with Bearer auth — requires RESEND_API_KEY env var
+- React Email templates in packages/email/ for development/preview — Convex uses its own HTML builder since it can't import workspace JSX
+- packages/email/ needs `"jsx": "react-jsx"` and `"types": ["node"]` in tsconfig.json for JSX + process.env support
 
 ---
 
@@ -950,4 +957,51 @@ Started: tors  2 apr. 2026 14:51:49 CEST
   - `items` array within sections supports service/feature lists (title + description + optional icon name)
   - convex/_generated/api.ts is gitignored — cannot be committed, but must be updated locally for typecheck
   - No new codebase patterns discovered — follows existing Convex query/mutation conventions
+---
+
+## 2026-04-02 - US-043
+- Implemented landing page with four pages: Startsida (/), Tjänster (/tjanster), Om oss (/om-oss), Kontakt (/kontakt)
+- Installed `convex` and `lucide-react` in landing app, added `@convex` Vite alias
+- Created `convex-api.d.ts` with CMS query type declarations
+- Updated `__root.tsx` with ConvexProvider (no Clerk), responsive site header with mobile hamburger menu, and footer with site links and contact info
+- Startsida: hero gradient section with CTAs, stats bar, 6 feature cards (icon + title + description), bottom CTA
+- Tjänster: 6 service detail cards with alternating layout (icon + description + feature checklist), blue CTA section
+- Om oss: hero, mission statement card, 4 value cards in grid, company story with paragraphs
+- Kontakt: hero, contact info cards (email/phone/address/hours), contact form (mailto-based submission)
+- All pages query CMS via `useQuery(api.cms.getPage, { slug })` with comprehensive static fallback content
+- Swedish language throughout, responsive design (mobile-first with sm/md/lg breakpoints)
+- Google Fonts Inter loaded in head for professional typography
+- Files created: convex-api.d.ts, tjanster.tsx, om-oss.tsx, kontakt.tsx
+- Files modified: __root.tsx, index.tsx, vite.config.ts, package.json, pnpm-lock.yaml
+- **Learnings for future iterations:**
+  - Landing app uses `ConvexProvider` + `ConvexReactClient` directly — no Clerk/auth wrapping needed since CMS queries are public
+  - Landing app does NOT need `@elevatorbud/auth` dependency — just plain `convex` package
+  - Contact form uses `mailto:` link approach — no backend form processing needed for initial version
+  - CMS fallback pattern: define `FALLBACK_SECTIONS` / `FALLBACK` constant per page, use CMS data when available (`page?.sections?.find(s => s.type === "hero")`)
+  - Icon mapping: define `iconMap` Record<string, ComponentType> to map CMS icon strings to lucide-react components
+  - `routeTree.gen.ts` is gitignored — cannot stage it, but must be updated locally for typecheck
+  - Manual browser verification needed (no browser testing tools configured)
+---
+
+## 2026-04-02 - US-044
+- Implemented React Email import report template and Resend integration
+- Created `packages/email/src/templates/import-report.tsx` — React Email component with styled sections: summary (created/updated/errors), new orgs, error details
+- Created `packages/email/src/resend.ts` — Resend SDK wrapper with `sendImportReport()` function for use outside Convex
+- Created `convex/email.ts` — self-contained HTML builder + Resend REST API sender via `fetch()` for use in Convex actions
+- Updated `convex/importera.ts`: added `adminEmail` optional arg to `confirm` action, calls `sendImportReport()` after all batches complete
+- Updated admin import page: passes `currentUser.email` to confirm action, shows "Importrapport skickad via e-post" confirmation on success
+- Installed: @react-email/components 1.0.11, @react-email/render 2.0.5, resend 6.10.0 in packages/email; resend at root for Convex
+- Added @types/react and @types/node as devDeps for email package
+- Sender: noreply@hisskompetens.se
+- Email sending is non-blocking — if RESEND_API_KEY is not configured, import still completes (logs error, returns emailSent: false)
+- Files created: packages/email/src/templates/import-report.tsx, packages/email/src/resend.ts, convex/email.ts
+- Files modified: packages/email/src/index.ts, packages/email/package.json, packages/email/tsconfig.json, convex/importera.ts, apps/admin/src/routes/_authenticated/admin.import.tsx, package.json, pnpm-lock.yaml
+- **Learnings for future iterations:**
+  - Convex bundler does NOT resolve pnpm workspace packages — cannot import from `@elevatorbud/email` in convex/ directory
+  - Use `fetch()` to call external APIs from Convex actions — Resend REST API is simple: POST to `https://api.resend.com/emails` with Bearer token
+  - React Email `<Preview>` component expects a single string child — template literals work, but `{number} text` fragments fail with `Type 'number' is not assignable to type 'ReactNode & string'`
+  - `convex/email.ts` is self-contained (no workspace imports) — builds HTML via string interpolation with `escapeHtml()` for XSS safety
+  - Email sending errors don't fail the import — `sendImportReport()` catches all errors and returns `{ success: false, error }` instead of throwing
+  - `RESEND_API_KEY` env var must be set in Convex dashboard for email sending to work
+  - Manual browser verification needed (no browser testing tools configured)
 ---
