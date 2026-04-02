@@ -23,6 +23,7 @@ declare module "@convex/_generated/api" {
       listByOrganisation: FunctionReference<"query", "public">;
     };
     hissar: {
+      list: FunctionReference<"query", "public">;
       stats: FunctionReference<"query", "public">;
       chartData: FunctionReference<"query", "public">;
       dagensHissar: FunctionReference<"query", "public">;

@@ -44,6 +44,191 @@ async function autoAddForslagsvarden(
   }
 }
 
+export const list = query({
+  args: {
+    // Free text search across hissnummer, adress, distrikt, fabrikat, hisstyp
+    search: v.optional(v.string()),
+    // Multi-select filters
+    distrikt: v.optional(v.array(v.string())),
+    hisstyp: v.optional(v.array(v.string())),
+    fabrikat: v.optional(v.array(v.string())),
+    skotselforetag: v.optional(v.array(v.string())),
+    besiktningsorgan: v.optional(v.array(v.string())),
+    // Range filter
+    byggarMin: v.optional(v.number()),
+    byggarMax: v.optional(v.number()),
+    // Boolean filter
+    moderniserad: v.optional(v.boolean()),
+    // Status filter (defaults to "aktiv" if not provided)
+    status: v.optional(
+      v.union(
+        v.literal("aktiv"),
+        v.literal("rivd"),
+        v.literal("arkiverad"),
+      ),
+    ),
+    // Tenant isolation
+    organisation_id: v.optional(v.id("organisationer")),
+    // Sorting
+    sort: v.optional(v.string()),
+    order: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+    // Pagination
+    page: v.optional(v.number()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+
+    // Fetch base data — use org index when filtering by organisation
+    let allHissar;
+    if (args.organisation_id) {
+      allHissar = await ctx.db
+        .query("hissar")
+        .withIndex("by_organisation_id", (q) =>
+          q.eq("organisation_id", args.organisation_id!),
+        )
+        .collect();
+    } else {
+      allHissar = await ctx.db.query("hissar").collect();
+    }
+
+    // Apply status filter (default to aktiv)
+    const statusFilter = args.status ?? "aktiv";
+    let filtered = allHissar.filter((h) => h.status === statusFilter);
+
+    // Free text search
+    if (args.search) {
+      const s = args.search.toLowerCase().trim();
+      if (s) {
+        filtered = filtered.filter(
+          (h) =>
+            h.hissnummer.toLowerCase().includes(s) ||
+            (h.adress && h.adress.toLowerCase().includes(s)) ||
+            (h.distrikt && h.distrikt.toLowerCase().includes(s)) ||
+            (h.fabrikat && h.fabrikat.toLowerCase().includes(s)) ||
+            (h.hisstyp && h.hisstyp.toLowerCase().includes(s)),
+        );
+      }
+    }
+
+    // Multi-select filters
+    if (args.distrikt && args.distrikt.length > 0) {
+      const set = new Set(args.distrikt.map((d) => d.toLowerCase()));
+      filtered = filtered.filter(
+        (h) => h.distrikt && set.has(h.distrikt.toLowerCase()),
+      );
+    }
+    if (args.hisstyp && args.hisstyp.length > 0) {
+      const set = new Set(args.hisstyp.map((d) => d.toLowerCase()));
+      filtered = filtered.filter(
+        (h) => h.hisstyp && set.has(h.hisstyp.toLowerCase()),
+      );
+    }
+    if (args.fabrikat && args.fabrikat.length > 0) {
+      const set = new Set(args.fabrikat.map((d) => d.toLowerCase()));
+      filtered = filtered.filter(
+        (h) => h.fabrikat && set.has(h.fabrikat.toLowerCase()),
+      );
+    }
+    if (args.skotselforetag && args.skotselforetag.length > 0) {
+      const set = new Set(args.skotselforetag.map((d) => d.toLowerCase()));
+      filtered = filtered.filter(
+        (h) => h.skotselforetag && set.has(h.skotselforetag.toLowerCase()),
+      );
+    }
+    if (args.besiktningsorgan && args.besiktningsorgan.length > 0) {
+      const set = new Set(args.besiktningsorgan.map((d) => d.toLowerCase()));
+      filtered = filtered.filter(
+        (h) =>
+          h.besiktningsorgan && set.has(h.besiktningsorgan.toLowerCase()),
+      );
+    }
+
+    // Range filter for byggar
+    if (args.byggarMin !== undefined) {
+      filtered = filtered.filter(
+        (h) => h.byggar !== undefined && h.byggar >= args.byggarMin!,
+      );
+    }
+    if (args.byggarMax !== undefined) {
+      filtered = filtered.filter(
+        (h) => h.byggar !== undefined && h.byggar <= args.byggarMax!,
+      );
+    }
+
+    // Boolean filter for moderniserad
+    if (args.moderniserad !== undefined) {
+      if (args.moderniserad) {
+        // Has been modernized (has a value that is not "Ej ombyggd")
+        filtered = filtered.filter(
+          (h) => h.moderniserar && h.moderniserar !== "Ej ombyggd",
+        );
+      } else {
+        // Not modernized
+        filtered = filtered.filter(
+          (h) => !h.moderniserar || h.moderniserar === "Ej ombyggd",
+        );
+      }
+    }
+
+    const totalCount = filtered.length;
+
+    // Sorting
+    const sortField = args.sort || "hissnummer";
+    const sortOrder = args.order || "asc";
+    filtered.sort((a, b) => {
+      const aVal = (a as Record<string, unknown>)[sortField];
+      const bVal = (b as Record<string, unknown>)[sortField];
+
+      // Handle undefined values — push them to the end
+      if (aVal === undefined && bVal === undefined) return 0;
+      if (aVal === undefined) return 1;
+      if (bVal === undefined) return -1;
+
+      let cmp: number;
+      if (typeof aVal === "number" && typeof bVal === "number") {
+        cmp = aVal - bVal;
+      } else {
+        cmp = String(aVal).localeCompare(String(bVal), "sv");
+      }
+
+      return sortOrder === "desc" ? -cmp : cmp;
+    });
+
+    // Pagination
+    const limit = args.limit ?? 25;
+    const page = args.page ?? 0;
+    const offset = page * limit;
+    const pageData = filtered.slice(offset, offset + limit);
+
+    // Enrich with organisation name
+    const orgCache = new Map<string, string>();
+    const results = await Promise.all(
+      pageData.map(async (h) => {
+        let orgNamn = orgCache.get(h.organisation_id);
+        if (orgNamn === undefined) {
+          const org = await ctx.db.get(h.organisation_id);
+          orgNamn = org?.namn ?? "Okänd";
+          orgCache.set(h.organisation_id, orgNamn);
+        }
+        return {
+          ...h,
+          organisationsnamn: orgNamn,
+        };
+      }),
+    );
+
+    return {
+      data: results,
+      totalCount,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount / limit),
+    };
+  },
+});
+
 export const stats = query({
   args: { organisation_id: v.optional(v.id("organisationer")) },
   handler: async (ctx, { organisation_id }) => {
