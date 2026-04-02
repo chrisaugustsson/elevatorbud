@@ -44,6 +44,43 @@ async function autoAddForslagsvarden(
   }
 }
 
+export const dagensHissar = query({
+  args: { todayStart: v.number() },
+  handler: async (ctx, { todayStart }) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Ej autentiserad");
+
+    const allHissar = await ctx.db.query("hissar").collect();
+
+    const today = allHissar.filter((h) => {
+      const createdToday =
+        h.skapad_av === user._id && h.skapad_datum >= todayStart;
+      const updatedToday =
+        h.senast_uppdaterad_av === user._id &&
+        h.senast_uppdaterad !== undefined &&
+        h.senast_uppdaterad >= todayStart;
+      return createdToday || updatedToday;
+    });
+
+    // Enrich with organisation name
+    const results = await Promise.all(
+      today.map(async (h) => {
+        const org = await ctx.db.get(h.organisation_id);
+        return {
+          _id: h._id,
+          hissnummer: h.hissnummer,
+          adress: h.adress,
+          organisationsnamn: org?.namn,
+          skapad_datum: h.skapad_datum,
+          senast_uppdaterad: h.senast_uppdaterad,
+        };
+      }),
+    );
+
+    return results;
+  },
+});
+
 export const get = query({
   args: { id: v.id("hissar") },
   handler: async (ctx, { id }) => {
