@@ -1,4 +1,17 @@
 // Shared utility functions for the Elevatorbud monorepo
-// Real utilities will be added in later user stories
 
-export type Placeholder = Record<string, unknown>;
+export { generateCSV, generateExcel, downloadCSV, downloadExcel } from "./export";
+export type { ExportColumn } from "./export";
+
+export {
+  parseHissarSheet,
+  readWorkbook,
+  validateWorkbookSheets,
+  HISSAR_COLUMNS,
+} from "./excel-import";
+export type {
+  ParsedHiss,
+  ImportWarning,
+  HissarParseResult,
+  ColumnDef,
+} from "./excel-import";
