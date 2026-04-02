@@ -22,6 +22,13 @@ declare module "@convex/_generated/api" {
       get: FunctionReference<"query", "public">;
       listByOrganisation: FunctionReference<"query", "public">;
     };
+    forslagsvarden: {
+      list: FunctionReference<"query", "public">;
+      create: FunctionReference<"mutation", "public">;
+      update: FunctionReference<"mutation", "public">;
+      merge: FunctionReference<"mutation", "public">;
+      deactivate: FunctionReference<"mutation", "public">;
+    };
   };
 
   export const internal: {
