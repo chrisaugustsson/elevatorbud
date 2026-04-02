@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useForm } from "@tanstack/react-form";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Input } from "@elevatorbud/ui/components/ui/input";
+import { Textarea } from "@elevatorbud/ui/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -21,6 +22,13 @@ import {
   ChevronRight,
   Check,
   AlertCircle,
+  WifiOff,
+  Loader2,
+  CheckCircle2,
+  Pencil,
+  Phone,
+  MessageSquare,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@elevatorbud/ui/lib/utils";
 
@@ -149,16 +157,110 @@ function useSuggestions(kategori: string): string[] {
     .map((d: { varde: string }) => d.varde);
 }
 
+function toOptionalString(val: string): string | undefined {
+  return val.trim() === "" ? undefined : val.trim();
+}
+
+function toOptionalNumber(val: string): number | undefined {
+  const trimmed = val.trim();
+  if (trimmed === "") return undefined;
+  const num = Number(trimmed);
+  return Number.isNaN(num) ? undefined : num;
+}
+
 function NyHiss() {
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const orgs = useQuery(api.organisationer.list);
+  const createHiss = useMutation(api.hissar.create);
 
   const form = useForm({
     defaultValues,
-    onSubmit: async () => {
-      // Submit handled in US-023
+    onSubmit: async ({ value }) => {
+      setSubmitError(null);
+      setIsSubmitting(true);
+      try {
+        if (!navigator.onLine) {
+          throw new Error("OFFLINE");
+        }
+        await createHiss({
+          hissnummer: value.hissnummer,
+          organisation_id: value.organisation_id as never,
+          adress: toOptionalString(value.adress),
+          hissbeteckning: toOptionalString(value.hissbeteckning),
+          distrikt: toOptionalString(value.distrikt),
+          hisstyp: toOptionalString(value.hisstyp),
+          fabrikat: toOptionalString(value.fabrikat),
+          byggar: toOptionalNumber(value.byggar),
+          hastighet: toOptionalString(value.hastighet),
+          lyfthojd: toOptionalString(value.lyfthojd),
+          marklast: toOptionalString(value.marklast),
+          antal_plan: toOptionalNumber(value.antal_plan),
+          antal_dorrar: toOptionalNumber(value.antal_dorrar),
+          typ_dorrar: toOptionalString(value.typ_dorrar),
+          genomgang: value.genomgang || undefined,
+          kollektiv: toOptionalString(value.kollektiv),
+          korgstorlek: toOptionalString(value.korgstorlek),
+          dagoppning: toOptionalString(value.dagoppning),
+          barbeslag: toOptionalString(value.barbeslag),
+          dorrmaskin: toOptionalString(value.dorrmaskin),
+          drivsystem: toOptionalString(value.drivsystem),
+          upphangning: toOptionalString(value.upphangning),
+          maskinplacering: toOptionalString(value.maskinplacering),
+          typ_maskin: toOptionalString(value.typ_maskin),
+          typ_styrsystem: toOptionalString(value.typ_styrsystem),
+          besiktningsorgan: toOptionalString(value.besiktningsorgan),
+          besiktningsmanad: toOptionalString(value.besiktningsmanad),
+          skotselforetag: toOptionalString(value.skotselforetag),
+          schaktbelysning: toOptionalString(value.schaktbelysning),
+          moderniserar: toOptionalString(value.moderniserar),
+          garanti: value.garanti || undefined,
+          rekommenderat_moderniserar: toOptionalString(
+            value.rekommenderat_moderniserar,
+          ),
+          budget_belopp: toOptionalNumber(value.budget_belopp),
+          atgarder_vid_modernisering: toOptionalString(
+            value.atgarder_vid_modernisering,
+          ),
+          har_nodtelefon: value.har_nodtelefon || undefined,
+          nodtelefon_modell: toOptionalString(value.nodtelefon_modell),
+          nodtelefon_typ: toOptionalString(value.nodtelefon_typ),
+          behover_uppgradering: value.behover_uppgradering || undefined,
+          nodtelefon_pris: toOptionalNumber(value.nodtelefon_pris),
+          kommentarer: toOptionalString(value.kommentarer),
+        });
+        setSubmitSuccess(true);
+      } catch (err: unknown) {
+        if (
+          err instanceof Error &&
+          (err.message === "OFFLINE" || err.message.includes("fetch"))
+        ) {
+          setSubmitError(
+            "Ingen uppkoppling — försök igen när du har nät",
+          );
+        } else {
+          setSubmitError(
+            err instanceof Error ? err.message : "Ett oväntat fel uppstod",
+          );
+        }
+      } finally {
+        setIsSubmitting(false);
+      }
     },
   });
+
+  const handleSubmit = () => {
+    form.handleSubmit();
+  };
+
+  const resetForm = () => {
+    form.reset();
+    setCurrentStep(1);
+    setSubmitSuccess(false);
+    setSubmitError(null);
+  };
 
   const goNext = () => {
     if (currentStep < STEPS.length) {
@@ -177,6 +279,29 @@ function NyHiss() {
       setCurrentStep(step);
     }
   };
+
+  // Success confirmation view
+  if (submitSuccess) {
+    return (
+      <div className="flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center px-4">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="flex size-20 items-center justify-center rounded-full bg-green-100 text-green-600">
+            <CheckCircle2 className="size-10" />
+          </div>
+          <h2 className="text-xl font-semibold">Hiss sparad!</h2>
+          <p className="text-muted-foreground">
+            Hissen har lagts till i registret.
+          </p>
+          <Button
+            className="mt-4 h-12 min-w-[200px] text-base"
+            onClick={resetForm}
+          >
+            Registrera ny hiss
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
@@ -244,8 +369,27 @@ function NyHiss() {
 
       {/* Step content area */}
       <div className="flex-1 overflow-auto px-4 py-4">
-        <StepContent step={currentStep} form={form} />
+        <StepContent
+          step={currentStep}
+          form={form}
+          goToStep={goToStep}
+          orgs={orgs}
+        />
       </div>
+
+      {/* Error message */}
+      {submitError && (
+        <div className="border-t border-destructive/30 bg-destructive/10 px-4 py-3">
+          <p className="flex items-center gap-2 text-sm font-medium text-destructive">
+            {submitError.includes("uppkoppling") ? (
+              <WifiOff className="size-4 shrink-0" />
+            ) : (
+              <AlertCircle className="size-4 shrink-0" />
+            )}
+            {submitError}
+          </p>
+        </div>
+      )}
 
       {/* Navigation buttons */}
       <div className="sticky bottom-0 border-t bg-background px-4 py-3">
@@ -255,7 +399,7 @@ function NyHiss() {
             variant="outline"
             className="h-12 min-w-[44px] flex-1 text-base"
             onClick={goPrev}
-            disabled={currentStep === 1}
+            disabled={currentStep === 1 || isSubmitting}
           >
             <ChevronLeft className="mr-1 size-5" />
             Föregående
@@ -273,12 +417,15 @@ function NyHiss() {
             <Button
               type="button"
               className="h-12 min-w-[44px] flex-1 text-base"
-              onClick={() => {
-                // Submit handled in US-023
-              }}
+              onClick={handleSubmit}
+              disabled={isSubmitting}
             >
-              <Check className="mr-1 size-5" />
-              Spara
+              {isSubmitting ? (
+                <Loader2 className="mr-1 size-5 animate-spin" />
+              ) : (
+                <Check className="mr-1 size-5" />
+              )}
+              {isSubmitting ? "Sparar..." : "Spara"}
             </Button>
           )}
         </div>
@@ -287,7 +434,17 @@ function NyHiss() {
   );
 }
 
-function StepContent({ step, form }: { step: number; form: HissForm }) {
+function StepContent({
+  step,
+  form,
+  goToStep,
+  orgs,
+}: {
+  step: number;
+  form: HissForm;
+  goToStep: (step: number) => void;
+  orgs: Array<{ _id: string; namn: string }> | undefined;
+}) {
   switch (step) {
     case 1:
       return <Step1Identifiering form={form} />;
@@ -301,20 +458,14 @@ function StepContent({ step, form }: { step: number; form: HissForm }) {
       return <Step5Besiktning form={form} />;
     case 6:
       return <Step6Modernisering form={form} />;
-    default: {
-      const stepInfo = STEPS[step - 1];
-      return (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="flex size-16 items-center justify-center rounded-full bg-muted text-2xl font-bold text-muted-foreground">
-            {stepInfo.number}
-          </div>
-          <h2 className="mt-4 text-lg font-semibold">{stepInfo.title}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Fälten för detta steg läggs till i kommande steg.
-          </p>
-        </div>
-      );
-    }
+    case 7:
+      return <Step7Nodtelefon form={form} />;
+    case 8:
+      return <Step8Kommentarer form={form} />;
+    case 9:
+      return <Step9Granska form={form} goToStep={goToStep} orgs={orgs} />;
+    default:
+      return null;
   }
 }
 
@@ -959,6 +1110,345 @@ function Step6Modernisering({ form }: { form: HissForm }) {
           </div>
         )}
       </form.Field>
+    </div>
+  );
+}
+
+// --- Step 7: Nödtelefon ---
+
+function Step7Nodtelefon({ form }: { form: HissForm }) {
+  return (
+    <div className="space-y-5">
+      {/* Har nödtelefon (toggle) */}
+      <form.Field name="har_nodtelefon">
+        {(field) => (
+          <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
+            <Label htmlFor="har_nodtelefon" className="cursor-pointer">
+              <Phone className="mr-1.5 inline size-4" />
+              Har nödtelefon
+            </Label>
+            <Switch
+              id="har_nodtelefon"
+              checked={field.state.value}
+              onCheckedChange={(val) => field.handleChange(val)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Modell */}
+      <form.Field name="nodtelefon_modell">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="nodtelefon_modell">Modell</Label>
+            <Input
+              id="nodtelefon_modell"
+              className="h-11"
+              placeholder="Ange modell..."
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Typ */}
+      <form.Field name="nodtelefon_typ">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="nodtelefon_typ">Typ</Label>
+            <Input
+              id="nodtelefon_typ"
+              className="h-11"
+              placeholder="Ange typ..."
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Behöver uppgradering (toggle) */}
+      <form.Field name="behover_uppgradering">
+        {(field) => (
+          <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
+            <Label htmlFor="behover_uppgradering" className="cursor-pointer">
+              Behöver uppgradering
+            </Label>
+            <Switch
+              id="behover_uppgradering"
+              checked={field.state.value}
+              onCheckedChange={(val) => field.handleChange(val)}
+            />
+          </div>
+        )}
+      </form.Field>
+
+      {/* Pris */}
+      <form.Field name="nodtelefon_pris">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="nodtelefon_pris">Pris</Label>
+            <Input
+              id="nodtelefon_pris"
+              className="h-11"
+              type="number"
+              inputMode="numeric"
+              placeholder="SEK"
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+    </div>
+  );
+}
+
+// --- Step 8: Kommentarer ---
+
+function Step8Kommentarer({ form }: { form: HissForm }) {
+  return (
+    <div className="space-y-5">
+      <form.Field name="kommentarer">
+        {(field) => (
+          <div className="space-y-1.5">
+            <Label htmlFor="kommentarer">
+              <MessageSquare className="mr-1.5 inline size-4" />
+              Kommentarer
+            </Label>
+            <Textarea
+              id="kommentarer"
+              className="min-h-[200px]"
+              placeholder="Skriv eventuella kommentarer här..."
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+            />
+          </div>
+        )}
+      </form.Field>
+    </div>
+  );
+}
+
+// --- Step 9: Granska och spara ---
+
+type ReviewSection = {
+  title: string;
+  step: number;
+  fields: Array<{
+    label: string;
+    value: string | boolean;
+    type?: "text" | "boolean";
+  }>;
+};
+
+function Step9Granska({
+  form,
+  goToStep,
+  orgs,
+}: {
+  form: HissForm;
+  goToStep: (step: number) => void;
+  orgs: Array<{ _id: string; namn: string }> | undefined;
+}) {
+  const values = form.state.values;
+  const orgName =
+    orgs?.find((o) => o._id === values.organisation_id)?.namn ?? "";
+
+  const sections: ReviewSection[] = [
+    {
+      title: "Identifiering",
+      step: 1,
+      fields: [
+        { label: "Organisation", value: orgName },
+        { label: "Hissnummer", value: values.hissnummer },
+        { label: "Adress", value: values.adress },
+        { label: "Hissbeteckning", value: values.hissbeteckning },
+        { label: "Distrikt", value: values.distrikt },
+      ],
+    },
+    {
+      title: "Teknisk specifikation",
+      step: 2,
+      fields: [
+        { label: "Hisstyp", value: values.hisstyp },
+        { label: "Fabrikat", value: values.fabrikat },
+        { label: "Byggår", value: values.byggar },
+        { label: "Hastighet", value: values.hastighet },
+        { label: "Lyfthöjd", value: values.lyfthojd },
+        { label: "Marklast", value: values.marklast },
+        { label: "Antal plan", value: values.antal_plan },
+        { label: "Antal dörrar", value: values.antal_dorrar },
+      ],
+    },
+    {
+      title: "Dörrar och korg",
+      step: 3,
+      fields: [
+        { label: "Typ dörrar", value: values.typ_dorrar },
+        { label: "Genomgång", value: values.genomgang, type: "boolean" },
+        { label: "Kollektiv", value: values.kollektiv },
+        { label: "Korgstorlek", value: values.korgstorlek },
+        { label: "Dagöppning", value: values.dagoppning },
+        { label: "Bärbeslag", value: values.barbeslag },
+        { label: "Dörrmaskin", value: values.dorrmaskin },
+      ],
+    },
+    {
+      title: "Maskineri",
+      step: 4,
+      fields: [
+        { label: "Drivsystem", value: values.drivsystem },
+        { label: "Upphängning", value: values.upphangning },
+        { label: "Maskinplacering", value: values.maskinplacering },
+        { label: "Typ maskin", value: values.typ_maskin },
+        { label: "Typ styrsystem", value: values.typ_styrsystem },
+      ],
+    },
+    {
+      title: "Besiktning och underhåll",
+      step: 5,
+      fields: [
+        { label: "Besiktningsorgan", value: values.besiktningsorgan },
+        { label: "Besiktningsmånad", value: values.besiktningsmanad },
+        { label: "Skötselföretag", value: values.skotselforetag },
+        { label: "Schaktbelysning", value: values.schaktbelysning },
+      ],
+    },
+    {
+      title: "Modernisering",
+      step: 6,
+      fields: [
+        { label: "Moderniseringsår", value: values.moderniserar },
+        { label: "Garanti", value: values.garanti, type: "boolean" },
+        {
+          label: "Rekommenderat moderniseringsår",
+          value: values.rekommenderat_moderniserar,
+        },
+        { label: "Budget belopp", value: values.budget_belopp },
+        {
+          label: "Åtgärder vid modernisering",
+          value: values.atgarder_vid_modernisering,
+        },
+      ],
+    },
+    {
+      title: "Nödtelefon",
+      step: 7,
+      fields: [
+        {
+          label: "Har nödtelefon",
+          value: values.har_nodtelefon,
+          type: "boolean",
+        },
+        { label: "Modell", value: values.nodtelefon_modell },
+        { label: "Typ", value: values.nodtelefon_typ },
+        {
+          label: "Behöver uppgradering",
+          value: values.behover_uppgradering,
+          type: "boolean",
+        },
+        { label: "Pris", value: values.nodtelefon_pris },
+      ],
+    },
+    {
+      title: "Kommentarer",
+      step: 8,
+      fields: [{ label: "Kommentarer", value: values.kommentarer }],
+    },
+  ];
+
+  const hasRequiredFields = values.hissnummer.trim() !== "" && values.organisation_id !== "";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <ClipboardList className="size-5 text-primary" />
+        <h2 className="text-lg font-semibold">Granska uppgifterna</h2>
+      </div>
+
+      {!hasRequiredFields && (
+        <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <AlertCircle className="size-4 shrink-0" />
+          <span>
+            Hissnummer och organisation måste anges innan du kan spara.
+          </span>
+        </div>
+      )}
+
+      {sections.map((section) => (
+        <ReviewSectionCard
+          key={section.step}
+          section={section}
+          goToStep={goToStep}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ReviewSectionCard({
+  section,
+  goToStep,
+}: {
+  section: ReviewSection;
+  goToStep: (step: number) => void;
+}) {
+  const hasAnyValue = section.fields.some((f) => {
+    if (f.type === "boolean") return f.value === true;
+    return typeof f.value === "string" && f.value.trim() !== "";
+  });
+
+  return (
+    <div className="rounded-lg border bg-card">
+      <div className="flex items-center justify-between border-b px-3 py-2">
+        <h3 className="text-sm font-semibold">
+          {section.step}. {section.title}
+        </h3>
+        <button
+          type="button"
+          onClick={() => goToStep(section.step)}
+          className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Pencil className="size-4" />
+        </button>
+      </div>
+      <div className="px-3 py-2">
+        {!hasAnyValue ? (
+          <p className="py-1 text-sm italic text-muted-foreground">
+            Inga uppgifter ifyllda
+          </p>
+        ) : (
+          <div className="space-y-1">
+            {section.fields.map((field) => {
+              const displayValue =
+                field.type === "boolean"
+                  ? field.value
+                    ? "Ja"
+                    : "Nej"
+                  : (field.value as string);
+              if (
+                field.type !== "boolean" &&
+                (!displayValue || displayValue.trim() === "")
+              )
+                return null;
+              if (field.type === "boolean" && !field.value) return null;
+              return (
+                <div
+                  key={field.label}
+                  className="flex items-baseline justify-between gap-2 py-0.5 text-sm"
+                >
+                  <span className="text-muted-foreground">{field.label}</span>
+                  <span className="text-right font-medium">
+                    {displayValue}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
