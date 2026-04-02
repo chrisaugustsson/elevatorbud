@@ -31,7 +31,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@elevatorbud/ui/components/ui/dialog";
-import { Plus, ArrowUpDown, Building2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Plus, ArrowUpDown, Building2, UserPlus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/organisationer")({
   component: Organisationer,
@@ -493,6 +494,17 @@ function EditOrgDialogInner({
             Uppdatera organisationens uppgifter.
           </DialogDescription>
         </DialogHeader>
+        <div>
+          <Link
+            to="/admin/anvandare"
+            search={{ org: org._id, create: true }}
+          >
+            <Button variant="outline" size="sm" className="w-full">
+              <UserPlus className="mr-1 size-4" />
+              Lägg till kundanvändare
+            </Button>
+          </Link>
+        </div>
         <form
           onSubmit={(e) => {
             e.preventDefault();
