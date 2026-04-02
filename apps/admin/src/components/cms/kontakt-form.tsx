@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Input } from "@elevatorbud/ui/components/ui/input";
 import { Textarea } from "@elevatorbud/ui/components/ui/textarea";
 import { Label } from "@elevatorbud/ui/components/ui/label";
+import { Button } from "@elevatorbud/ui/components/ui/button";
+import { Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -16,7 +18,7 @@ import {
   CardTitle,
 } from "@elevatorbud/ui/components/ui/card";
 import { Mail, Phone, MapPin, Clock } from "lucide-react";
-import type { CmsPage } from "./startsida-form";
+import type { CmsPage, CmsSection } from "./startsida-form";
 
 const CONTACT_ICONS = [
   { value: "Mail", label: "Mail", icon: Mail },
@@ -80,7 +82,46 @@ function pageToFormState(page: CmsPage): KontaktFormState {
   };
 }
 
-export function KontaktForm({ page }: { page: CmsPage | null }) {
+function formStateToSections(form: KontaktFormState): CmsSection[] {
+  return [
+    {
+      id: "hero",
+      type: "hero",
+      title: form.hero.title,
+      subtitle: form.hero.subtitle,
+      order: 0,
+    },
+    {
+      id: "contact",
+      type: "contact",
+      title: form.contact.title,
+      subtitle: form.contact.subtitle,
+      items: form.contact.items.map((item) => ({
+        title: item.title,
+        description: item.description,
+        icon: item.icon,
+      })),
+      order: 1,
+    },
+    {
+      id: "form",
+      type: "form",
+      title: form.form.title,
+      subtitle: form.form.subtitle,
+      order: 2,
+    },
+  ];
+}
+
+export function KontaktForm({
+  page,
+  onSave,
+  isSaving,
+}: {
+  page: CmsPage | null;
+  onSave: (sections: CmsSection[]) => void;
+  isSaving: boolean;
+}) {
   const [form, setForm] = useState<KontaktFormState>(() =>
     page ? pageToFormState(page) : emptyState(),
   );
@@ -271,6 +312,16 @@ export function KontaktForm({ page }: { page: CmsPage | null }) {
           </div>
         </CardContent>
       </Card>
+
+      <div className="flex justify-end">
+        <Button
+          onClick={() => onSave(formStateToSections(form))}
+          disabled={isSaving}
+        >
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Spara
+        </Button>
+      </div>
     </div>
   );
 }

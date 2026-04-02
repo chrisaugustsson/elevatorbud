@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import {
   Tabs,
@@ -7,10 +8,12 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@elevatorbud/ui/components/ui/tabs";
+import { toast } from "sonner";
 import { StartsidaForm } from "../../components/cms/startsida-form";
 import { OmOssForm } from "../../components/cms/om-oss-form";
 import { TjansterForm } from "../../components/cms/tjanster-form";
 import { KontaktForm } from "../../components/cms/kontakt-form";
+import type { CmsSection } from "../../components/cms/startsida-form";
 
 const pages = [
   { slug: "startsida", label: "Startsida" },
@@ -65,6 +68,35 @@ function Webbplats() {
 
 function PageTab({ slug, label }: { slug: string; label: string }) {
   const page = useQuery(api.cms.getPage, { slug });
+  const createPage = useMutation(api.cms.createPage);
+  const updatePage = useMutation(api.cms.updatePage);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function handleSave(sections: CmsSection[]) {
+    setIsSaving(true);
+    try {
+      if (page) {
+        await updatePage({
+          id: page._id,
+          title: label,
+          sections,
+        });
+      } else {
+        await createPage({
+          slug,
+          title: label,
+          sections,
+        });
+      }
+      toast.success("Sidan har sparats");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Kunde inte spara sidan",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   if (page === undefined) {
     return (
@@ -75,7 +107,7 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
   if (slug === "startsida") {
     return (
       <div className="py-4">
-        <StartsidaForm page={page} />
+        <StartsidaForm page={page} onSave={handleSave} isSaving={isSaving} />
       </div>
     );
   }
@@ -83,7 +115,7 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
   if (slug === "om-oss") {
     return (
       <div className="py-4">
-        <OmOssForm page={page} />
+        <OmOssForm page={page} onSave={handleSave} isSaving={isSaving} />
       </div>
     );
   }
@@ -91,7 +123,7 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
   if (slug === "tjanster") {
     return (
       <div className="py-4">
-        <TjansterForm page={page} />
+        <TjansterForm page={page} onSave={handleSave} isSaving={isSaving} />
       </div>
     );
   }
@@ -99,7 +131,7 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
   if (slug === "kontakt") {
     return (
       <div className="py-4">
-        <KontaktForm page={page} />
+        <KontaktForm page={page} onSave={handleSave} isSaving={isSaving} />
       </div>
     );
   }

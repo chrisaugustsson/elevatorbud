@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Input } from "@elevatorbud/ui/components/ui/input";
 import { Textarea } from "@elevatorbud/ui/components/ui/textarea";
 import { Label } from "@elevatorbud/ui/components/ui/label";
+import { Button } from "@elevatorbud/ui/components/ui/button";
+import { Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -16,7 +18,7 @@ import {
   CardTitle,
 } from "@elevatorbud/ui/components/ui/card";
 import { Target, Eye, Users, Award } from "lucide-react";
-import type { CmsPage } from "./startsida-form";
+import type { CmsPage, CmsSection } from "./startsida-form";
 
 const VALUE_ICONS = [
   { value: "Target", label: "Target", icon: Target },
@@ -85,7 +87,52 @@ function pageToFormState(page: CmsPage): OmOssFormState {
   };
 }
 
-export function OmOssForm({ page }: { page: CmsPage | null }) {
+function formStateToSections(form: OmOssFormState): CmsSection[] {
+  return [
+    {
+      id: "hero",
+      type: "hero",
+      title: form.hero.title,
+      subtitle: form.hero.subtitle,
+      order: 0,
+    },
+    {
+      id: "mission",
+      type: "mission",
+      title: form.mission.title,
+      content: form.mission.content,
+      order: 1,
+    },
+    {
+      id: "values",
+      type: "values",
+      title: form.values.title,
+      items: form.values.items.map((item) => ({
+        title: item.title,
+        description: item.description,
+        icon: item.icon,
+      })),
+      order: 2,
+    },
+    {
+      id: "story",
+      type: "story",
+      title: form.story.title,
+      content: form.story.content,
+      order: 3,
+    },
+  ];
+}
+
+export function OmOssForm({
+  page,
+  onSave,
+  isSaving,
+}: {
+  page: CmsPage | null;
+  onSave: (sections: CmsSection[]) => void;
+  isSaving: boolean;
+}) {
   const [form, setForm] = useState<OmOssFormState>(() =>
     page ? pageToFormState(page) : emptyState(),
   );
@@ -295,6 +342,16 @@ export function OmOssForm({ page }: { page: CmsPage | null }) {
           </div>
         </CardContent>
       </Card>
+
+      <div className="flex justify-end">
+        <Button
+          onClick={() => onSave(formStateToSections(form))}
+          disabled={isSaving}
+        >
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Spara
+        </Button>
+      </div>
     </div>
   );
 }

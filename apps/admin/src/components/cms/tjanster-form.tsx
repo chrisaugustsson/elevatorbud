@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Input } from "@elevatorbud/ui/components/ui/input";
 import { Textarea } from "@elevatorbud/ui/components/ui/textarea";
 import { Label } from "@elevatorbud/ui/components/ui/label";
+import { Button } from "@elevatorbud/ui/components/ui/button";
+import { Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -23,7 +25,7 @@ import {
   Building2,
   Phone,
 } from "lucide-react";
-import type { CmsPage } from "./startsida-form";
+import type { CmsPage, CmsSection } from "./startsida-form";
 
 const SERVICE_ICONS = [
   { value: "ClipboardCheck", label: "ClipboardCheck", icon: ClipboardCheck },
@@ -76,7 +78,37 @@ function pageToFormState(page: CmsPage): TjansterFormState {
   };
 }
 
-export function TjansterForm({ page }: { page: CmsPage | null }) {
+function formStateToSections(form: TjansterFormState): CmsSection[] {
+  return [
+    {
+      id: "hero",
+      type: "hero",
+      title: form.hero.title,
+      subtitle: form.hero.subtitle,
+      order: 0,
+    },
+    {
+      id: "services",
+      type: "services",
+      items: form.services.items.map((item) => ({
+        title: item.title,
+        description: item.description,
+        icon: item.icon,
+      })),
+      order: 1,
+    },
+  ];
+}
+
+export function TjansterForm({
+  page,
+  onSave,
+  isSaving,
+}: {
+  page: CmsPage | null;
+  onSave: (sections: CmsSection[]) => void;
+  isSaving: boolean;
+}) {
   const [form, setForm] = useState<TjansterFormState>(() =>
     page ? pageToFormState(page) : emptyState(),
   );
@@ -196,6 +228,16 @@ export function TjansterForm({ page }: { page: CmsPage | null }) {
           </div>
         </CardContent>
       </Card>
+
+      <div className="flex justify-end">
+        <Button
+          onClick={() => onSave(formStateToSections(form))}
+          disabled={isSaving}
+        >
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Spara
+        </Button>
+      </div>
     </div>
   );
 }

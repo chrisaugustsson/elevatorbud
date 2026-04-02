@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Input } from "@elevatorbud/ui/components/ui/input";
 import { Textarea } from "@elevatorbud/ui/components/ui/textarea";
 import { Label } from "@elevatorbud/ui/components/ui/label";
+import { Button } from "@elevatorbud/ui/components/ui/button";
+import { Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -131,10 +133,56 @@ function pageToFormState(page: CmsPage): StartsidaFormState {
   };
 }
 
+function formStateToSections(form: StartsidaFormState): CmsSection[] {
+  return [
+    {
+      id: "hero",
+      type: "hero",
+      title: form.hero.title,
+      subtitle: form.hero.subtitle,
+      cta: { text: form.hero.ctaText, href: form.hero.ctaHref },
+      order: 0,
+    },
+    {
+      id: "features",
+      type: "features",
+      title: form.features.title,
+      subtitle: form.features.subtitle,
+      items: form.features.items.map((item) => ({
+        title: item.title,
+        description: item.description,
+        icon: item.icon,
+      })),
+      order: 1,
+    },
+    {
+      id: "stats",
+      type: "stats",
+      items: form.stats.items.map((item) => ({
+        title: item.value,
+        description: item.label,
+      })),
+      order: 2,
+    },
+    {
+      id: "cta",
+      type: "cta",
+      title: form.cta.title,
+      subtitle: form.cta.subtitle,
+      cta: { text: form.cta.ctaText, href: form.cta.ctaHref },
+      order: 3,
+    },
+  ];
+}
+
 export function StartsidaForm({
   page,
+  onSave,
+  isSaving,
 }: {
   page: CmsPage | null;
+  onSave: (sections: CmsSection[]) => void;
+  isSaving: boolean;
 }) {
   const [form, setForm] = useState<StartsidaFormState>(() =>
     page ? pageToFormState(page) : emptyState(),
@@ -414,6 +462,16 @@ export function StartsidaForm({
           </div>
         </CardContent>
       </Card>
+
+      <div className="flex justify-end">
+        <Button
+          onClick={() => onSave(formStateToSections(form))}
+          disabled={isSaving}
+        >
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Spara
+        </Button>
+      </div>
     </div>
   );
 }
