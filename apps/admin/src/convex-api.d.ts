@@ -13,12 +13,29 @@ declare module "@convex/_generated/api" {
       create: FunctionReference<"mutation", "public">;
       update: FunctionReference<"mutation", "public">;
     };
+    anvandare: {
+      create: FunctionReference<"action", "public">;
+      update: FunctionReference<"action", "public">;
+      inaktivera: FunctionReference<"action", "public">;
+      remove: FunctionReference<"action", "public">;
+      list: FunctionReference<"query", "public">;
+      get: FunctionReference<"query", "public">;
+      listByOrganisation: FunctionReference<"query", "public">;
+    };
   };
 
   export const internal: {
     users: {
       upsertFromClerk: FunctionReference<"mutation", "internal">;
       deleteFromClerk: FunctionReference<"mutation", "internal">;
+    };
+    anvandareInternal: {
+      checkAdmin: FunctionReference<"query", "internal">;
+      insertAnvandare: FunctionReference<"mutation", "internal">;
+      updateAnvandare: FunctionReference<"mutation", "internal">;
+      inaktiveraAnvandare: FunctionReference<"mutation", "internal">;
+      removeAnvandare: FunctionReference<"mutation", "internal">;
+      getInternal: FunctionReference<"query", "internal">;
     };
   };
 }
