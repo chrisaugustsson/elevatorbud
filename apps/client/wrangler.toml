@@ -1,2 +1,6 @@
 name = "elevatorbud-client"
 compatibility_date = "2025-04-01"
+
+routes = [
+  { pattern = "app.hisskompetens.se", custom_domain = true },
+]

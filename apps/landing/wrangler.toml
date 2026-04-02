@@ -1,2 +1,7 @@
 name = "elevatorbud-landing"
 compatibility_date = "2025-04-01"
+
+routes = [
+  { pattern = "hisskompetens.se", custom_domain = true },
+  { pattern = "www.hisskompetens.se", custom_domain = true },
+]
