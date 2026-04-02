@@ -7,13 +7,13 @@ import { requireAdmin } from "./auth";
 // Use anyApi to reference internal functions — avoids circular type dependency
 // with _generated/api.ts which imports this module's types.
 const internalRef = anyApi as unknown as {
-  anvandareInternal: {
+  userAdminInternal: {
     checkAdmin: FunctionReference<"query", "internal">;
     getInternal: FunctionReference<"query", "internal">;
-    insertAnvandare: FunctionReference<"mutation", "internal">;
-    updateAnvandare: FunctionReference<"mutation", "internal">;
-    inaktiveraAnvandare: FunctionReference<"mutation", "internal">;
-    removeAnvandare: FunctionReference<"mutation", "internal">;
+    insertUser: FunctionReference<"mutation", "internal">;
+    updateUser: FunctionReference<"mutation", "internal">;
+    deactivateUser: FunctionReference<"mutation", "internal">;
+    removeUser: FunctionReference<"mutation", "internal">;
   };
 };
 
@@ -27,15 +27,15 @@ function getClerkClient() {
 
 export const create = action({
   args: {
-    namn: v.string(),
+    name: v.string(),
     email: v.string(),
-    roll: v.union(v.literal("admin"), v.literal("kund")),
-    organisation_id: v.optional(v.id("organisationer")),
+    role: v.union(v.literal("admin"), v.literal("customer")),
+    organization_id: v.optional(v.id("organizations")),
   },
   handler: async (ctx, args) => {
-    await ctx.runQuery(internalRef.anvandareInternal.checkAdmin);
+    await ctx.runQuery(internalRef.userAdminInternal.checkAdmin);
 
-    const nameParts = args.namn.trim().split(/\s+/);
+    const nameParts = args.name.trim().split(/\s+/);
     const firstName = nameParts[0] || "";
     const lastName = nameParts.slice(1).join(" ") || undefined;
 
@@ -46,78 +46,78 @@ export const create = action({
       lastName,
       skipPasswordRequirement: true,
       publicMetadata: {
-        roll: args.roll,
-        organisation_id: args.organisation_id,
+        role: args.role,
+        organization_id: args.organization_id,
       },
     });
 
-    const anvandareId = await ctx.runMutation(
-      internalRef.anvandareInternal.insertAnvandare,
+    const userId = await ctx.runMutation(
+      internalRef.userAdminInternal.insertUser,
       {
         clerk_user_id: clerkUser.id,
         email: args.email,
-        namn: args.namn,
-        roll: args.roll,
-        organisation_id: args.organisation_id,
+        name: args.name,
+        role: args.role,
+        organization_id: args.organization_id,
       },
     );
 
-    return anvandareId;
+    return userId;
   },
 });
 
 export const update = action({
   args: {
-    id: v.id("anvandare"),
-    namn: v.optional(v.string()),
+    id: v.id("users"),
+    name: v.optional(v.string()),
     email: v.optional(v.string()),
-    roll: v.optional(v.union(v.literal("admin"), v.literal("kund"))),
-    organisation_id: v.optional(v.id("organisationer")),
+    role: v.optional(v.union(v.literal("admin"), v.literal("customer"))),
+    organization_id: v.optional(v.id("organizations")),
   },
   handler: async (ctx, args) => {
-    await ctx.runQuery(internalRef.anvandareInternal.checkAdmin);
+    await ctx.runQuery(internalRef.userAdminInternal.checkAdmin);
 
     const currentData = await ctx.runQuery(
-      internalRef.anvandareInternal.getInternal,
+      internalRef.userAdminInternal.getInternal,
       { id: args.id },
     );
     if (!currentData) {
       throw new Error("Användaren hittades inte");
     }
 
-    await ctx.runMutation(internalRef.anvandareInternal.updateAnvandare, {
+    await ctx.runMutation(internalRef.userAdminInternal.updateUser, {
       id: args.id,
-      namn: args.namn,
+      name: args.name,
       email: args.email,
-      roll: args.roll,
-      organisation_id: args.organisation_id,
+      role: args.role,
+      organization_id: args.organization_id,
     });
 
     const clerk = getClerkClient();
     const clerkUpdate: Record<string, unknown> = {};
 
-    if (args.namn !== undefined) {
-      const nameParts = args.namn.trim().split(/\s+/);
+    if (args.name !== undefined) {
+      const nameParts = args.name.trim().split(/\s+/);
       clerkUpdate.firstName = nameParts[0] || "";
       clerkUpdate.lastName = nameParts.slice(1).join(" ") || undefined;
     }
 
     clerkUpdate.publicMetadata = {
-      roll: args.roll ?? currentData.roll,
-      organisation_id: args.organisation_id ?? currentData.organisation_id,
+      role: args.role ?? currentData.role,
+      organization_id: args.organization_id ?? currentData.organization_id,
     };
 
     await clerk.users.updateUser(currentData.clerk_user_id, clerkUpdate);
   },
 });
 
-export const inaktivera = action({
-  args: { id: v.id("anvandare") },
+export const deactivate = action({
+  args: { id: v.id("users") },
   handler: async (ctx, { id }) => {
-    await ctx.runQuery(internalRef.anvandareInternal.checkAdmin);
+    await ctx.runQuery(internalRef.userAdminInternal.checkAdmin);
 
     const clerkUserId = await ctx.runMutation(
-      internalRef.anvandareInternal.inaktiveraAnvandare,
+      internalRef.userAdminInternal.deactivateUser,
       { id },
     );
 
@@ -127,12 +127,12 @@ export const inaktivera = action({
 });
 
 export const remove = action({
-  args: { id: v.id("anvandare") },
+  args: { id: v.id("users") },
   handler: async (ctx, { id }) => {
-    await ctx.runQuery(internalRef.anvandareInternal.checkAdmin);
+    await ctx.runQuery(internalRef.userAdminInternal.checkAdmin);
 
     const clerkUserId = await ctx.runMutation(
-      internalRef.anvandareInternal.removeAnvandare,
+      internalRef.userAdminInternal.removeUser,
       { id },
     );
 
@@ -145,26 +145,26 @@ export const remove = action({
 
 export const list = query({
   args: {
-    roll: v.optional(v.union(v.literal("admin"), v.literal("kund"))),
-    organisation_id: v.optional(v.id("organisationer")),
+    role: v.optional(v.union(v.literal("admin"), v.literal("customer"))),
+    organization_id: v.optional(v.id("organizations")),
     search: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
 
-    let users = await ctx.db.query("anvandare").collect();
+    let users = await ctx.db.query("users").collect();
 
-    if (args.roll !== undefined) {
-      users = users.filter((u) => u.roll === args.roll);
+    if (args.role !== undefined) {
+      users = users.filter((u) => u.role === args.role);
     }
-    if (args.organisation_id !== undefined) {
-      users = users.filter((u) => u.organisation_id === args.organisation_id);
+    if (args.organization_id !== undefined) {
+      users = users.filter((u) => u.organization_id === args.organization_id);
     }
     if (args.search) {
       const search = args.search.toLowerCase();
       users = users.filter(
         (u) =>
-          u.namn.toLowerCase().includes(search) ||
+          u.name.toLowerCase().includes(search) ||
           u.email.toLowerCase().includes(search),
       );
     }
@@ -174,20 +174,20 @@ export const list = query({
 });
 
 export const get = query({
-  args: { id: v.id("anvandare") },
+  args: { id: v.id("users") },
   handler: async (ctx, { id }) => {
     await requireAdmin(ctx);
     return await ctx.db.get(id);
   },
 });
 
-export const listByOrganisation = query({
-  args: { organisation_id: v.id("organisationer") },
-  handler: async (ctx, { organisation_id }) => {
+export const listByOrganization = query({
+  args: { organization_id: v.id("organizations") },
+  handler: async (ctx, { organization_id }) => {
     await requireAdmin(ctx);
     return await ctx.db
-      .query("anvandare")
-      .filter((q) => q.eq(q.field("organisation_id"), organisation_id))
+      .query("users")
+      .filter((q) => q.eq(q.field("organization_id"), organization_id))
       .collect();
   },
 });

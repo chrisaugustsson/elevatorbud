@@ -7,9 +7,9 @@ import { Search, MapPin, Building2, ArrowRight } from "lucide-react";
 
 type SearchResult = {
   _id: string;
-  hissnummer: string;
-  adress?: string;
-  organisationsnamn?: string;
+  elevator_number: string;
+  address?: string;
+  organizationName?: string;
 };
 
 export const Route = createFileRoute("/_authenticated/sok")({
@@ -29,7 +29,7 @@ function SokHiss() {
   }, [input]);
 
   const results = useQuery(
-    api.hissar.search,
+    api.elevators.search,
     debouncedSearch.trim() ? { search: debouncedSearch.trim() } : "skip",
   ) as SearchResult[] | undefined;
 
@@ -78,18 +78,18 @@ function SokHiss() {
                 className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/50 active:bg-muted"
               >
                 <div className="min-w-0 flex-1 space-y-1">
-                  <p className="font-medium">{hiss.hissnummer}</p>
-                  {hiss.adress && (
+                  <p className="font-medium">{hiss.elevator_number}</p>
+                  {hiss.address && (
                     <p className="flex items-center gap-1 text-sm text-muted-foreground">
                       <MapPin className="size-3 shrink-0" />
-                      <span className="truncate">{hiss.adress}</span>
+                      <span className="truncate">{hiss.address}</span>
                     </p>
                   )}
-                  {hiss.organisationsnamn && (
+                  {hiss.organizationName && (
                     <p className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Building2 className="size-3 shrink-0" />
                       <span className="truncate">
-                        {hiss.organisationsnamn}
+                        {hiss.organizationName}
                       </span>
                     </p>
                   )}

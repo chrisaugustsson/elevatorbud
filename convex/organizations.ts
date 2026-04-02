@@ -6,16 +6,16 @@ export const list = query({
   args: {},
   handler: async (ctx) => {
     await requireAdmin(ctx);
-    const orgs = await ctx.db.query("organisationer").collect();
+    const orgs = await ctx.db.query("organizations").collect();
     const orgsWithCount = await Promise.all(
       orgs.map(async (org) => {
         const elevators = await ctx.db
-          .query("hissar")
-          .withIndex("by_organisation_id", (q) =>
-            q.eq("organisation_id", org._id),
+          .query("elevators")
+          .withIndex("by_organization_id", (q) =>
+            q.eq("organization_id", org._id),
           )
           .collect();
-        return { ...org, antalHissar: elevators.length };
+        return { ...org, elevatorCount: elevators.length };
       }),
     );
     return orgsWithCount;
@@ -23,7 +23,7 @@ export const list = query({
 });
 
 export const get = query({
-  args: { id: v.id("organisationer") },
+  args: { id: v.id("organizations") },
   handler: async (ctx, { id }) => {
     await requireTenantAccess(ctx, id);
     return await ctx.db.get(id);
@@ -32,25 +32,25 @@ export const get = query({
 
 export const create = mutation({
   args: {
-    namn: v.string(),
-    organisationsnummer: v.optional(v.string()),
-    kontaktperson: v.optional(v.string()),
-    telefonnummer: v.optional(v.string()),
+    name: v.string(),
+    organization_number: v.optional(v.string()),
+    contact_person: v.optional(v.string()),
+    phone_number: v.optional(v.string()),
     email: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    return await ctx.db.insert("organisationer", args);
+    return await ctx.db.insert("organizations", args);
   },
 });
 
 export const update = mutation({
   args: {
-    id: v.id("organisationer"),
-    namn: v.optional(v.string()),
-    organisationsnummer: v.optional(v.string()),
-    kontaktperson: v.optional(v.string()),
-    telefonnummer: v.optional(v.string()),
+    id: v.id("organizations"),
+    name: v.optional(v.string()),
+    organization_number: v.optional(v.string()),
+    contact_person: v.optional(v.string()),
+    phone_number: v.optional(v.string()),
     email: v.optional(v.string()),
   },
   handler: async (ctx, { id, ...fields }) => {

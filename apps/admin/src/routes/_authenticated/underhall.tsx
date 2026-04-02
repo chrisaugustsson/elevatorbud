@@ -70,20 +70,20 @@ const tooltipStyle = {
 function Underhall() {
   const { selectedOrgId } = useSelectedOrg();
   const orgFilter = selectedOrgId
-    ? ({ organisation_id: selectedOrgId } as never)
+    ? ({ organization_id: selectedOrgId } as never)
     : {};
 
   const [selectedManad, setSelectedManad] = useState<string | null>(null);
 
-  const kalender = useQuery(api.hissar.besiktningskalender, orgFilter);
-  const foretag = useQuery(api.hissar.skotselforetag, orgFilter);
-  const nodtelefon = useQuery(api.hissar.nodtelefonstatus, orgFilter);
+  const kalender = useQuery(api.elevators.inspectionCalendar, orgFilter);
+  const foretag = useQuery(api.elevators.maintenanceCompanies, orgFilter);
+  const nodtelefon = useQuery(api.elevators.emergencyPhoneStatus, orgFilter);
 
   const besiktningslistaArgs = selectedManad
-    ? { ...(selectedOrgId ? { organisation_id: selectedOrgId as never } : {}), manad: selectedManad }
+    ? { ...(selectedOrgId ? { organization_id: selectedOrgId as never } : {}), month: selectedManad }
     : "skip";
   const besiktningslista = useQuery(
-    api.hissar.besiktningslista,
+    api.elevators.inspectionList,
     besiktningslistaArgs as never,
   );
 
@@ -95,13 +95,13 @@ function Underhall() {
     return <UnderhallSkeleton />;
   }
 
-  const kalenderData = (kalender as { manad: string; antal: number }[]).map(
+  const kalenderData = (kalender as { month: string; count: number }[]).map(
     (k) => ({
-      name: k.manad.substring(0, 3),
-      fullName: k.manad,
-      antal: k.antal,
-      isCurrent: k.manad === currentMonthName,
-      isSelected: k.manad === selectedManad,
+      name: k.month.substring(0, 3),
+      fullName: k.month,
+      antal: k.count,
+      isCurrent: k.month === currentMonthName,
+      isSelected: k.month === selectedManad,
     }),
   );
 
@@ -110,25 +110,25 @@ function Underhall() {
     kalenderData.find((k) => k.isCurrent)?.antal || 0;
 
   const foretagData = foretag as {
-    foretag: {
-      namn: string;
-      antal: number;
-      perDistrikt: { distrikt: string; antal: number }[];
+    companies: {
+      name: string;
+      count: number;
+      byDistrict: { district: string; count: number }[];
     }[];
-    distrikt: string[];
+    districts: string[];
   };
 
   const nodData = nodtelefon as {
-    medNodtelefon: number;
-    utanNodtelefon: number;
-    behoverUppgradering: number;
-    totalUppgraderingskostnad: number;
-    perDistrikt: {
-      distrikt: string;
-      med: number;
-      utan: number;
-      uppgradering: number;
-      kostnad: number;
+    withEmergencyPhone: number;
+    withoutEmergencyPhone: number;
+    needsUpgrade: number;
+    totalUpgradeCost: number;
+    byDistrict: {
+      district: string;
+      with: number;
+      without: number;
+      upgrade: number;
+      cost: number;
     }[];
   };
 
@@ -303,28 +303,28 @@ function Underhall() {
                       {(
                         besiktningslista as {
                           _id: string;
-                          hissnummer: string;
-                          adress?: string;
-                          distrikt?: string;
-                          besiktningsorgan?: string;
-                          organisationsnamn: string;
+                          elevator_number: string;
+                          address?: string;
+                          district?: string;
+                          inspection_authority?: string;
+                          organizationName: string;
                         }[]
                       ).map((h) => (
                         <TableRow key={h._id}>
                           <TableCell className="font-medium">
-                            {h.hissnummer}
+                            {h.elevator_number}
                           </TableCell>
                           <TableCell className="hidden sm:table-cell">
-                            {h.adress || "–"}
+                            {h.address || "–"}
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
-                            {h.distrikt || "–"}
+                            {h.district || "–"}
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">
-                            {h.besiktningsorgan || "–"}
+                            {h.inspection_authority || "–"}
                           </TableCell>
                           <TableCell className="hidden sm:table-cell">
-                            {h.organisationsnamn}
+                            {h.organizationName}
                           </TableCell>
                           <TableCell>
                             <a
@@ -359,7 +359,7 @@ function Underhall() {
               <CardTitle className="text-base">Antal hissar per företag</CardTitle>
             </CardHeader>
             <CardContent>
-              {foretagData.foretag.length === 0 ? (
+              {foretagData.companies.length === 0 ? (
                 <p className="py-8 text-center text-muted-foreground">
                   Inga skötselföretag registrerade.
                 </p>
@@ -367,9 +367,9 @@ function Underhall() {
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={foretagData.foretag.map((f) => ({
-                        name: f.namn,
-                        antal: f.antal,
+                      data={foretagData.companies.map((f) => ({
+                        name: f.name,
+                        antal: f.count,
                       }))}
                       layout="vertical"
                       margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
@@ -409,7 +409,7 @@ function Underhall() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {foretagData.foretag.length === 0 ? (
+              {foretagData.companies.length === 0 ? (
                 <p className="py-8 text-center text-muted-foreground">
                   Inga data tillgängliga.
                 </p>
@@ -421,7 +421,7 @@ function Underhall() {
                         <TableHead className="sticky left-0 bg-background">
                           Företag
                         </TableHead>
-                        {foretagData.distrikt.map((d) => (
+                        {foretagData.districts.map((d) => (
                           <TableHead
                             key={d}
                             className="text-center text-xs"
@@ -435,21 +435,21 @@ function Underhall() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {foretagData.foretag.map((f) => (
-                        <TableRow key={f.namn}>
+                      {foretagData.companies.map((f) => (
+                        <TableRow key={f.name}>
                           <TableCell className="sticky left-0 bg-background font-medium text-sm">
-                            {f.namn}
+                            {f.name}
                           </TableCell>
-                          {f.perDistrikt.map((pd) => (
+                          {f.byDistrict.map((pd) => (
                             <TableCell
-                              key={pd.distrikt}
+                              key={pd.district}
                               className="text-center text-sm"
                             >
-                              {pd.antal || "–"}
+                              {pd.count || "–"}
                             </TableCell>
                           ))}
                           <TableCell className="text-center font-bold text-sm">
-                            {f.antal}
+                            {f.count}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -477,7 +477,7 @@ function Underhall() {
                 Med nödtelefon
               </div>
               <div className="mt-1 text-2xl font-bold">
-                {nodData.medNodtelefon}
+                {nodData.withEmergencyPhone}
               </div>
             </CardContent>
           </Card>
@@ -488,7 +488,7 @@ function Underhall() {
                 Utan nödtelefon
               </div>
               <div className="mt-1 text-2xl font-bold">
-                {nodData.utanNodtelefon}
+                {nodData.withoutEmergencyPhone}
               </div>
             </CardContent>
           </Card>
@@ -499,7 +499,7 @@ function Underhall() {
                 Behöver uppgradering
               </div>
               <div className="mt-1 text-2xl font-bold">
-                {nodData.behoverUppgradering}
+                {nodData.needsUpgrade}
               </div>
             </CardContent>
           </Card>
@@ -509,7 +509,7 @@ function Underhall() {
                 Total uppgraderingskostnad
               </div>
               <div className="mt-1 text-2xl font-bold">
-                {nodData.totalUppgraderingskostnad.toLocaleString("sv-SE")} kr
+                {nodData.totalUpgradeCost.toLocaleString("sv-SE")} kr
               </div>
             </CardContent>
           </Card>
@@ -523,7 +523,7 @@ function Underhall() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {nodData.perDistrikt.length === 0 ? (
+            {nodData.byDistrict.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">
                 Ingen data tillgänglig.
               </p>
@@ -542,38 +542,38 @@ function Underhall() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {nodData.perDistrikt.map((d) => (
-                      <TableRow key={d.distrikt}>
+                    {nodData.byDistrict.map((d) => (
+                      <TableRow key={d.district}>
                         <TableCell className="font-medium">
-                          {d.distrikt}
+                          {d.district}
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge
                             variant="secondary"
                             className="bg-green-100 text-green-800"
                           >
-                            {d.med}
+                            {d.with}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          {d.utan > 0 ? (
-                            <Badge variant="destructive">{d.utan}</Badge>
+                          {d.without > 0 ? (
+                            <Badge variant="destructive">{d.without}</Badge>
                           ) : (
                             <span className="text-muted-foreground">0</span>
                           )}
                         </TableCell>
                         <TableCell className="text-center">
-                          {d.uppgradering > 0 ? (
+                          {d.upgrade > 0 ? (
                             <Badge className="bg-orange-500 text-white hover:bg-orange-600">
-                              {d.uppgradering}
+                              {d.upgrade}
                             </Badge>
                           ) : (
                             <span className="text-muted-foreground">0</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {d.kostnad > 0
-                            ? `${d.kostnad.toLocaleString("sv-SE")} kr`
+                          {d.cost > 0
+                            ? `${d.cost.toLocaleString("sv-SE")} kr`
                             : "–"}
                         </TableCell>
                       </TableRow>
@@ -582,16 +582,16 @@ function Underhall() {
                     <TableRow className="border-t-2 font-bold">
                       <TableCell>Totalt</TableCell>
                       <TableCell className="text-center">
-                        {nodData.medNodtelefon}
+                        {nodData.withEmergencyPhone}
                       </TableCell>
                       <TableCell className="text-center">
-                        {nodData.utanNodtelefon}
+                        {nodData.withoutEmergencyPhone}
                       </TableCell>
                       <TableCell className="text-center">
-                        {nodData.behoverUppgradering}
+                        {nodData.needsUpgrade}
                       </TableCell>
                       <TableCell className="text-right">
-                        {nodData.totalUppgraderingskostnad.toLocaleString(
+                        {nodData.totalUpgradeCost.toLocaleString(
                           "sv-SE",
                         )}{" "}
                         kr

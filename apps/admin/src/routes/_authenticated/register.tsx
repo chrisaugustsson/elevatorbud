@@ -57,16 +57,16 @@ export const Route = createFileRoute("/_authenticated/register")({
 
 type HissRow = {
   _id: string;
-  hissnummer: string;
-  adress?: string;
-  distrikt?: string;
-  hisstyp?: string;
-  fabrikat?: string;
-  byggar?: number;
-  moderniserar?: string;
-  rekommenderat_moderniserar?: string;
-  budget_belopp?: number;
-  organisationsnamn: string;
+  elevator_number: string;
+  address?: string;
+  district?: string;
+  elevator_type?: string;
+  manufacturer?: string;
+  build_year?: number;
+  modernization_year?: string;
+  recommended_modernization_year?: string;
+  budget_amount?: number;
+  organizationName: string;
 };
 
 type ListResult = {
@@ -77,11 +77,11 @@ type ListResult = {
   totalPages: number;
 };
 
-type ForslagsvardItem = {
+type SuggestedValueItem = {
   _id: string;
-  kategori: string;
-  varde: string;
-  aktiv: boolean;
+  category: string;
+  value: string;
+  active: boolean;
 };
 
 function SortHeader({
@@ -199,16 +199,16 @@ function Register() {
   const [limit, setLimit] = useState(25);
 
   // Multi-select filter state
-  const [filterDistrikt, setFilterDistrikt] = useState<string[]>([]);
-  const [filterHisstyp, setFilterHisstyp] = useState<string[]>([]);
-  const [filterFabrikat, setFilterFabrikat] = useState<string[]>([]);
+  const [filterDistrict, setFilterDistrict] = useState<string[]>([]);
+  const [filterElevatorType, setFilterElevatorType] = useState<string[]>([]);
+  const [filterManufacturer, setFilterManufacturer] = useState<string[]>([]);
 
   // Status filter
-  const [statusFilter, setStatusFilter] = useState<string>("aktiv");
+  const [statusFilter, setStatusFilter] = useState<string>("active");
 
   // Range filter
-  const [byggarMin, setByggarMin] = useState("");
-  const [byggarMax, setByggarMax] = useState("");
+  const [buildYearMin, setBuildYearMin] = useState("");
+  const [buildYearMax, setBuildYearMax] = useState("");
 
   // Debounce search
   useEffect(() => {
@@ -221,29 +221,29 @@ function Register() {
     setPage(0);
   }, [
     debouncedSearch,
-    filterDistrikt,
-    filterHisstyp,
-    filterFabrikat,
-    byggarMin,
-    byggarMax,
+    filterDistrict,
+    filterElevatorType,
+    filterManufacturer,
+    buildYearMin,
+    buildYearMax,
     selectedOrgId,
     statusFilter,
   ]);
 
-  // Get filter options from forslagsvarden
-  const allSuggestions = useQuery(api.forslagsvarden.list, {});
+  // Get filter options from suggestedValues
+  const allSuggestions = useQuery(api.suggestedValues.list, {});
   const filterOptions = useMemo(() => {
     if (!allSuggestions) return null;
-    const aktiv = (allSuggestions as ForslagsvardItem[]).filter((s) => s.aktiv);
+    const active = (allSuggestions as SuggestedValueItem[]).filter((s) => s.active);
     const byCategory = (cat: string) =>
-      aktiv
-        .filter((s) => s.kategori === cat)
-        .map((s) => s.varde)
+      active
+        .filter((s) => s.category === cat)
+        .map((s) => s.value)
         .sort((a, b) => a.localeCompare(b, "sv"));
     return {
-      distrikt: byCategory("distrikt"),
-      hisstyp: byCategory("hisstyp"),
-      fabrikat: byCategory("fabrikat"),
+      district: byCategory("district"),
+      elevator_type: byCategory("elevator_type"),
+      manufacturer: byCategory("manufacturer"),
     };
   }, [allSuggestions]);
 
@@ -254,17 +254,17 @@ function Register() {
 
   const filterBaseArgs = {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
-    ...(filterDistrikt.length > 0 ? { distrikt: filterDistrikt } : {}),
-    ...(filterHisstyp.length > 0 ? { hisstyp: filterHisstyp } : {}),
-    ...(filterFabrikat.length > 0 ? { fabrikat: filterFabrikat } : {}),
-    ...(byggarMin && !isNaN(parseInt(byggarMin))
-      ? { byggarMin: parseInt(byggarMin) }
+    ...(filterDistrict.length > 0 ? { district: filterDistrict } : {}),
+    ...(filterElevatorType.length > 0 ? { elevator_type: filterElevatorType } : {}),
+    ...(filterManufacturer.length > 0 ? { manufacturer: filterManufacturer } : {}),
+    ...(buildYearMin && !isNaN(parseInt(buildYearMin))
+      ? { buildYearMin: parseInt(buildYearMin) }
       : {}),
-    ...(byggarMax && !isNaN(parseInt(byggarMax))
-      ? { byggarMax: parseInt(byggarMax) }
+    ...(buildYearMax && !isNaN(parseInt(buildYearMax))
+      ? { buildYearMax: parseInt(buildYearMax) }
       : {}),
-    ...(selectedOrgId ? { organisation_id: selectedOrgId } : {}),
-    ...(statusFilter !== "alla" ? { status: statusFilter } : {}),
+    ...(selectedOrgId ? { organization_id: selectedOrgId } : {}),
+    ...(statusFilter !== "all" ? { status: statusFilter } : {}),
   };
 
   const queryArgs = {
@@ -275,7 +275,7 @@ function Register() {
     limit,
   } as never;
 
-  const result = useQuery(api.hissar.list, queryArgs) as
+  const result = useQuery(api.elevators.list, queryArgs) as
     | ListResult
     | undefined;
 
@@ -285,7 +285,7 @@ function Register() {
   >(null);
   const exportArgs = exportRequested ? (filterBaseArgs as never) : "skip";
   const exportData = useQuery(
-    api.hissar.exportData,
+    api.elevators.exportData,
     exportArgs as never,
   ) as Record<string, unknown>[] | undefined;
 
@@ -301,28 +301,28 @@ function Register() {
     if (!exportRequested || !exportData) return;
     const timestamp = new Date().toISOString().slice(0, 10);
     if (exportRequested === "csv") {
-      downloadCSV(exportData, `hissar-${timestamp}.csv`);
+      downloadCSV(exportData, `elevators-${timestamp}.csv`);
     } else {
-      downloadExcel(exportData, `hissar-${timestamp}.xlsx`);
+      downloadExcel(exportData, `elevators-${timestamp}.xlsx`);
     }
     setExportRequested(null);
   }, [exportData, exportRequested]);
 
   const hasActiveFilters =
-    filterDistrikt.length > 0 ||
-    filterHisstyp.length > 0 ||
-    filterFabrikat.length > 0 ||
-    byggarMin !== "" ||
-    byggarMax !== "" ||
-    statusFilter !== "aktiv";
+    filterDistrict.length > 0 ||
+    filterElevatorType.length > 0 ||
+    filterManufacturer.length > 0 ||
+    buildYearMin !== "" ||
+    buildYearMax !== "" ||
+    statusFilter !== "active";
 
   function clearAllFilters() {
-    setFilterDistrikt([]);
-    setFilterHisstyp([]);
-    setFilterFabrikat([]);
-    setByggarMin("");
-    setByggarMax("");
-    setStatusFilter("aktiv");
+    setFilterDistrict([]);
+    setFilterElevatorType([]);
+    setFilterManufacturer([]);
+    setBuildYearMin("");
+    setBuildYearMax("");
+    setStatusFilter("active");
   }
 
   function handleSort(field: string) {
@@ -337,11 +337,11 @@ function Register() {
   const columnHelper = createColumnHelper<HissRow>();
   const columns = useMemo(
     () => [
-      columnHelper.accessor("hissnummer", {
+      columnHelper.accessor("elevator_number", {
         header: () => (
           <SortHeader
             label="Hissnummer"
-            field="hissnummer"
+            field="elevator_number"
             sorting={sorting}
             onSort={handleSort}
           />
@@ -350,88 +350,88 @@ function Register() {
           <span className="font-medium">{info.getValue()}</span>
         ),
       }),
-      columnHelper.accessor("adress", {
+      columnHelper.accessor("address", {
         header: () => (
           <SortHeader
             label="Adress"
-            field="adress"
+            field="address"
             sorting={sorting}
             onSort={handleSort}
           />
         ),
         cell: (info) => info.getValue() || "\u2014",
       }),
-      columnHelper.accessor("distrikt", {
+      columnHelper.accessor("district", {
         header: () => (
           <SortHeader
             label="Distrikt"
-            field="distrikt"
+            field="district"
             sorting={sorting}
             onSort={handleSort}
           />
         ),
         cell: (info) => info.getValue() || "\u2014",
       }),
-      columnHelper.accessor("hisstyp", {
+      columnHelper.accessor("elevator_type", {
         header: () => (
           <SortHeader
             label="Hisstyp"
-            field="hisstyp"
+            field="elevator_type"
             sorting={sorting}
             onSort={handleSort}
           />
         ),
         cell: (info) => info.getValue() || "\u2014",
       }),
-      columnHelper.accessor("fabrikat", {
+      columnHelper.accessor("manufacturer", {
         header: () => (
           <SortHeader
             label="Fabrikat"
-            field="fabrikat"
+            field="manufacturer"
             sorting={sorting}
             onSort={handleSort}
           />
         ),
         cell: (info) => info.getValue() || "\u2014",
       }),
-      columnHelper.accessor("byggar", {
+      columnHelper.accessor("build_year", {
         header: () => (
           <SortHeader
-            label="Bygg\u00e5r"
-            field="byggar"
+            label="Byggår"
+            field="build_year"
             sorting={sorting}
             onSort={handleSort}
           />
         ),
         cell: (info) => info.getValue() ?? "\u2014",
       }),
-      columnHelper.accessor("moderniserar", {
+      columnHelper.accessor("modernization_year", {
         header: () => (
           <SortHeader
             label="Moderniserad"
-            field="moderniserar"
+            field="modernization_year"
             sorting={sorting}
             onSort={handleSort}
           />
         ),
         cell: (info) => info.getValue() || "\u2014",
       }),
-      columnHelper.accessor("rekommenderat_moderniserar", {
+      columnHelper.accessor("recommended_modernization_year", {
         header: () => (
           <SortHeader
             label="Rek. modern."
-            field="rekommenderat_moderniserar"
+            field="recommended_modernization_year"
             sorting={sorting}
             onSort={handleSort}
           />
         ),
         cell: (info) => info.getValue() || "\u2014",
       }),
-      columnHelper.accessor("budget_belopp", {
+      columnHelper.accessor("budget_amount", {
         header: () => (
           <SortHeader
             label="Budget"
-            field="budget_belopp"
+            field="budget_amount"
             sorting={sorting}
             onSort={handleSort}
           />
@@ -550,21 +550,21 @@ function Register() {
           <>
             <MultiSelectFilter
               title="Distrikt"
-              options={filterOptions.distrikt}
-              selected={filterDistrikt}
-              onSelectedChange={setFilterDistrikt}
+              options={filterOptions.district}
+              selected={filterDistrict}
+              onSelectedChange={setFilterDistrict}
             />
             <MultiSelectFilter
               title="Hisstyp"
-              options={filterOptions.hisstyp}
-              selected={filterHisstyp}
-              onSelectedChange={setFilterHisstyp}
+              options={filterOptions.elevator_type}
+              selected={filterElevatorType}
+              onSelectedChange={setFilterElevatorType}
             />
             <MultiSelectFilter
               title="Fabrikat"
-              options={filterOptions.fabrikat}
-              selected={filterFabrikat}
-              onSelectedChange={setFilterFabrikat}
+              options={filterOptions.manufacturer}
+              selected={filterManufacturer}
+              onSelectedChange={setFilterManufacturer}
             />
           </>
         )}
@@ -574,10 +574,10 @@ function Register() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="aktiv">Aktiva</SelectItem>
-            <SelectItem value="rivd">Rivda</SelectItem>
-            <SelectItem value="arkiverad">Arkiverade</SelectItem>
-            <SelectItem value="alla">Alla</SelectItem>
+            <SelectItem value="active">Aktiva</SelectItem>
+            <SelectItem value="demolished">Rivda</SelectItem>
+            <SelectItem value="archived">Arkiverade</SelectItem>
+            <SelectItem value="all">Alla</SelectItem>
           </SelectContent>
         </Select>
 
@@ -585,17 +585,17 @@ function Register() {
           <span className="text-sm text-muted-foreground">Bygg\u00e5r:</span>
           <Input
             type="number"
-            placeholder="Fr\u00e5n"
-            value={byggarMin}
-            onChange={(e) => setByggarMin(e.target.value)}
+            placeholder="Från"
+            value={buildYearMin}
+            onChange={(e) => setBuildYearMin(e.target.value)}
             className="h-9 w-20"
           />
-          <span className="text-muted-foreground">\u2013</span>
+          <span className="text-muted-foreground">–</span>
           <Input
             type="number"
             placeholder="Till"
-            value={byggarMax}
-            onChange={(e) => setByggarMax(e.target.value)}
+            value={buildYearMax}
+            onChange={(e) => setBuildYearMax(e.target.value)}
             className="h-9 w-20"
           />
         </div>

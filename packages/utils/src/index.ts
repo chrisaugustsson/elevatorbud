@@ -4,19 +4,19 @@ export { generateCSV, generateExcel, downloadCSV, downloadExcel } from "./export
 export type { ExportColumn } from "./export";
 
 export {
-  parseHissarSheet,
-  parseNodtelefonerSheet,
-  parseRivnaHissarSheet,
+  parseElevatorSheet,
+  parseEmergencyPhoneSheet,
+  parseDemolishedSheet,
   parseExcelImport,
   readWorkbook,
   validateWorkbookSheets,
-  HISSAR_COLUMNS,
+  ELEVATOR_COLUMNS,
 } from "./excel-import";
 export type {
-  ParsedHiss,
+  ParsedElevator,
   ImportWarning,
-  HissarParseResult,
-  NodtelefonerParseResult,
+  ElevatorParseResult,
+  EmergencyPhoneParseResult,
   FullImportResult,
   ColumnDef,
 } from "./excel-import";

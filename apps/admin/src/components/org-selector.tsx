@@ -11,7 +11,7 @@ import {
 import { Building2 } from "lucide-react";
 
 export function OrgSelector() {
-  const orgs = useQuery(api.organisationer.list);
+  const orgs = useQuery(api.organizations.list);
   const { selectedOrgId, setSelectedOrgId } = useSelectedOrg();
 
   return (
@@ -27,9 +27,9 @@ export function OrgSelector() {
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="all">Alla organisationer</SelectItem>
-        {orgs?.map((org: { _id: string; namn: string }) => (
+        {orgs?.map((org: { _id: string; name: string }) => (
           <SelectItem key={org._id} value={org._id}>
-            {org.namn}
+            {org.name}
           </SelectItem>
         ))}
       </SelectContent>

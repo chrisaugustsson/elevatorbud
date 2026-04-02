@@ -13,7 +13,7 @@ import {
 export interface ImportReportData {
   created: number;
   updated: number;
-  errors: { hissnummer: string; error: string }[];
+  errors: { elevator_number: string; error: string }[];
   orgsCreated: string[];
   adminEmail: string;
   timestamp: string;
@@ -83,7 +83,7 @@ export function ImportReportEmail({
               </Heading>
               {errors.slice(0, 50).map((err, i) => (
                 <Text key={i} style={error_item}>
-                  <strong>{err.hissnummer}</strong>: {err.error}
+                  <strong>{err.elevator_number}</strong>: {err.error}
                 </Text>
               ))}
               {errors.length > 50 && (

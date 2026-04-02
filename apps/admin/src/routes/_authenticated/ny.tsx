@@ -57,97 +57,97 @@ const STEPS = [
 ] as const;
 
 type HissFormValues = {
-  organisation_id: string;
+  organization_id: string;
   // Step 1 - Identifiering
-  hissnummer: string;
-  adress: string;
-  hissbeteckning: string;
-  distrikt: string;
+  elevator_number: string;
+  address: string;
+  elevator_designation: string;
+  district: string;
   // Step 2 - Teknisk specifikation
-  hisstyp: string;
-  fabrikat: string;
-  byggar: string;
-  hastighet: string;
-  lyfthojd: string;
-  marklast: string;
-  antal_plan: string;
-  antal_dorrar: string;
+  elevator_type: string;
+  manufacturer: string;
+  build_year: string;
+  speed: string;
+  lift_height: string;
+  load_capacity: string;
+  floor_count: string;
+  door_count: string;
   // Step 3 - Dörrar och korg
-  typ_dorrar: string;
-  genomgang: boolean;
-  kollektiv: string;
-  korgstorlek: string;
-  dagoppning: string;
-  barbeslag: string;
-  dorrmaskin: string;
+  door_type: string;
+  passthrough: boolean;
+  collective: string;
+  cab_size: string;
+  daylight_opening: string;
+  grab_rail: string;
+  door_machine: string;
   // Step 4 - Maskineri
-  drivsystem: string;
-  upphangning: string;
-  maskinplacering: string;
-  typ_maskin: string;
-  typ_styrsystem: string;
+  drive_system: string;
+  suspension: string;
+  machine_placement: string;
+  machine_type: string;
+  control_system_type: string;
   // Step 5 - Besiktning och underhåll
-  besiktningsorgan: string;
-  besiktningsmanad: string;
-  skotselforetag: string;
-  schaktbelysning: string;
+  inspection_authority: string;
+  inspection_month: string;
+  maintenance_company: string;
+  shaft_lighting: string;
   // Step 6 - Modernisering
-  moderniserar: string;
-  garanti: boolean;
-  rekommenderat_moderniserar: string;
-  budget_belopp: string;
-  atgarder_vid_modernisering: string;
+  modernization_year: string;
+  warranty: boolean;
+  recommended_modernization_year: string;
+  budget_amount: string;
+  modernization_measures: string;
   // Step 7 - Nödtelefon
-  har_nodtelefon: boolean;
-  nodtelefon_modell: string;
-  nodtelefon_typ: string;
-  behover_uppgradering: boolean;
-  nodtelefon_pris: string;
+  has_emergency_phone: boolean;
+  emergency_phone_model: string;
+  emergency_phone_type: string;
+  needs_upgrade: boolean;
+  emergency_phone_price: string;
   // Step 8 - Kommentarer
-  kommentarer: string;
+  comments: string;
 };
 
 const defaultValues: HissFormValues = {
-  organisation_id: "",
-  hissnummer: "",
-  adress: "",
-  hissbeteckning: "",
-  distrikt: "",
-  hisstyp: "",
-  fabrikat: "",
-  byggar: "",
-  hastighet: "",
-  lyfthojd: "",
-  marklast: "",
-  antal_plan: "",
-  antal_dorrar: "",
-  typ_dorrar: "",
-  genomgang: false,
-  kollektiv: "",
-  korgstorlek: "",
-  dagoppning: "",
-  barbeslag: "",
-  dorrmaskin: "",
-  drivsystem: "",
-  upphangning: "",
-  maskinplacering: "",
-  typ_maskin: "",
-  typ_styrsystem: "",
-  besiktningsorgan: "",
-  besiktningsmanad: "",
-  skotselforetag: "",
-  schaktbelysning: "",
-  moderniserar: "",
-  garanti: false,
-  rekommenderat_moderniserar: "",
-  budget_belopp: "",
-  atgarder_vid_modernisering: "",
-  har_nodtelefon: false,
-  nodtelefon_modell: "",
-  nodtelefon_typ: "",
-  behover_uppgradering: false,
-  nodtelefon_pris: "",
-  kommentarer: "",
+  organization_id: "",
+  elevator_number: "",
+  address: "",
+  elevator_designation: "",
+  district: "",
+  elevator_type: "",
+  manufacturer: "",
+  build_year: "",
+  speed: "",
+  lift_height: "",
+  load_capacity: "",
+  floor_count: "",
+  door_count: "",
+  door_type: "",
+  passthrough: false,
+  collective: "",
+  cab_size: "",
+  daylight_opening: "",
+  grab_rail: "",
+  door_machine: "",
+  drive_system: "",
+  suspension: "",
+  machine_placement: "",
+  machine_type: "",
+  control_system_type: "",
+  inspection_authority: "",
+  inspection_month: "",
+  maintenance_company: "",
+  shaft_lighting: "",
+  modernization_year: "",
+  warranty: false,
+  recommended_modernization_year: "",
+  budget_amount: "",
+  modernization_measures: "",
+  has_emergency_phone: false,
+  emergency_phone_model: "",
+  emergency_phone_type: "",
+  needs_upgrade: false,
+  emergency_phone_price: "",
+  comments: "",
 };
 
 // Helper to extract the form instance type from useForm
@@ -157,12 +157,12 @@ function _hissFormTypeHelper() {
 }
 type HissForm = ReturnType<typeof _hissFormTypeHelper>;
 
-function useSuggestions(kategori: string): string[] {
-  const data = useQuery(api.forslagsvarden.list, { kategori });
+function useSuggestions(category: string): string[] {
+  const data = useQuery(api.suggestedValues.list, { category });
   if (!data) return [];
   return data
-    .filter((d: { aktiv: boolean }) => d.aktiv)
-    .map((d: { varde: string }) => d.varde);
+    .filter((d: { active: boolean }) => d.active)
+    .map((d: { value: string }) => d.value);
 }
 
 function toOptionalString(val: string): string | undefined {
@@ -185,8 +185,8 @@ function NyHiss() {
   const [draftSavedVisible, setDraftSavedVisible] = useState(false);
   const draftSavedTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const draftKey = getDraftKey();
-  const orgs = useQuery(api.organisationer.list);
-  const createHiss = useMutation(api.hissar.create);
+  const orgs = useQuery(api.organizations.list);
+  const createHiss = useMutation(api.elevators.create);
 
   // Check for existing draft on mount
   useEffect(() => {
@@ -205,50 +205,50 @@ function NyHiss() {
           throw new Error("OFFLINE");
         }
         await createHiss({
-          hissnummer: value.hissnummer,
-          organisation_id: value.organisation_id as never,
-          adress: toOptionalString(value.adress),
-          hissbeteckning: toOptionalString(value.hissbeteckning),
-          distrikt: toOptionalString(value.distrikt),
-          hisstyp: toOptionalString(value.hisstyp),
-          fabrikat: toOptionalString(value.fabrikat),
-          byggar: toOptionalNumber(value.byggar),
-          hastighet: toOptionalString(value.hastighet),
-          lyfthojd: toOptionalString(value.lyfthojd),
-          marklast: toOptionalString(value.marklast),
-          antal_plan: toOptionalNumber(value.antal_plan),
-          antal_dorrar: toOptionalNumber(value.antal_dorrar),
-          typ_dorrar: toOptionalString(value.typ_dorrar),
-          genomgang: value.genomgang || undefined,
-          kollektiv: toOptionalString(value.kollektiv),
-          korgstorlek: toOptionalString(value.korgstorlek),
-          dagoppning: toOptionalString(value.dagoppning),
-          barbeslag: toOptionalString(value.barbeslag),
-          dorrmaskin: toOptionalString(value.dorrmaskin),
-          drivsystem: toOptionalString(value.drivsystem),
-          upphangning: toOptionalString(value.upphangning),
-          maskinplacering: toOptionalString(value.maskinplacering),
-          typ_maskin: toOptionalString(value.typ_maskin),
-          typ_styrsystem: toOptionalString(value.typ_styrsystem),
-          besiktningsorgan: toOptionalString(value.besiktningsorgan),
-          besiktningsmanad: toOptionalString(value.besiktningsmanad),
-          skotselforetag: toOptionalString(value.skotselforetag),
-          schaktbelysning: toOptionalString(value.schaktbelysning),
-          moderniserar: toOptionalString(value.moderniserar),
-          garanti: value.garanti || undefined,
-          rekommenderat_moderniserar: toOptionalString(
-            value.rekommenderat_moderniserar,
+          elevator_number: value.elevator_number,
+          organization_id: value.organization_id as never,
+          address: toOptionalString(value.address),
+          elevator_designation: toOptionalString(value.elevator_designation),
+          district: toOptionalString(value.district),
+          elevator_type: toOptionalString(value.elevator_type),
+          manufacturer: toOptionalString(value.manufacturer),
+          build_year: toOptionalNumber(value.build_year),
+          speed: toOptionalString(value.speed),
+          lift_height: toOptionalString(value.lift_height),
+          load_capacity: toOptionalString(value.load_capacity),
+          floor_count: toOptionalNumber(value.floor_count),
+          door_count: toOptionalNumber(value.door_count),
+          door_type: toOptionalString(value.door_type),
+          passthrough: value.passthrough || undefined,
+          collective: toOptionalString(value.collective),
+          cab_size: toOptionalString(value.cab_size),
+          daylight_opening: toOptionalString(value.daylight_opening),
+          grab_rail: toOptionalString(value.grab_rail),
+          door_machine: toOptionalString(value.door_machine),
+          drive_system: toOptionalString(value.drive_system),
+          suspension: toOptionalString(value.suspension),
+          machine_placement: toOptionalString(value.machine_placement),
+          machine_type: toOptionalString(value.machine_type),
+          control_system_type: toOptionalString(value.control_system_type),
+          inspection_authority: toOptionalString(value.inspection_authority),
+          inspection_month: toOptionalString(value.inspection_month),
+          maintenance_company: toOptionalString(value.maintenance_company),
+          shaft_lighting: toOptionalString(value.shaft_lighting),
+          modernization_year: toOptionalString(value.modernization_year),
+          warranty: value.warranty || undefined,
+          recommended_modernization_year: toOptionalString(
+            value.recommended_modernization_year,
           ),
-          budget_belopp: toOptionalNumber(value.budget_belopp),
-          atgarder_vid_modernisering: toOptionalString(
-            value.atgarder_vid_modernisering,
+          budget_amount: toOptionalNumber(value.budget_amount),
+          modernization_measures: toOptionalString(
+            value.modernization_measures,
           ),
-          har_nodtelefon: value.har_nodtelefon || undefined,
-          nodtelefon_modell: toOptionalString(value.nodtelefon_modell),
-          nodtelefon_typ: toOptionalString(value.nodtelefon_typ),
-          behover_uppgradering: value.behover_uppgradering || undefined,
-          nodtelefon_pris: toOptionalNumber(value.nodtelefon_pris),
-          kommentarer: toOptionalString(value.kommentarer),
+          has_emergency_phone: value.has_emergency_phone || undefined,
+          emergency_phone_model: toOptionalString(value.emergency_phone_model),
+          emergency_phone_type: toOptionalString(value.emergency_phone_type),
+          needs_upgrade: value.needs_upgrade || undefined,
+          emergency_phone_price: toOptionalNumber(value.emergency_phone_price),
+          comments: toOptionalString(value.comments),
         });
         clearDraft(draftKey);
         setSubmitSuccess(true);
@@ -327,7 +327,7 @@ function NyHiss() {
     const timer = setTimeout(() => {
       // Only save if there's something worth saving
       const hasContent = Object.entries(formValues).some(([key, val]) => {
-        if (key === "organisation_id") return false;
+        if (key === "organization_id") return false;
         if (typeof val === "boolean") return val;
         return typeof val === "string" && val.trim() !== "";
       });
@@ -411,7 +411,7 @@ function NyHiss() {
           )}
         </div>
         <div className="mt-2">
-          <form.Field name="organisation_id">
+          <form.Field name="organization_id">
             {(field) => (
               <div className="space-y-1">
                 <Label className="text-sm text-muted-foreground">
@@ -426,9 +426,9 @@ function NyHiss() {
                     <SelectValue placeholder="Välj organisation..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {orgs?.map((org: { _id: string; namn: string }) => (
+                    {orgs?.map((org: { _id: string; name: string }) => (
                       <SelectItem key={org._id} value={org._id}>
-                        {org.namn}
+                        {org.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -545,7 +545,7 @@ function StepContent({
   step: number;
   form: HissForm;
   goToStep: (step: number) => void;
-  orgs: Array<{ _id: string; namn: string }> | undefined;
+  orgs: Array<{ _id: string; name: string }> | undefined;
 }) {
   switch (step) {
     case 1:
@@ -574,23 +574,23 @@ function StepContent({
 // --- Step 1: Identifiering ---
 
 function Step1Identifiering({ form }: { form: HissForm }) {
-  const hissbeteckningSuggestions = useSuggestions("hissbeteckning");
-  const distriktSuggestions = useSuggestions("distrikt");
+  const hissbeteckningSuggestions = useSuggestions("elevator_designation");
+  const distriktSuggestions = useSuggestions("district");
 
   return (
     <div className="space-y-5">
       {/* Hissnummer with real-time uniqueness check */}
-      <form.Field name="hissnummer">
+      <form.Field name="elevator_number">
         {(field) => <HissnummerField field={field} />}
       </form.Field>
 
       {/* Adress */}
-      <form.Field name="adress">
+      <form.Field name="address">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="adress">Adress</Label>
+            <Label htmlFor="address">Adress</Label>
             <Input
-              id="adress"
+              id="address"
               className="h-11"
               placeholder="Gatuadress..."
               value={field.state.value}
@@ -601,7 +601,7 @@ function Step1Identifiering({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Hissbeteckning (combobox) */}
-      <form.Field name="hissbeteckning">
+      <form.Field name="elevator_designation">
         {(field) => (
           <div className="space-y-1.5">
             <Label>Hissbeteckning</Label>
@@ -616,7 +616,7 @@ function Step1Identifiering({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Distrikt (combobox) */}
-      <form.Field name="distrikt">
+      <form.Field name="district">
         {(field) => (
           <div className="space-y-1.5">
             <Label>Distrikt</Label>
@@ -641,23 +641,23 @@ function HissnummerField({
     handleChange: (value: string) => void;
   };
 }) {
-  const hissnummer = field.state.value;
+  const elevatorNumber = field.state.value;
   const checkResult = useQuery(
-    api.hissar.checkHissnummer,
-    hissnummer ? { hissnummer } : "skip",
+    api.elevators.checkElevatorNumber,
+    elevatorNumber ? { elevator_number: elevatorNumber } : "skip",
   );
   const isDuplicate = checkResult?.exists === true;
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor="hissnummer">
+      <Label htmlFor="elevator_number">
         Hissnummer <span className="text-destructive">*</span>
       </Label>
       <Input
-        id="hissnummer"
+        id="elevator_number"
         className={cn("h-11", isDuplicate && "border-destructive")}
         placeholder="Ange hissnummer..."
-        value={hissnummer}
+        value={elevatorNumber}
         onChange={(e) => field.handleChange(e.target.value)}
       />
       {isDuplicate && (
@@ -673,13 +673,13 @@ function HissnummerField({
 // --- Step 2: Teknisk specifikation ---
 
 function Step2TekniskSpec({ form }: { form: HissForm }) {
-  const hisstypSuggestions = useSuggestions("hisstyp");
-  const fabrikatSuggestions = useSuggestions("fabrikat");
+  const hisstypSuggestions = useSuggestions("elevator_type");
+  const fabrikatSuggestions = useSuggestions("manufacturer");
 
   return (
     <div className="space-y-5">
       {/* Hisstyp (combobox) */}
-      <form.Field name="hisstyp">
+      <form.Field name="elevator_type">
         {(field) => (
           <div className="space-y-1.5">
             <Label>Hisstyp</Label>
@@ -694,7 +694,7 @@ function Step2TekniskSpec({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Fabrikat (combobox) */}
-      <form.Field name="fabrikat">
+      <form.Field name="manufacturer">
         {(field) => (
           <div className="space-y-1.5">
             <Label>Fabrikat</Label>
@@ -709,12 +709,12 @@ function Step2TekniskSpec({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Byggår */}
-      <form.Field name="byggar">
+      <form.Field name="build_year">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="byggar">Byggår</Label>
+            <Label htmlFor="build_year">Byggår</Label>
             <Input
-              id="byggar"
+              id="build_year"
               className="h-11"
               type="number"
               inputMode="numeric"
@@ -728,12 +728,12 @@ function Step2TekniskSpec({ form }: { form: HissForm }) {
 
       {/* Hastighet & Lyfthöjd — side by side */}
       <div className="grid grid-cols-2 gap-3">
-        <form.Field name="hastighet">
+        <form.Field name="speed">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="hastighet">Hastighet</Label>
+              <Label htmlFor="speed">Hastighet</Label>
               <Input
-                id="hastighet"
+                id="speed"
                 className="h-11"
                 placeholder="m/s"
                 value={field.state.value}
@@ -743,12 +743,12 @@ function Step2TekniskSpec({ form }: { form: HissForm }) {
           )}
         </form.Field>
 
-        <form.Field name="lyfthojd">
+        <form.Field name="lift_height">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="lyfthojd">Lyfthöjd</Label>
+              <Label htmlFor="lift_height">Lyfthöjd</Label>
               <Input
-                id="lyfthojd"
+                id="lift_height"
                 className="h-11"
                 placeholder="meter"
                 value={field.state.value}
@@ -760,12 +760,12 @@ function Step2TekniskSpec({ form }: { form: HissForm }) {
       </div>
 
       {/* Marklast */}
-      <form.Field name="marklast">
+      <form.Field name="load_capacity">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="marklast">Marklast</Label>
+            <Label htmlFor="load_capacity">Marklast</Label>
             <Input
-              id="marklast"
+              id="load_capacity"
               className="h-11"
               placeholder="t.ex. 500*6 (kg*personer)"
               value={field.state.value}
@@ -777,12 +777,12 @@ function Step2TekniskSpec({ form }: { form: HissForm }) {
 
       {/* Antal plan & Antal dörrar — side by side */}
       <div className="grid grid-cols-2 gap-3">
-        <form.Field name="antal_plan">
+        <form.Field name="floor_count">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="antal_plan">Antal plan</Label>
+              <Label htmlFor="floor_count">Antal plan</Label>
               <Input
-                id="antal_plan"
+                id="floor_count"
                 className="h-11"
                 type="number"
                 inputMode="numeric"
@@ -794,12 +794,12 @@ function Step2TekniskSpec({ form }: { form: HissForm }) {
           )}
         </form.Field>
 
-        <form.Field name="antal_dorrar">
+        <form.Field name="door_count">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="antal_dorrar">Antal dörrar</Label>
+              <Label htmlFor="door_count">Antal dörrar</Label>
               <Input
-                id="antal_dorrar"
+                id="door_count"
                 className="h-11"
                 type="number"
                 inputMode="numeric"
@@ -818,13 +818,13 @@ function Step2TekniskSpec({ form }: { form: HissForm }) {
 // --- Step 3: Dörrar och korg ---
 
 function Step3DorrarOchKorg({ form }: { form: HissForm }) {
-  const typDorrarSuggestions = useSuggestions("typ_dorrar");
-  const kollektivSuggestions = useSuggestions("kollektiv");
+  const typDorrarSuggestions = useSuggestions("door_type");
+  const kollektivSuggestions = useSuggestions("collective");
 
   return (
     <div className="space-y-5">
       {/* Typ dörrar (combobox) */}
-      <form.Field name="typ_dorrar">
+      <form.Field name="door_type">
         {(field) => (
           <div className="space-y-1.5">
             <Label>Typ dörrar</Label>
@@ -839,14 +839,14 @@ function Step3DorrarOchKorg({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Genomgång (toggle) */}
-      <form.Field name="genomgang">
+      <form.Field name="passthrough">
         {(field) => (
           <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
-            <Label htmlFor="genomgang" className="cursor-pointer">
+            <Label htmlFor="passthrough" className="cursor-pointer">
               Genomgång
             </Label>
             <Switch
-              id="genomgang"
+              id="passthrough"
               checked={field.state.value}
               onCheckedChange={(val) => field.handleChange(val)}
             />
@@ -855,7 +855,7 @@ function Step3DorrarOchKorg({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Kollektiv (combobox) */}
-      <form.Field name="kollektiv">
+      <form.Field name="collective">
         {(field) => (
           <div className="space-y-1.5">
             <Label>Kollektiv</Label>
@@ -870,12 +870,12 @@ function Step3DorrarOchKorg({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Korgstorlek */}
-      <form.Field name="korgstorlek">
+      <form.Field name="cab_size">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="korgstorlek">Korgstorlek</Label>
+            <Label htmlFor="cab_size">Korgstorlek</Label>
             <Input
-              id="korgstorlek"
+              id="cab_size"
               className="h-11"
               placeholder="t.ex. 1000*2050*2300 (B*D*H mm)"
               value={field.state.value}
@@ -886,12 +886,12 @@ function Step3DorrarOchKorg({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Dagöppning */}
-      <form.Field name="dagoppning">
+      <form.Field name="daylight_opening">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="dagoppning">Dagöppning</Label>
+            <Label htmlFor="daylight_opening">Dagöppning</Label>
             <Input
-              id="dagoppning"
+              id="daylight_opening"
               className="h-11"
               placeholder="t.ex. 900*2000 (B*H mm)"
               value={field.state.value}
@@ -903,12 +903,12 @@ function Step3DorrarOchKorg({ form }: { form: HissForm }) {
 
       {/* Bärbeslag & Dörrmaskin — side by side */}
       <div className="grid grid-cols-2 gap-3">
-        <form.Field name="barbeslag">
+        <form.Field name="grab_rail">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="barbeslag">Bärbeslag</Label>
+              <Label htmlFor="grab_rail">Bärbeslag</Label>
               <Input
-                id="barbeslag"
+                id="grab_rail"
                 className="h-11"
                 placeholder="Typ..."
                 value={field.state.value}
@@ -918,12 +918,12 @@ function Step3DorrarOchKorg({ form }: { form: HissForm }) {
           )}
         </form.Field>
 
-        <form.Field name="dorrmaskin">
+        <form.Field name="door_machine">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="dorrmaskin">Dörrmaskin</Label>
+              <Label htmlFor="door_machine">Dörrmaskin</Label>
               <Input
-                id="dorrmaskin"
+                id="door_machine"
                 className="h-11"
                 placeholder="Typ..."
                 value={field.state.value}
@@ -955,13 +955,13 @@ const BESIKTNINGSMANADER = [
 ] as const;
 
 function Step4Maskineri({ form }: { form: HissForm }) {
-  const drivsystemSuggestions = useSuggestions("drivsystem");
-  const maskinplaceringSuggestions = useSuggestions("maskinplacering");
+  const drivsystemSuggestions = useSuggestions("drive_system");
+  const maskinplaceringSuggestions = useSuggestions("machine_placement");
 
   return (
     <div className="space-y-5">
       {/* Drivsystem (combobox) */}
-      <form.Field name="drivsystem">
+      <form.Field name="drive_system">
         {(field) => (
           <div className="space-y-1.5">
             <Label>Drivsystem</Label>
@@ -976,12 +976,12 @@ function Step4Maskineri({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Upphängning */}
-      <form.Field name="upphangning">
+      <form.Field name="suspension">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="upphangning">Upphängning</Label>
+            <Label htmlFor="suspension">Upphängning</Label>
             <Input
-              id="upphangning"
+              id="suspension"
               className="h-11"
               placeholder="Ange upphängning..."
               value={field.state.value}
@@ -992,7 +992,7 @@ function Step4Maskineri({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Maskinplacering (combobox) */}
-      <form.Field name="maskinplacering">
+      <form.Field name="machine_placement">
         {(field) => (
           <div className="space-y-1.5">
             <Label>Maskinplacering</Label>
@@ -1008,12 +1008,12 @@ function Step4Maskineri({ form }: { form: HissForm }) {
 
       {/* Typ maskin & Typ styrsystem — side by side */}
       <div className="grid grid-cols-2 gap-3">
-        <form.Field name="typ_maskin">
+        <form.Field name="machine_type">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="typ_maskin">Typ maskin</Label>
+              <Label htmlFor="machine_type">Typ maskin</Label>
               <Input
-                id="typ_maskin"
+                id="machine_type"
                 className="h-11"
                 placeholder="Typ..."
                 value={field.state.value}
@@ -1023,12 +1023,12 @@ function Step4Maskineri({ form }: { form: HissForm }) {
           )}
         </form.Field>
 
-        <form.Field name="typ_styrsystem">
+        <form.Field name="control_system_type">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="typ_styrsystem">Typ styrsystem</Label>
+              <Label htmlFor="control_system_type">Typ styrsystem</Label>
               <Input
-                id="typ_styrsystem"
+                id="control_system_type"
                 className="h-11"
                 placeholder="Typ..."
                 value={field.state.value}
@@ -1045,13 +1045,13 @@ function Step4Maskineri({ form }: { form: HissForm }) {
 // --- Step 5: Besiktning och underhåll ---
 
 function Step5Besiktning({ form }: { form: HissForm }) {
-  const besiktningsorganSuggestions = useSuggestions("besiktningsorgan");
-  const skotselforetagSuggestions = useSuggestions("skotselforetag");
+  const besiktningsorganSuggestions = useSuggestions("inspection_authority");
+  const skotselforetagSuggestions = useSuggestions("maintenance_company");
 
   return (
     <div className="space-y-5">
       {/* Besiktningsorgan (combobox) */}
-      <form.Field name="besiktningsorgan">
+      <form.Field name="inspection_authority">
         {(field) => (
           <div className="space-y-1.5">
             <Label>Besiktningsorgan</Label>
@@ -1066,7 +1066,7 @@ function Step5Besiktning({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Besiktningsmånad (fixed enum) */}
-      <form.Field name="besiktningsmanad">
+      <form.Field name="inspection_month">
         {(field) => (
           <div className="space-y-1.5">
             <Label>Besiktningsmånad</Label>
@@ -1090,7 +1090,7 @@ function Step5Besiktning({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Skötselföretag (combobox) */}
-      <form.Field name="skotselforetag">
+      <form.Field name="maintenance_company">
         {(field) => (
           <div className="space-y-1.5">
             <Label>Skötselföretag</Label>
@@ -1105,12 +1105,12 @@ function Step5Besiktning({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Schaktbelysning */}
-      <form.Field name="schaktbelysning">
+      <form.Field name="shaft_lighting">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="schaktbelysning">Schaktbelysning</Label>
+            <Label htmlFor="shaft_lighting">Schaktbelysning</Label>
             <Input
-              id="schaktbelysning"
+              id="shaft_lighting"
               className="h-11"
               placeholder="Ange schaktbelysning..."
               value={field.state.value}
@@ -1126,17 +1126,17 @@ function Step5Besiktning({ form }: { form: HissForm }) {
 // --- Step 6: Modernisering ---
 
 function Step6Modernisering({ form }: { form: HissForm }) {
-  const atgarderSuggestions = useSuggestions("atgarder_vid_modernisering");
+  const atgarderSuggestions = useSuggestions("modernization_measures");
 
   return (
     <div className="space-y-5">
       {/* Moderniseringsår */}
-      <form.Field name="moderniserar">
+      <form.Field name="modernization_year">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="moderniserar">Moderniseringsår</Label>
+            <Label htmlFor="modernization_year">Moderniseringsår</Label>
             <Input
-              id="moderniserar"
+              id="modernization_year"
               className="h-11"
               placeholder="t.ex. 2007 eller Ej ombyggd"
               value={field.state.value}
@@ -1147,14 +1147,14 @@ function Step6Modernisering({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Garanti (toggle) */}
-      <form.Field name="garanti">
+      <form.Field name="warranty">
         {(field) => (
           <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
-            <Label htmlFor="garanti" className="cursor-pointer">
+            <Label htmlFor="warranty" className="cursor-pointer">
               Garanti
             </Label>
             <Switch
-              id="garanti"
+              id="warranty"
               checked={field.state.value}
               onCheckedChange={(val) => field.handleChange(val)}
             />
@@ -1163,14 +1163,14 @@ function Step6Modernisering({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Rekommenderat moderniseringsår */}
-      <form.Field name="rekommenderat_moderniserar">
+      <form.Field name="recommended_modernization_year">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="rekommenderat_moderniserar">
+            <Label htmlFor="recommended_modernization_year">
               Rekommenderat moderniseringsår
             </Label>
             <Input
-              id="rekommenderat_moderniserar"
+              id="recommended_modernization_year"
               className="h-11"
               placeholder="t.ex. 2030"
               value={field.state.value}
@@ -1181,12 +1181,12 @@ function Step6Modernisering({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Budget belopp */}
-      <form.Field name="budget_belopp">
+      <form.Field name="budget_amount">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="budget_belopp">Budget belopp</Label>
+            <Label htmlFor="budget_amount">Budget belopp</Label>
             <Input
-              id="budget_belopp"
+              id="budget_amount"
               className="h-11"
               type="number"
               inputMode="numeric"
@@ -1199,7 +1199,7 @@ function Step6Modernisering({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Åtgärder vid modernisering (combobox) */}
-      <form.Field name="atgarder_vid_modernisering">
+      <form.Field name="modernization_measures">
         {(field) => (
           <div className="space-y-1.5">
             <Label>Åtgärder vid modernisering</Label>
@@ -1222,15 +1222,15 @@ function Step7Nodtelefon({ form }: { form: HissForm }) {
   return (
     <div className="space-y-5">
       {/* Har nödtelefon (toggle) */}
-      <form.Field name="har_nodtelefon">
+      <form.Field name="has_emergency_phone">
         {(field) => (
           <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
-            <Label htmlFor="har_nodtelefon" className="cursor-pointer">
+            <Label htmlFor="has_emergency_phone" className="cursor-pointer">
               <Phone className="mr-1.5 inline size-4" />
               Har nödtelefon
             </Label>
             <Switch
-              id="har_nodtelefon"
+              id="has_emergency_phone"
               checked={field.state.value}
               onCheckedChange={(val) => field.handleChange(val)}
             />
@@ -1239,12 +1239,12 @@ function Step7Nodtelefon({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Modell */}
-      <form.Field name="nodtelefon_modell">
+      <form.Field name="emergency_phone_model">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="nodtelefon_modell">Modell</Label>
+            <Label htmlFor="emergency_phone_model">Modell</Label>
             <Input
-              id="nodtelefon_modell"
+              id="emergency_phone_model"
               className="h-11"
               placeholder="Ange modell..."
               value={field.state.value}
@@ -1255,12 +1255,12 @@ function Step7Nodtelefon({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Typ */}
-      <form.Field name="nodtelefon_typ">
+      <form.Field name="emergency_phone_type">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="nodtelefon_typ">Typ</Label>
+            <Label htmlFor="emergency_phone_type">Typ</Label>
             <Input
-              id="nodtelefon_typ"
+              id="emergency_phone_type"
               className="h-11"
               placeholder="Ange typ..."
               value={field.state.value}
@@ -1271,14 +1271,14 @@ function Step7Nodtelefon({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Behöver uppgradering (toggle) */}
-      <form.Field name="behover_uppgradering">
+      <form.Field name="needs_upgrade">
         {(field) => (
           <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
-            <Label htmlFor="behover_uppgradering" className="cursor-pointer">
+            <Label htmlFor="needs_upgrade" className="cursor-pointer">
               Behöver uppgradering
             </Label>
             <Switch
-              id="behover_uppgradering"
+              id="needs_upgrade"
               checked={field.state.value}
               onCheckedChange={(val) => field.handleChange(val)}
             />
@@ -1287,12 +1287,12 @@ function Step7Nodtelefon({ form }: { form: HissForm }) {
       </form.Field>
 
       {/* Pris */}
-      <form.Field name="nodtelefon_pris">
+      <form.Field name="emergency_phone_price">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="nodtelefon_pris">Pris</Label>
+            <Label htmlFor="emergency_phone_price">Pris</Label>
             <Input
-              id="nodtelefon_pris"
+              id="emergency_phone_price"
               className="h-11"
               type="number"
               inputMode="numeric"
@@ -1312,15 +1312,15 @@ function Step7Nodtelefon({ form }: { form: HissForm }) {
 function Step8Kommentarer({ form }: { form: HissForm }) {
   return (
     <div className="space-y-5">
-      <form.Field name="kommentarer">
+      <form.Field name="comments">
         {(field) => (
           <div className="space-y-1.5">
-            <Label htmlFor="kommentarer">
+            <Label htmlFor="comments">
               <MessageSquare className="mr-1.5 inline size-4" />
               Kommentarer
             </Label>
             <Textarea
-              id="kommentarer"
+              id="comments"
               className="min-h-[200px]"
               placeholder="Skriv eventuella kommentarer här..."
               value={field.state.value}
@@ -1352,11 +1352,11 @@ function Step9Granska({
 }: {
   form: HissForm;
   goToStep: (step: number) => void;
-  orgs: Array<{ _id: string; namn: string }> | undefined;
+  orgs: Array<{ _id: string; name: string }> | undefined;
 }) {
   const values = form.state.values;
   const orgName =
-    orgs?.find((o) => o._id === values.organisation_id)?.namn ?? "";
+    orgs?.find((o) => o._id === values.organization_id)?.name ?? "";
 
   const sections: ReviewSection[] = [
     {
@@ -1364,74 +1364,74 @@ function Step9Granska({
       step: 1,
       fields: [
         { label: "Organisation", value: orgName },
-        { label: "Hissnummer", value: values.hissnummer },
-        { label: "Adress", value: values.adress },
-        { label: "Hissbeteckning", value: values.hissbeteckning },
-        { label: "Distrikt", value: values.distrikt },
+        { label: "Hissnummer", value: values.elevator_number },
+        { label: "Adress", value: values.address },
+        { label: "Hissbeteckning", value: values.elevator_designation },
+        { label: "Distrikt", value: values.district },
       ],
     },
     {
       title: "Teknisk specifikation",
       step: 2,
       fields: [
-        { label: "Hisstyp", value: values.hisstyp },
-        { label: "Fabrikat", value: values.fabrikat },
-        { label: "Byggår", value: values.byggar },
-        { label: "Hastighet", value: values.hastighet },
-        { label: "Lyfthöjd", value: values.lyfthojd },
-        { label: "Marklast", value: values.marklast },
-        { label: "Antal plan", value: values.antal_plan },
-        { label: "Antal dörrar", value: values.antal_dorrar },
+        { label: "Hisstyp", value: values.elevator_type },
+        { label: "Fabrikat", value: values.manufacturer },
+        { label: "Byggår", value: values.build_year },
+        { label: "Hastighet", value: values.speed },
+        { label: "Lyfthöjd", value: values.lift_height },
+        { label: "Marklast", value: values.load_capacity },
+        { label: "Antal plan", value: values.floor_count },
+        { label: "Antal dörrar", value: values.door_count },
       ],
     },
     {
       title: "Dörrar och korg",
       step: 3,
       fields: [
-        { label: "Typ dörrar", value: values.typ_dorrar },
-        { label: "Genomgång", value: values.genomgang, type: "boolean" },
-        { label: "Kollektiv", value: values.kollektiv },
-        { label: "Korgstorlek", value: values.korgstorlek },
-        { label: "Dagöppning", value: values.dagoppning },
-        { label: "Bärbeslag", value: values.barbeslag },
-        { label: "Dörrmaskin", value: values.dorrmaskin },
+        { label: "Typ dörrar", value: values.door_type },
+        { label: "Genomgång", value: values.passthrough, type: "boolean" },
+        { label: "Kollektiv", value: values.collective },
+        { label: "Korgstorlek", value: values.cab_size },
+        { label: "Dagöppning", value: values.daylight_opening },
+        { label: "Bärbeslag", value: values.grab_rail },
+        { label: "Dörrmaskin", value: values.door_machine },
       ],
     },
     {
       title: "Maskineri",
       step: 4,
       fields: [
-        { label: "Drivsystem", value: values.drivsystem },
-        { label: "Upphängning", value: values.upphangning },
-        { label: "Maskinplacering", value: values.maskinplacering },
-        { label: "Typ maskin", value: values.typ_maskin },
-        { label: "Typ styrsystem", value: values.typ_styrsystem },
+        { label: "Drivsystem", value: values.drive_system },
+        { label: "Upphängning", value: values.suspension },
+        { label: "Maskinplacering", value: values.machine_placement },
+        { label: "Typ maskin", value: values.machine_type },
+        { label: "Typ styrsystem", value: values.control_system_type },
       ],
     },
     {
       title: "Besiktning och underhåll",
       step: 5,
       fields: [
-        { label: "Besiktningsorgan", value: values.besiktningsorgan },
-        { label: "Besiktningsmånad", value: values.besiktningsmanad },
-        { label: "Skötselföretag", value: values.skotselforetag },
-        { label: "Schaktbelysning", value: values.schaktbelysning },
+        { label: "Besiktningsorgan", value: values.inspection_authority },
+        { label: "Besiktningsmånad", value: values.inspection_month },
+        { label: "Skötselföretag", value: values.maintenance_company },
+        { label: "Schaktbelysning", value: values.shaft_lighting },
       ],
     },
     {
       title: "Modernisering",
       step: 6,
       fields: [
-        { label: "Moderniseringsår", value: values.moderniserar },
-        { label: "Garanti", value: values.garanti, type: "boolean" },
+        { label: "Moderniseringsår", value: values.modernization_year },
+        { label: "Garanti", value: values.warranty, type: "boolean" },
         {
           label: "Rekommenderat moderniseringsår",
-          value: values.rekommenderat_moderniserar,
+          value: values.recommended_modernization_year,
         },
-        { label: "Budget belopp", value: values.budget_belopp },
+        { label: "Budget belopp", value: values.budget_amount },
         {
           label: "Åtgärder vid modernisering",
-          value: values.atgarder_vid_modernisering,
+          value: values.modernization_measures,
         },
       ],
     },
@@ -1441,27 +1441,27 @@ function Step9Granska({
       fields: [
         {
           label: "Har nödtelefon",
-          value: values.har_nodtelefon,
+          value: values.has_emergency_phone,
           type: "boolean",
         },
-        { label: "Modell", value: values.nodtelefon_modell },
-        { label: "Typ", value: values.nodtelefon_typ },
+        { label: "Modell", value: values.emergency_phone_model },
+        { label: "Typ", value: values.emergency_phone_type },
         {
           label: "Behöver uppgradering",
-          value: values.behover_uppgradering,
+          value: values.needs_upgrade,
           type: "boolean",
         },
-        { label: "Pris", value: values.nodtelefon_pris },
+        { label: "Pris", value: values.emergency_phone_price },
       ],
     },
     {
       title: "Kommentarer",
       step: 8,
-      fields: [{ label: "Kommentarer", value: values.kommentarer }],
+      fields: [{ label: "Kommentarer", value: values.comments }],
     },
   ];
 
-  const hasRequiredFields = values.hissnummer.trim() !== "" && values.organisation_id !== "";
+  const hasRequiredFields = values.elevator_number.trim() !== "" && values.organization_id !== "";
 
   return (
     <div className="space-y-4">

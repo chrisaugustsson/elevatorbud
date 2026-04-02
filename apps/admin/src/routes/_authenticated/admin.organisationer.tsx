@@ -40,18 +40,18 @@ export const Route = createFileRoute("/_authenticated/admin/organisationer")({
 
 type Organisation = {
   _id: string;
-  namn: string;
-  organisationsnummer?: string;
-  kontaktperson?: string;
-  telefonnummer?: string;
+  name: string;
+  organization_number?: string;
+  contact_person?: string;
+  phone_number?: string;
   email?: string;
-  antalHissar: number;
+  elevatorCount: number;
 };
 
 const columnHelper = createColumnHelper<Organisation>();
 
 const columns = [
-  columnHelper.accessor("namn", {
+  columnHelper.accessor("name", {
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -67,11 +67,11 @@ const columns = [
       <span className="font-medium">{info.getValue()}</span>
     ),
   }),
-  columnHelper.accessor("organisationsnummer", {
+  columnHelper.accessor("organization_number", {
     header: "Org.nummer",
     cell: (info) => info.getValue() || "—",
   }),
-  columnHelper.accessor("kontaktperson", {
+  columnHelper.accessor("contact_person", {
     header: "Kontaktperson",
     cell: (info) => info.getValue() || "—",
   }),
@@ -79,7 +79,7 @@ const columns = [
     header: "E-post",
     cell: (info) => info.getValue() || "—",
   }),
-  columnHelper.accessor("antalHissar", {
+  columnHelper.accessor("elevatorCount", {
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -104,9 +104,9 @@ function validateOrganisationsnummer(value: string): string | undefined {
 }
 
 function Organisationer() {
-  const orgs = useQuery(api.organisationer.list);
-  const createOrg = useMutation(api.organisationer.create);
-  const updateOrg = useMutation(api.organisationer.update);
+  const orgs = useQuery(api.organizations.list);
+  const createOrg = useMutation(api.organizations.create);
+  const updateOrg = useMutation(api.organizations.update);
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -244,27 +244,27 @@ function CreateOrgDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
-    namn: string;
-    organisationsnummer?: string;
-    kontaktperson?: string;
-    telefonnummer?: string;
+    name: string;
+    organization_number?: string;
+    contact_person?: string;
+    phone_number?: string;
     email?: string;
   }) => Promise<void>;
 }) {
   const form = useForm({
     defaultValues: {
-      namn: "",
-      organisationsnummer: "",
-      kontaktperson: "",
-      telefonnummer: "",
+      name: "",
+      organization_number: "",
+      contact_person: "",
+      phone_number: "",
       email: "",
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
-        namn: value.namn,
-        organisationsnummer: value.organisationsnummer || undefined,
-        kontaktperson: value.kontaktperson || undefined,
-        telefonnummer: value.telefonnummer || undefined,
+        name: value.name,
+        organization_number: value.organization_number || undefined,
+        contact_person: value.contact_person || undefined,
+        phone_number: value.phone_number || undefined,
         email: value.email || undefined,
       });
       form.reset();
@@ -295,7 +295,7 @@ function CreateOrgDialog({
           className="space-y-4"
         >
           <form.Field
-            name="namn"
+            name="name"
             validators={{
               onChange: ({ value }) =>
                 !value.trim() ? "Namn krävs" : undefined,
@@ -328,7 +328,7 @@ function CreateOrgDialog({
           </form.Field>
 
           <form.Field
-            name="organisationsnummer"
+            name="organization_number"
             validators={{
               onChange: ({ value }) => validateOrganisationsnummer(value),
             }}
@@ -357,7 +357,7 @@ function CreateOrgDialog({
             )}
           </form.Field>
 
-          <form.Field name="kontaktperson">
+          <form.Field name="contact_person">
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Kontaktperson</Label>
@@ -371,7 +371,7 @@ function CreateOrgDialog({
             )}
           </form.Field>
 
-          <form.Field name="telefonnummer">
+          <form.Field name="phone_number">
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Telefonnummer</Label>
@@ -432,10 +432,10 @@ function EditOrgDialog({
   org: Organisation | null;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
-    namn?: string;
-    organisationsnummer?: string;
-    kontaktperson?: string;
-    telefonnummer?: string;
+    name?: string;
+    organization_number?: string;
+    contact_person?: string;
+    phone_number?: string;
     email?: string;
   }) => Promise<void>;
 }) {
@@ -459,27 +459,27 @@ function EditOrgDialogInner({
   org: Organisation;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
-    namn?: string;
-    organisationsnummer?: string;
-    kontaktperson?: string;
-    telefonnummer?: string;
+    name?: string;
+    organization_number?: string;
+    contact_person?: string;
+    phone_number?: string;
     email?: string;
   }) => Promise<void>;
 }) {
   const form = useForm({
     defaultValues: {
-      namn: org.namn,
-      organisationsnummer: org.organisationsnummer ?? "",
-      kontaktperson: org.kontaktperson ?? "",
-      telefonnummer: org.telefonnummer ?? "",
+      name: org.name,
+      organization_number: org.organization_number ?? "",
+      contact_person: org.contact_person ?? "",
+      phone_number: org.phone_number ?? "",
       email: org.email ?? "",
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
-        namn: value.namn,
-        organisationsnummer: value.organisationsnummer || undefined,
-        kontaktperson: value.kontaktperson || undefined,
-        telefonnummer: value.telefonnummer || undefined,
+        name: value.name,
+        organization_number: value.organization_number || undefined,
+        contact_person: value.contact_person || undefined,
+        phone_number: value.phone_number || undefined,
         email: value.email || undefined,
       });
     },
@@ -514,7 +514,7 @@ function EditOrgDialogInner({
           className="space-y-4"
         >
           <form.Field
-            name="namn"
+            name="name"
             validators={{
               onChange: ({ value }) =>
                 !value.trim() ? "Namn krävs" : undefined,
@@ -546,7 +546,7 @@ function EditOrgDialogInner({
           </form.Field>
 
           <form.Field
-            name="organisationsnummer"
+            name="organization_number"
             validators={{
               onChange: ({ value }) => validateOrganisationsnummer(value),
             }}
@@ -575,7 +575,7 @@ function EditOrgDialogInner({
             )}
           </form.Field>
 
-          <form.Field name="kontaktperson">
+          <form.Field name="contact_person">
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Kontaktperson</Label>
@@ -588,7 +588,7 @@ function EditOrgDialogInner({
             )}
           </form.Field>
 
-          <form.Field name="telefonnummer">
+          <form.Field name="phone_number">
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Telefonnummer</Label>

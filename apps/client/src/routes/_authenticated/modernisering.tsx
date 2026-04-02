@@ -81,21 +81,21 @@ function getUrgencyBadge(year: number) {
 
 type TimelinePeriod = {
   label: string;
-  arFran: number;
-  arTill: number;
+  yearFrom: number;
+  yearTo: number;
 };
 
 const PERIODS: TimelinePeriod[] = [
-  { label: "Akut (≤1 år)", arFran: 0, arTill: currentYear + 1 },
-  { label: "2-4 år", arFran: currentYear + 2, arTill: currentYear + 4 },
-  { label: "5-9 år", arFran: currentYear + 5, arTill: currentYear + 9 },
-  { label: "10+ år", arFran: currentYear + 10, arTill: 2099 },
+  { label: "Akut (≤1 år)", yearFrom: 0, yearTo: currentYear + 1 },
+  { label: "2-4 år", yearFrom: currentYear + 2, yearTo: currentYear + 4 },
+  { label: "5-9 år", yearFrom: currentYear + 5, yearTo: currentYear + 9 },
+  { label: "10+ år", yearFrom: currentYear + 10, yearTo: 2099 },
 ];
 
 function ModerniseringPage() {
   const user = useQuery(api.users.me);
-  const orgFilter = user?.organisation_id
-    ? ({ organisation_id: user.organisation_id } as never)
+  const orgFilter = user?.organization_id
+    ? ({ organization_id: user.organization_id } as never)
     : "skip";
 
   const [selectedPeriod, setSelectedPeriod] = useState<TimelinePeriod | null>(
@@ -103,30 +103,30 @@ function ModerniseringPage() {
   );
 
   const tidslinje = useQuery(
-    api.hissar.moderniseringTidslinje,
+    api.elevators.modernizationTimeline,
     orgFilter as never,
   );
-  const budget = useQuery(api.hissar.moderniseringBudget, orgFilter as never);
+  const budget = useQuery(api.elevators.modernizationBudget, orgFilter as never);
   const atgarder = useQuery(
-    api.hissar.moderniseringAtgarder,
+    api.elevators.modernizationMeasures,
     orgFilter as never,
   );
 
   const prioritetslistaArgs = useMemo(() => {
-    if (!user?.organisation_id) return "skip";
-    const base = { organisation_id: user.organisation_id as never };
+    if (!user?.organization_id) return "skip";
+    const base = { organization_id: user.organization_id as never };
     if (selectedPeriod) {
       return {
         ...base,
-        arFran: selectedPeriod.arFran,
-        arTill: selectedPeriod.arTill,
+        yearFrom: selectedPeriod.yearFrom,
+        yearTo: selectedPeriod.yearTo,
       };
     }
     return base;
-  }, [user?.organisation_id, selectedPeriod]);
+  }, [user?.organization_id, selectedPeriod]);
 
   const prioritetslista = useQuery(
-    api.hissar.moderniseringPrioritetslista,
+    api.elevators.modernizationPriorityList,
     prioritetslistaArgs as never,
   );
 
@@ -140,53 +140,53 @@ function ModerniseringPage() {
     return <ModerniseringSkeleton />;
   }
 
-  const tidslinjeData = tidslinje.map((t: { ar: string; antal: number }) => ({
-    name: t.ar,
-    antal: t.antal,
-    fill: getUrgencyColor(parseInt(t.ar, 10)),
+  const tidslinjeData = tidslinje.map((t: { year: string; count: number }) => ({
+    name: t.year,
+    count: t.count,
+    fill: getUrgencyColor(parseInt(t.year, 10)),
   }));
 
   const periodSummary = PERIODS.map((p) => {
     const count = tidslinje
-      .filter((t: { ar: string }) => {
-        const y = parseInt(t.ar, 10);
-        return y >= p.arFran && y <= p.arTill;
+      .filter((t: { year: string }) => {
+        const y = parseInt(t.year, 10);
+        return y >= p.yearFrom && y <= p.yearTo;
       })
-      .reduce((sum: number, t: { antal: number }) => sum + t.antal, 0);
+      .reduce((sum: number, t: { count: number }) => sum + t.count, 0);
     return { ...p, count };
   });
 
-  const budgetPerAr = budget.perAr.map(
-    (b: { ar: string; belopp: number }) => ({
-      name: b.ar,
-      belopp: Math.round(b.belopp / 1000),
+  const budgetPerAr = budget.byYear.map(
+    (b: { year: string; amount: number }) => ({
+      name: b.year,
+      amount: Math.round(b.amount / 1000),
     }),
   );
 
   let cumulative = 0;
   const budgetCumulative = budgetPerAr.map(
-    (b: { name: string; belopp: number }) => {
-      cumulative += b.belopp;
+    (b: { name: string; amount: number }) => {
+      cumulative += b.amount;
       return { ...b, kumulativt: cumulative };
     },
   );
 
-  const budgetPerDistrikt = budget.perDistrikt.map(
-    (b: { namn: string; belopp: number }) => ({
-      name: b.namn,
-      belopp: Math.round(b.belopp / 1000),
+  const budgetPerDistrikt = budget.byDistrict.map(
+    (b: { name: string; amount: number }) => ({
+      name: b.name,
+      amount: Math.round(b.amount / 1000),
     }),
   );
 
-  const budgetPerTyp = budget.perTyp.map(
-    (b: { namn: string; belopp: number }) => ({
-      name: b.namn,
-      belopp: Math.round(b.belopp / 1000),
+  const budgetPerTyp = budget.byType.map(
+    (b: { name: string; amount: number }) => ({
+      name: b.name,
+      amount: Math.round(b.amount / 1000),
     }),
   );
 
-  const totalBudget = budget.perAr.reduce(
-    (sum: number, b: { belopp: number }) => sum + b.belopp,
+  const totalBudget = budget.byYear.reduce(
+    (sum: number, b: { amount: number }) => sum + b.amount,
     0,
   );
 
@@ -263,7 +263,7 @@ function ModerniseringPage() {
                     }}
                     formatter={(value) => [String(value), "Antal hissar"]}
                   />
-                  <Bar dataKey="antal" radius={[4, 4, 0, 0]}>
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                     {tidslinjeData.map(
                       (entry: { fill: string }, index: number) => (
                         <rect key={index} fill={entry.fill} />
@@ -329,19 +329,19 @@ function ModerniseringPage() {
                         }}
                         formatter={(value, name) => [
                           `${String(value)} tkr`,
-                          name === "belopp" ? "Per år" : "Kumulativt",
+                          name === "amount" ? "Per år" : "Kumulativt",
                         ]}
                       />
                       <Legend
                         wrapperStyle={{ fontSize: "12px" }}
                         formatter={(value: string) => (
                           <span className="text-foreground">
-                            {value === "belopp" ? "Per år" : "Kumulativt"}
+                            {value === "amount" ? "Per år" : "Kumulativt"}
                           </span>
                         )}
                       />
                       <Bar
-                        dataKey="belopp"
+                        dataKey="amount"
                         fill="var(--color-chart-1, #2563eb)"
                         radius={[4, 4, 0, 0]}
                       />
@@ -401,7 +401,7 @@ function ModerniseringPage() {
                         formatter={(value) => [`${String(value)} tkr`, "Budget"]}
                       />
                       <Bar
-                        dataKey="belopp"
+                        dataKey="amount"
                         fill="var(--color-chart-2, #16a34a)"
                         radius={[4, 4, 0, 0]}
                       />
@@ -454,7 +454,7 @@ function ModerniseringPage() {
                         formatter={(value) => [`${String(value)} tkr`, "Budget"]}
                       />
                       <Bar
-                        dataKey="belopp"
+                        dataKey="amount"
                         fill="var(--color-chart-3, #d97706)"
                         radius={[4, 4, 0, 0]}
                       />
@@ -480,15 +480,15 @@ function ModerniseringPage() {
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {(atgarder as { atgard: string; antal: number }[]).map(
+                  {(atgarder as { measure: string; count: number }[]).map(
                     (a) => (
                       <div
-                        key={a.atgard}
+                        key={a.measure}
                         className="flex items-center justify-between"
                       >
-                        <span className="truncate text-sm">{a.atgard}</span>
+                        <span className="truncate text-sm">{a.measure}</span>
                         <Badge variant="secondary" className="ml-2 shrink-0">
-                          {a.antal}
+                          {a.count}
                         </Badge>
                       </div>
                     ),
@@ -555,38 +555,38 @@ function ModerniseringPage() {
                   {(
                     prioritetslista as {
                       _id: string;
-                      hissnummer: string;
-                      adress?: string;
-                      distrikt?: string;
-                      rekommenderat_moderniserar?: string;
-                      budget_belopp?: number;
-                      atgarder_vid_modernisering?: string;
+                      elevator_number: string;
+                      address?: string;
+                      district?: string;
+                      recommended_modernization_year?: string;
+                      budget_amount?: number;
+                      modernization_measures?: string;
                     }[]
                   ).map((h) => {
                     const year = parseInt(
-                      h.rekommenderat_moderniserar || "0",
+                      h.recommended_modernization_year || "0",
                       10,
                     );
                     return (
                       <TableRow key={h._id}>
                         <TableCell className="font-medium">
-                          {h.hissnummer}
+                          {h.elevator_number}
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
-                          {h.adress || "–"}
+                          {h.address || "–"}
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          {h.distrikt || "–"}
+                          {h.district || "–"}
                         </TableCell>
-                        <TableCell>{h.rekommenderat_moderniserar}</TableCell>
+                        <TableCell>{h.recommended_modernization_year}</TableCell>
                         <TableCell>{getUrgencyBadge(year)}</TableCell>
                         <TableCell className="hidden sm:table-cell">
-                          {h.budget_belopp
-                            ? `${h.budget_belopp.toLocaleString("sv-SE")} kr`
+                          {h.budget_amount
+                            ? `${h.budget_amount.toLocaleString("sv-SE")} kr`
                             : "–"}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
-                          {h.atgarder_vid_modernisering || "–"}
+                          {h.modernization_measures || "–"}
                         </TableCell>
                         <TableCell>
                           <a

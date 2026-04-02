@@ -42,89 +42,89 @@ export const Route = createFileRoute("/_authenticated/hiss/$id/redigera")({
 });
 
 type HissFormValues = {
-  organisation_id: string;
-  hissnummer: string;
-  adress: string;
-  hissbeteckning: string;
-  distrikt: string;
-  hisstyp: string;
-  fabrikat: string;
-  byggar: string;
-  hastighet: string;
-  lyfthojd: string;
-  marklast: string;
-  antal_plan: string;
-  antal_dorrar: string;
-  typ_dorrar: string;
-  genomgang: boolean;
-  kollektiv: string;
-  korgstorlek: string;
-  dagoppning: string;
-  barbeslag: string;
-  dorrmaskin: string;
-  drivsystem: string;
-  upphangning: string;
-  maskinplacering: string;
-  typ_maskin: string;
-  typ_styrsystem: string;
-  besiktningsorgan: string;
-  besiktningsmanad: string;
-  skotselforetag: string;
-  schaktbelysning: string;
-  moderniserar: string;
-  garanti: boolean;
-  rekommenderat_moderniserar: string;
-  budget_belopp: string;
-  atgarder_vid_modernisering: string;
-  har_nodtelefon: boolean;
-  nodtelefon_modell: string;
-  nodtelefon_typ: string;
-  behover_uppgradering: boolean;
-  nodtelefon_pris: string;
-  kommentarer: string;
+  organization_id: string;
+  elevator_number: string;
+  address: string;
+  elevator_designation: string;
+  district: string;
+  elevator_type: string;
+  manufacturer: string;
+  build_year: string;
+  speed: string;
+  lift_height: string;
+  load_capacity: string;
+  floor_count: string;
+  door_count: string;
+  door_type: string;
+  passthrough: boolean;
+  collective: string;
+  cab_size: string;
+  daylight_opening: string;
+  grab_rail: string;
+  door_machine: string;
+  drive_system: string;
+  suspension: string;
+  machine_placement: string;
+  machine_type: string;
+  control_system_type: string;
+  inspection_authority: string;
+  inspection_month: string;
+  maintenance_company: string;
+  shaft_lighting: string;
+  modernization_year: string;
+  warranty: boolean;
+  recommended_modernization_year: string;
+  budget_amount: string;
+  modernization_measures: string;
+  has_emergency_phone: boolean;
+  emergency_phone_model: string;
+  emergency_phone_type: string;
+  needs_upgrade: boolean;
+  emergency_phone_price: string;
+  comments: string;
 };
 
 const emptyValues: HissFormValues = {
-  organisation_id: "",
-  hissnummer: "",
-  adress: "",
-  hissbeteckning: "",
-  distrikt: "",
-  hisstyp: "",
-  fabrikat: "",
-  byggar: "",
-  hastighet: "",
-  lyfthojd: "",
-  marklast: "",
-  antal_plan: "",
-  antal_dorrar: "",
-  typ_dorrar: "",
-  genomgang: false,
-  kollektiv: "",
-  korgstorlek: "",
-  dagoppning: "",
-  barbeslag: "",
-  dorrmaskin: "",
-  drivsystem: "",
-  upphangning: "",
-  maskinplacering: "",
-  typ_maskin: "",
-  typ_styrsystem: "",
-  besiktningsorgan: "",
-  besiktningsmanad: "",
-  skotselforetag: "",
-  schaktbelysning: "",
-  moderniserar: "",
-  garanti: false,
-  rekommenderat_moderniserar: "",
-  budget_belopp: "",
-  atgarder_vid_modernisering: "",
-  har_nodtelefon: false,
-  nodtelefon_modell: "",
-  nodtelefon_typ: "",
-  behover_uppgradering: false,
-  nodtelefon_pris: "",
-  kommentarer: "",
+  organization_id: "",
+  elevator_number: "",
+  address: "",
+  elevator_designation: "",
+  district: "",
+  elevator_type: "",
+  manufacturer: "",
+  build_year: "",
+  speed: "",
+  lift_height: "",
+  load_capacity: "",
+  floor_count: "",
+  door_count: "",
+  door_type: "",
+  passthrough: false,
+  collective: "",
+  cab_size: "",
+  daylight_opening: "",
+  grab_rail: "",
+  door_machine: "",
+  drive_system: "",
+  suspension: "",
+  machine_placement: "",
+  machine_type: "",
+  control_system_type: "",
+  inspection_authority: "",
+  inspection_month: "",
+  maintenance_company: "",
+  shaft_lighting: "",
+  modernization_year: "",
+  warranty: false,
+  recommended_modernization_year: "",
+  budget_amount: "",
+  modernization_measures: "",
+  has_emergency_phone: false,
+  emergency_phone_model: "",
+  emergency_phone_type: "",
+  needs_upgrade: false,
+  emergency_phone_price: "",
+  comments: "",
 };
 
 // Helper to extract the form instance type from useForm
@@ -134,12 +134,12 @@ function _hissFormTypeHelper() {
 }
 type HissForm = ReturnType<typeof _hissFormTypeHelper>;
 
-function useSuggestions(kategori: string): string[] {
-  const data = useQuery(api.forslagsvarden.list, { kategori });
+function useSuggestions(category: string): string[] {
+  const data = useQuery(api.suggestedValues.list, { category });
   if (!data) return [];
   return data
-    .filter((d: { aktiv: boolean }) => d.aktiv)
-    .map((d: { varde: string }) => d.varde);
+    .filter((d: { active: boolean }) => d.active)
+    .map((d: { value: string }) => d.value);
 }
 
 function toOptionalString(val: string): string | undefined {
@@ -156,50 +156,50 @@ function toOptionalNumber(val: string): number | undefined {
 /** Convert server hiss document to form values (numbers → strings, undefined → "") */
 function serverToFormValues(hiss: Record<string, unknown>): HissFormValues {
   return {
-    organisation_id: (hiss.organisation_id as string) ?? "",
-    hissnummer: (hiss.hissnummer as string) ?? "",
-    adress: (hiss.adress as string) ?? "",
-    hissbeteckning: (hiss.hissbeteckning as string) ?? "",
-    distrikt: (hiss.distrikt as string) ?? "",
-    hisstyp: (hiss.hisstyp as string) ?? "",
-    fabrikat: (hiss.fabrikat as string) ?? "",
-    byggar: hiss.byggar != null ? String(hiss.byggar) : "",
-    hastighet: (hiss.hastighet as string) ?? "",
-    lyfthojd: (hiss.lyfthojd as string) ?? "",
-    marklast: (hiss.marklast as string) ?? "",
-    antal_plan: hiss.antal_plan != null ? String(hiss.antal_plan) : "",
-    antal_dorrar: hiss.antal_dorrar != null ? String(hiss.antal_dorrar) : "",
-    typ_dorrar: (hiss.typ_dorrar as string) ?? "",
-    genomgang: (hiss.genomgang as boolean) ?? false,
-    kollektiv: (hiss.kollektiv as string) ?? "",
-    korgstorlek: (hiss.korgstorlek as string) ?? "",
-    dagoppning: (hiss.dagoppning as string) ?? "",
-    barbeslag: (hiss.barbeslag as string) ?? "",
-    dorrmaskin: (hiss.dorrmaskin as string) ?? "",
-    drivsystem: (hiss.drivsystem as string) ?? "",
-    upphangning: (hiss.upphangning as string) ?? "",
-    maskinplacering: (hiss.maskinplacering as string) ?? "",
-    typ_maskin: (hiss.typ_maskin as string) ?? "",
-    typ_styrsystem: (hiss.typ_styrsystem as string) ?? "",
-    besiktningsorgan: (hiss.besiktningsorgan as string) ?? "",
-    besiktningsmanad: (hiss.besiktningsmanad as string) ?? "",
-    skotselforetag: (hiss.skotselforetag as string) ?? "",
-    schaktbelysning: (hiss.schaktbelysning as string) ?? "",
-    moderniserar: (hiss.moderniserar as string) ?? "",
-    garanti: (hiss.garanti as boolean) ?? false,
-    rekommenderat_moderniserar:
-      (hiss.rekommenderat_moderniserar as string) ?? "",
-    budget_belopp:
-      hiss.budget_belopp != null ? String(hiss.budget_belopp) : "",
-    atgarder_vid_modernisering:
-      (hiss.atgarder_vid_modernisering as string) ?? "",
-    har_nodtelefon: (hiss.har_nodtelefon as boolean) ?? false,
-    nodtelefon_modell: (hiss.nodtelefon_modell as string) ?? "",
-    nodtelefon_typ: (hiss.nodtelefon_typ as string) ?? "",
-    behover_uppgradering: (hiss.behover_uppgradering as boolean) ?? false,
-    nodtelefon_pris:
-      hiss.nodtelefon_pris != null ? String(hiss.nodtelefon_pris) : "",
-    kommentarer: (hiss.kommentarer as string) ?? "",
+    organization_id: (hiss.organization_id as string) ?? "",
+    elevator_number: (hiss.elevator_number as string) ?? "",
+    address: (hiss.address as string) ?? "",
+    elevator_designation: (hiss.elevator_designation as string) ?? "",
+    district: (hiss.district as string) ?? "",
+    elevator_type: (hiss.elevator_type as string) ?? "",
+    manufacturer: (hiss.manufacturer as string) ?? "",
+    build_year: hiss.build_year != null ? String(hiss.build_year) : "",
+    speed: (hiss.speed as string) ?? "",
+    lift_height: (hiss.lift_height as string) ?? "",
+    load_capacity: (hiss.load_capacity as string) ?? "",
+    floor_count: hiss.floor_count != null ? String(hiss.floor_count) : "",
+    door_count: hiss.door_count != null ? String(hiss.door_count) : "",
+    door_type: (hiss.door_type as string) ?? "",
+    passthrough: (hiss.passthrough as boolean) ?? false,
+    collective: (hiss.collective as string) ?? "",
+    cab_size: (hiss.cab_size as string) ?? "",
+    daylight_opening: (hiss.daylight_opening as string) ?? "",
+    grab_rail: (hiss.grab_rail as string) ?? "",
+    door_machine: (hiss.door_machine as string) ?? "",
+    drive_system: (hiss.drive_system as string) ?? "",
+    suspension: (hiss.suspension as string) ?? "",
+    machine_placement: (hiss.machine_placement as string) ?? "",
+    machine_type: (hiss.machine_type as string) ?? "",
+    control_system_type: (hiss.control_system_type as string) ?? "",
+    inspection_authority: (hiss.inspection_authority as string) ?? "",
+    inspection_month: (hiss.inspection_month as string) ?? "",
+    maintenance_company: (hiss.maintenance_company as string) ?? "",
+    shaft_lighting: (hiss.shaft_lighting as string) ?? "",
+    modernization_year: (hiss.modernization_year as string) ?? "",
+    warranty: (hiss.warranty as boolean) ?? false,
+    recommended_modernization_year:
+      (hiss.recommended_modernization_year as string) ?? "",
+    budget_amount:
+      hiss.budget_amount != null ? String(hiss.budget_amount) : "",
+    modernization_measures:
+      (hiss.modernization_measures as string) ?? "",
+    has_emergency_phone: (hiss.has_emergency_phone as boolean) ?? false,
+    emergency_phone_model: (hiss.emergency_phone_model as string) ?? "",
+    emergency_phone_type: (hiss.emergency_phone_type as string) ?? "",
+    needs_upgrade: (hiss.needs_upgrade as boolean) ?? false,
+    emergency_phone_price:
+      hiss.emergency_phone_price != null ? String(hiss.emergency_phone_price) : "",
+    comments: (hiss.comments as string) ?? "",
   };
 }
 
@@ -232,9 +232,9 @@ const BESIKTNINGSMANADER = [
 
 function RedigeraHiss() {
   const { id } = Route.useParams();
-  const hiss = useQuery(api.hissar.get, { id: id as never });
-  const orgs = useQuery(api.organisationer.list);
-  const updateHiss = useMutation(api.hissar.update);
+  const hiss = useQuery(api.elevators.get, { id: id as never });
+  const orgs = useQuery(api.organizations.list);
+  const updateHiss = useMutation(api.elevators.update);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -260,50 +260,50 @@ function RedigeraHiss() {
         }
         await updateHiss({
           id: id as never,
-          hissnummer: value.hissnummer,
-          organisation_id: value.organisation_id as never,
-          adress: toOptionalString(value.adress),
-          hissbeteckning: toOptionalString(value.hissbeteckning),
-          distrikt: toOptionalString(value.distrikt),
-          hisstyp: toOptionalString(value.hisstyp),
-          fabrikat: toOptionalString(value.fabrikat),
-          byggar: toOptionalNumber(value.byggar),
-          hastighet: toOptionalString(value.hastighet),
-          lyfthojd: toOptionalString(value.lyfthojd),
-          marklast: toOptionalString(value.marklast),
-          antal_plan: toOptionalNumber(value.antal_plan),
-          antal_dorrar: toOptionalNumber(value.antal_dorrar),
-          typ_dorrar: toOptionalString(value.typ_dorrar),
-          genomgang: value.genomgang || undefined,
-          kollektiv: toOptionalString(value.kollektiv),
-          korgstorlek: toOptionalString(value.korgstorlek),
-          dagoppning: toOptionalString(value.dagoppning),
-          barbeslag: toOptionalString(value.barbeslag),
-          dorrmaskin: toOptionalString(value.dorrmaskin),
-          drivsystem: toOptionalString(value.drivsystem),
-          upphangning: toOptionalString(value.upphangning),
-          maskinplacering: toOptionalString(value.maskinplacering),
-          typ_maskin: toOptionalString(value.typ_maskin),
-          typ_styrsystem: toOptionalString(value.typ_styrsystem),
-          besiktningsorgan: toOptionalString(value.besiktningsorgan),
-          besiktningsmanad: toOptionalString(value.besiktningsmanad),
-          skotselforetag: toOptionalString(value.skotselforetag),
-          schaktbelysning: toOptionalString(value.schaktbelysning),
-          moderniserar: toOptionalString(value.moderniserar),
-          garanti: value.garanti || undefined,
-          rekommenderat_moderniserar: toOptionalString(
-            value.rekommenderat_moderniserar,
+          elevator_number: value.elevator_number,
+          organization_id: value.organization_id as never,
+          address: toOptionalString(value.address),
+          elevator_designation: toOptionalString(value.elevator_designation),
+          district: toOptionalString(value.district),
+          elevator_type: toOptionalString(value.elevator_type),
+          manufacturer: toOptionalString(value.manufacturer),
+          build_year: toOptionalNumber(value.build_year),
+          speed: toOptionalString(value.speed),
+          lift_height: toOptionalString(value.lift_height),
+          load_capacity: toOptionalString(value.load_capacity),
+          floor_count: toOptionalNumber(value.floor_count),
+          door_count: toOptionalNumber(value.door_count),
+          door_type: toOptionalString(value.door_type),
+          passthrough: value.passthrough || undefined,
+          collective: toOptionalString(value.collective),
+          cab_size: toOptionalString(value.cab_size),
+          daylight_opening: toOptionalString(value.daylight_opening),
+          grab_rail: toOptionalString(value.grab_rail),
+          door_machine: toOptionalString(value.door_machine),
+          drive_system: toOptionalString(value.drive_system),
+          suspension: toOptionalString(value.suspension),
+          machine_placement: toOptionalString(value.machine_placement),
+          machine_type: toOptionalString(value.machine_type),
+          control_system_type: toOptionalString(value.control_system_type),
+          inspection_authority: toOptionalString(value.inspection_authority),
+          inspection_month: toOptionalString(value.inspection_month),
+          maintenance_company: toOptionalString(value.maintenance_company),
+          shaft_lighting: toOptionalString(value.shaft_lighting),
+          modernization_year: toOptionalString(value.modernization_year),
+          warranty: value.warranty || undefined,
+          recommended_modernization_year: toOptionalString(
+            value.recommended_modernization_year,
           ),
-          budget_belopp: toOptionalNumber(value.budget_belopp),
-          atgarder_vid_modernisering: toOptionalString(
-            value.atgarder_vid_modernisering,
+          budget_amount: toOptionalNumber(value.budget_amount),
+          modernization_measures: toOptionalString(
+            value.modernization_measures,
           ),
-          har_nodtelefon: value.har_nodtelefon || undefined,
-          nodtelefon_modell: toOptionalString(value.nodtelefon_modell),
-          nodtelefon_typ: toOptionalString(value.nodtelefon_typ),
-          behover_uppgradering: value.behover_uppgradering || undefined,
-          nodtelefon_pris: toOptionalNumber(value.nodtelefon_pris),
-          kommentarer: toOptionalString(value.kommentarer),
+          has_emergency_phone: value.has_emergency_phone || undefined,
+          emergency_phone_model: toOptionalString(value.emergency_phone_model),
+          emergency_phone_type: toOptionalString(value.emergency_phone_type),
+          needs_upgrade: value.needs_upgrade || undefined,
+          emergency_phone_price: toOptionalNumber(value.emergency_phone_price),
+          comments: toOptionalString(value.comments),
         });
         clearDraft(draftKey);
         setSubmitSuccess(true);
@@ -430,7 +430,7 @@ function RedigeraHiss() {
           </div>
           <h2 className="text-xl font-semibold">\u00c4ndringar sparade!</h2>
           <p className="text-muted-foreground">
-            Hiss {(hiss as { hissnummer: string }).hissnummer} har uppdaterats.
+            Hiss {(hiss as { elevator_number: string }).elevator_number} har uppdaterats.
           </p>
           <div className="mt-4 flex gap-3">
             <Link to="/sok">
@@ -487,7 +487,7 @@ function RedigeraHiss() {
             <div>
               <h1 className="text-lg font-semibold">Redigera hiss</h1>
               <p className="text-sm text-muted-foreground">
-                {(hiss as { hissnummer: string }).hissnummer}
+                {(hiss as { elevator_number: string }).elevator_number}
               </p>
             </div>
           </div>
@@ -511,13 +511,13 @@ function RedigeraHiss() {
       <div className="flex-1 overflow-auto px-4 py-4">
         <div className="space-y-6">
           {/* Organisation */}
-          <form.Field name="organisation_id">
+          <form.Field name="organization_id">
             {(field) => (
               <div
                 className={cn(
                   "space-y-1.5 rounded-md p-3",
                   originalValues &&
-                    isChanged("organisation_id", formValues, originalValues) &&
+                    isChanged("organization_id", formValues, originalValues) &&
                     "border-l-4 border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20",
                 )}
               >
@@ -533,9 +533,9 @@ function RedigeraHiss() {
                     <SelectValue placeholder="V\u00e4lj organisation..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {orgs?.map((org: { _id: string; namn: string }) => (
+                    {orgs?.map((org: { _id: string; name: string }) => (
                       <SelectItem key={org._id} value={org._id}>
-                        {org.namn}
+                        {org.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -549,10 +549,10 @@ function RedigeraHiss() {
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("hissnummer", formValues, originalValues)
+                isChanged("elevator_number", formValues, originalValues)
               }
             >
-              <form.Field name="hissnummer">
+              <form.Field name="elevator_number">
                 {(field) => (
                   <HissnummerField field={field} currentHissId={id} />
                 )}
@@ -562,15 +562,15 @@ function RedigeraHiss() {
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("adress", formValues, originalValues)
+                isChanged("address", formValues, originalValues)
               }
             >
-              <form.Field name="adress">
+              <form.Field name="address">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="adress">Adress</Label>
+                    <Label htmlFor="address">Adress</Label>
                     <Input
-                      id="adress"
+                      id="address"
                       className="h-11"
                       placeholder="Gatuadress..."
                       value={field.state.value}
@@ -583,25 +583,25 @@ function RedigeraHiss() {
 
             <ComboboxField
               form={form}
-              name="hissbeteckning"
+              name="elevator_designation"
               label="Hissbeteckning"
-              kategori="hissbeteckning"
+              category="elevator_designation"
               placeholder="V\u00e4lj eller ange beteckning..."
               changed={
                 !!originalValues &&
-                isChanged("hissbeteckning", formValues, originalValues)
+                isChanged("elevator_designation", formValues, originalValues)
               }
             />
 
             <ComboboxField
               form={form}
-              name="distrikt"
+              name="district"
               label="Distrikt"
-              kategori="distrikt"
+              category="district"
               placeholder="V\u00e4lj eller ange distrikt..."
               changed={
                 !!originalValues &&
-                isChanged("distrikt", formValues, originalValues)
+                isChanged("district", formValues, originalValues)
               }
             />
           </EditSection>
@@ -610,40 +610,40 @@ function RedigeraHiss() {
           <EditSection title="2. Teknisk specifikation">
             <ComboboxField
               form={form}
-              name="hisstyp"
+              name="elevator_type"
               label="Hisstyp"
-              kategori="hisstyp"
+              category="elevator_type"
               placeholder="V\u00e4lj eller ange hisstyp..."
               changed={
                 !!originalValues &&
-                isChanged("hisstyp", formValues, originalValues)
+                isChanged("elevator_type", formValues, originalValues)
               }
             />
 
             <ComboboxField
               form={form}
-              name="fabrikat"
+              name="manufacturer"
               label="Fabrikat"
-              kategori="fabrikat"
+              category="manufacturer"
               placeholder="V\u00e4lj eller ange fabrikat..."
               changed={
                 !!originalValues &&
-                isChanged("fabrikat", formValues, originalValues)
+                isChanged("manufacturer", formValues, originalValues)
               }
             />
 
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("byggar", formValues, originalValues)
+                isChanged("build_year", formValues, originalValues)
               }
             >
-              <form.Field name="byggar">
+              <form.Field name="build_year">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="byggar">Bygg\u00e5r</Label>
+                    <Label htmlFor="build_year">Bygg\u00e5r</Label>
                     <Input
-                      id="byggar"
+                      id="build_year"
                       className="h-11"
                       type="number"
                       inputMode="numeric"
@@ -660,15 +660,15 @@ function RedigeraHiss() {
               <FieldWrapper
                 changed={
                   !!originalValues &&
-                  isChanged("hastighet", formValues, originalValues)
+                  isChanged("speed", formValues, originalValues)
                 }
               >
-                <form.Field name="hastighet">
+                <form.Field name="speed">
                   {(field) => (
                     <div className="space-y-1.5">
-                      <Label htmlFor="hastighet">Hastighet</Label>
+                      <Label htmlFor="speed">Hastighet</Label>
                       <Input
-                        id="hastighet"
+                        id="speed"
                         className="h-11"
                         placeholder="m/s"
                         value={field.state.value}
@@ -682,15 +682,15 @@ function RedigeraHiss() {
               <FieldWrapper
                 changed={
                   !!originalValues &&
-                  isChanged("lyfthojd", formValues, originalValues)
+                  isChanged("lift_height", formValues, originalValues)
                 }
               >
-                <form.Field name="lyfthojd">
+                <form.Field name="lift_height">
                   {(field) => (
                     <div className="space-y-1.5">
-                      <Label htmlFor="lyfthojd">Lyfth\u00f6jd</Label>
+                      <Label htmlFor="lift_height">Lyfth\u00f6jd</Label>
                       <Input
-                        id="lyfthojd"
+                        id="lift_height"
                         className="h-11"
                         placeholder="meter"
                         value={field.state.value}
@@ -705,15 +705,15 @@ function RedigeraHiss() {
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("marklast", formValues, originalValues)
+                isChanged("load_capacity", formValues, originalValues)
               }
             >
-              <form.Field name="marklast">
+              <form.Field name="load_capacity">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="marklast">Marklast</Label>
+                    <Label htmlFor="load_capacity">Marklast</Label>
                     <Input
-                      id="marklast"
+                      id="load_capacity"
                       className="h-11"
                       placeholder="t.ex. 500*6 (kg*personer)"
                       value={field.state.value}
@@ -728,15 +728,15 @@ function RedigeraHiss() {
               <FieldWrapper
                 changed={
                   !!originalValues &&
-                  isChanged("antal_plan", formValues, originalValues)
+                  isChanged("floor_count", formValues, originalValues)
                 }
               >
-                <form.Field name="antal_plan">
+                <form.Field name="floor_count">
                   {(field) => (
                     <div className="space-y-1.5">
-                      <Label htmlFor="antal_plan">Antal plan</Label>
+                      <Label htmlFor="floor_count">Antal plan</Label>
                       <Input
-                        id="antal_plan"
+                        id="floor_count"
                         className="h-11"
                         type="number"
                         inputMode="numeric"
@@ -752,15 +752,15 @@ function RedigeraHiss() {
               <FieldWrapper
                 changed={
                   !!originalValues &&
-                  isChanged("antal_dorrar", formValues, originalValues)
+                  isChanged("door_count", formValues, originalValues)
                 }
               >
-                <form.Field name="antal_dorrar">
+                <form.Field name="door_count">
                   {(field) => (
                     <div className="space-y-1.5">
-                      <Label htmlFor="antal_dorrar">Antal d\u00f6rrar</Label>
+                      <Label htmlFor="door_count">Antal d\u00f6rrar</Label>
                       <Input
-                        id="antal_dorrar"
+                        id="door_count"
                         className="h-11"
                         type="number"
                         inputMode="numeric"
@@ -779,30 +779,30 @@ function RedigeraHiss() {
           <EditSection title="3. D\u00f6rrar och korg">
             <ComboboxField
               form={form}
-              name="typ_dorrar"
+              name="door_type"
               label="Typ d\u00f6rrar"
-              kategori="typ_dorrar"
+              category="door_type"
               placeholder="V\u00e4lj eller ange d\u00f6rrtyp..."
               changed={
                 !!originalValues &&
-                isChanged("typ_dorrar", formValues, originalValues)
+                isChanged("door_type", formValues, originalValues)
               }
             />
 
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("genomgang", formValues, originalValues)
+                isChanged("passthrough", formValues, originalValues)
               }
             >
-              <form.Field name="genomgang">
+              <form.Field name="passthrough">
                 {(field) => (
                   <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
-                    <Label htmlFor="genomgang" className="cursor-pointer">
+                    <Label htmlFor="passthrough" className="cursor-pointer">
                       Genomg\u00e5ng
                     </Label>
                     <Switch
-                      id="genomgang"
+                      id="passthrough"
                       checked={field.state.value}
                       onCheckedChange={(val) => field.handleChange(val)}
                     />
@@ -813,28 +813,28 @@ function RedigeraHiss() {
 
             <ComboboxField
               form={form}
-              name="kollektiv"
+              name="collective"
               label="Kollektiv"
-              kategori="kollektiv"
+              category="collective"
               placeholder="V\u00e4lj eller ange kollektiv..."
               changed={
                 !!originalValues &&
-                isChanged("kollektiv", formValues, originalValues)
+                isChanged("collective", formValues, originalValues)
               }
             />
 
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("korgstorlek", formValues, originalValues)
+                isChanged("cab_size", formValues, originalValues)
               }
             >
-              <form.Field name="korgstorlek">
+              <form.Field name="cab_size">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="korgstorlek">Korgstorlek</Label>
+                    <Label htmlFor="cab_size">Korgstorlek</Label>
                     <Input
-                      id="korgstorlek"
+                      id="cab_size"
                       className="h-11"
                       placeholder="t.ex. 1000*2050*2300 (B*D*H mm)"
                       value={field.state.value}
@@ -848,15 +848,15 @@ function RedigeraHiss() {
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("dagoppning", formValues, originalValues)
+                isChanged("daylight_opening", formValues, originalValues)
               }
             >
-              <form.Field name="dagoppning">
+              <form.Field name="daylight_opening">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="dagoppning">Dag\u00f6ppning</Label>
+                    <Label htmlFor="daylight_opening">Dag\u00f6ppning</Label>
                     <Input
-                      id="dagoppning"
+                      id="daylight_opening"
                       className="h-11"
                       placeholder="t.ex. 900*2000 (B*H mm)"
                       value={field.state.value}
@@ -871,15 +871,15 @@ function RedigeraHiss() {
               <FieldWrapper
                 changed={
                   !!originalValues &&
-                  isChanged("barbeslag", formValues, originalValues)
+                  isChanged("grab_rail", formValues, originalValues)
                 }
               >
-                <form.Field name="barbeslag">
+                <form.Field name="grab_rail">
                   {(field) => (
                     <div className="space-y-1.5">
-                      <Label htmlFor="barbeslag">B\u00e4rbeslag</Label>
+                      <Label htmlFor="grab_rail">B\u00e4rbeslag</Label>
                       <Input
-                        id="barbeslag"
+                        id="grab_rail"
                         className="h-11"
                         placeholder="Typ..."
                         value={field.state.value}
@@ -893,15 +893,15 @@ function RedigeraHiss() {
               <FieldWrapper
                 changed={
                   !!originalValues &&
-                  isChanged("dorrmaskin", formValues, originalValues)
+                  isChanged("door_machine", formValues, originalValues)
                 }
               >
-                <form.Field name="dorrmaskin">
+                <form.Field name="door_machine">
                   {(field) => (
                     <div className="space-y-1.5">
-                      <Label htmlFor="dorrmaskin">D\u00f6rrmaskin</Label>
+                      <Label htmlFor="door_machine">D\u00f6rrmaskin</Label>
                       <Input
-                        id="dorrmaskin"
+                        id="door_machine"
                         className="h-11"
                         placeholder="Typ..."
                         value={field.state.value}
@@ -918,28 +918,28 @@ function RedigeraHiss() {
           <EditSection title="4. Maskineri">
             <ComboboxField
               form={form}
-              name="drivsystem"
+              name="drive_system"
               label="Drivsystem"
-              kategori="drivsystem"
+              category="drive_system"
               placeholder="V\u00e4lj eller ange drivsystem..."
               changed={
                 !!originalValues &&
-                isChanged("drivsystem", formValues, originalValues)
+                isChanged("drive_system", formValues, originalValues)
               }
             />
 
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("upphangning", formValues, originalValues)
+                isChanged("suspension", formValues, originalValues)
               }
             >
-              <form.Field name="upphangning">
+              <form.Field name="suspension">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="upphangning">Upph\u00e4ngning</Label>
+                    <Label htmlFor="suspension">Upph\u00e4ngning</Label>
                     <Input
-                      id="upphangning"
+                      id="suspension"
                       className="h-11"
                       placeholder="Ange upph\u00e4ngning..."
                       value={field.state.value}
@@ -952,13 +952,13 @@ function RedigeraHiss() {
 
             <ComboboxField
               form={form}
-              name="maskinplacering"
+              name="machine_placement"
               label="Maskinplacering"
-              kategori="maskinplacering"
+              category="machine_placement"
               placeholder="V\u00e4lj eller ange maskinplacering..."
               changed={
                 !!originalValues &&
-                isChanged("maskinplacering", formValues, originalValues)
+                isChanged("machine_placement", formValues, originalValues)
               }
             />
 
@@ -966,15 +966,15 @@ function RedigeraHiss() {
               <FieldWrapper
                 changed={
                   !!originalValues &&
-                  isChanged("typ_maskin", formValues, originalValues)
+                  isChanged("machine_type", formValues, originalValues)
                 }
               >
-                <form.Field name="typ_maskin">
+                <form.Field name="machine_type">
                   {(field) => (
                     <div className="space-y-1.5">
-                      <Label htmlFor="typ_maskin">Typ maskin</Label>
+                      <Label htmlFor="machine_type">Typ maskin</Label>
                       <Input
-                        id="typ_maskin"
+                        id="machine_type"
                         className="h-11"
                         placeholder="Typ..."
                         value={field.state.value}
@@ -988,15 +988,15 @@ function RedigeraHiss() {
               <FieldWrapper
                 changed={
                   !!originalValues &&
-                  isChanged("typ_styrsystem", formValues, originalValues)
+                  isChanged("control_system_type", formValues, originalValues)
                 }
               >
-                <form.Field name="typ_styrsystem">
+                <form.Field name="control_system_type">
                   {(field) => (
                     <div className="space-y-1.5">
-                      <Label htmlFor="typ_styrsystem">Typ styrsystem</Label>
+                      <Label htmlFor="control_system_type">Typ styrsystem</Label>
                       <Input
-                        id="typ_styrsystem"
+                        id="control_system_type"
                         className="h-11"
                         placeholder="Typ..."
                         value={field.state.value}
@@ -1013,23 +1013,23 @@ function RedigeraHiss() {
           <EditSection title="5. Besiktning och underh\u00e5ll">
             <ComboboxField
               form={form}
-              name="besiktningsorgan"
+              name="inspection_authority"
               label="Besiktningsorgan"
-              kategori="besiktningsorgan"
+              category="inspection_authority"
               placeholder="V\u00e4lj eller ange besiktningsorgan..."
               changed={
                 !!originalValues &&
-                isChanged("besiktningsorgan", formValues, originalValues)
+                isChanged("inspection_authority", formValues, originalValues)
               }
             />
 
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("besiktningsmanad", formValues, originalValues)
+                isChanged("inspection_month", formValues, originalValues)
               }
             >
-              <form.Field name="besiktningsmanad">
+              <form.Field name="inspection_month">
                 {(field) => (
                   <div className="space-y-1.5">
                     <Label>Besiktningsm\u00e5nad</Label>
@@ -1055,28 +1055,28 @@ function RedigeraHiss() {
 
             <ComboboxField
               form={form}
-              name="skotselforetag"
+              name="maintenance_company"
               label="Sk\u00f6tself\u00f6retag"
-              kategori="skotselforetag"
+              category="maintenance_company"
               placeholder="V\u00e4lj eller ange sk\u00f6tself\u00f6retag..."
               changed={
                 !!originalValues &&
-                isChanged("skotselforetag", formValues, originalValues)
+                isChanged("maintenance_company", formValues, originalValues)
               }
             />
 
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("schaktbelysning", formValues, originalValues)
+                isChanged("shaft_lighting", formValues, originalValues)
               }
             >
-              <form.Field name="schaktbelysning">
+              <form.Field name="shaft_lighting">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="schaktbelysning">Schaktbelysning</Label>
+                    <Label htmlFor="shaft_lighting">Schaktbelysning</Label>
                     <Input
-                      id="schaktbelysning"
+                      id="shaft_lighting"
                       className="h-11"
                       placeholder="Ange schaktbelysning..."
                       value={field.state.value}
@@ -1093,15 +1093,15 @@ function RedigeraHiss() {
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("moderniserar", formValues, originalValues)
+                isChanged("modernization_year", formValues, originalValues)
               }
             >
-              <form.Field name="moderniserar">
+              <form.Field name="modernization_year">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="moderniserar">Moderniserings\u00e5r</Label>
+                    <Label htmlFor="modernization_year">Moderniserings\u00e5r</Label>
                     <Input
-                      id="moderniserar"
+                      id="modernization_year"
                       className="h-11"
                       placeholder="t.ex. 2007 eller Ej ombyggd"
                       value={field.state.value}
@@ -1115,17 +1115,17 @@ function RedigeraHiss() {
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("garanti", formValues, originalValues)
+                isChanged("warranty", formValues, originalValues)
               }
             >
-              <form.Field name="garanti">
+              <form.Field name="warranty">
                 {(field) => (
                   <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
-                    <Label htmlFor="garanti" className="cursor-pointer">
+                    <Label htmlFor="warranty" className="cursor-pointer">
                       Garanti
                     </Label>
                     <Switch
-                      id="garanti"
+                      id="warranty"
                       checked={field.state.value}
                       onCheckedChange={(val) => field.handleChange(val)}
                     />
@@ -1138,20 +1138,20 @@ function RedigeraHiss() {
               changed={
                 !!originalValues &&
                 isChanged(
-                  "rekommenderat_moderniserar",
+                  "recommended_modernization_year",
                   formValues,
                   originalValues,
                 )
               }
             >
-              <form.Field name="rekommenderat_moderniserar">
+              <form.Field name="recommended_modernization_year">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="rekommenderat_moderniserar">
+                    <Label htmlFor="recommended_modernization_year">
                       Rekommenderat moderniserings\u00e5r
                     </Label>
                     <Input
-                      id="rekommenderat_moderniserar"
+                      id="recommended_modernization_year"
                       className="h-11"
                       placeholder="t.ex. 2030"
                       value={field.state.value}
@@ -1165,15 +1165,15 @@ function RedigeraHiss() {
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("budget_belopp", formValues, originalValues)
+                isChanged("budget_amount", formValues, originalValues)
               }
             >
-              <form.Field name="budget_belopp">
+              <form.Field name="budget_amount">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="budget_belopp">Budget belopp</Label>
+                    <Label htmlFor="budget_amount">Budget belopp</Label>
                     <Input
-                      id="budget_belopp"
+                      id="budget_amount"
                       className="h-11"
                       type="number"
                       inputMode="numeric"
@@ -1188,14 +1188,14 @@ function RedigeraHiss() {
 
             <ComboboxField
               form={form}
-              name="atgarder_vid_modernisering"
+              name="modernization_measures"
               label="\u00c5tg\u00e4rder vid modernisering"
-              kategori="atgarder_vid_modernisering"
+              category="modernization_measures"
               placeholder="V\u00e4lj eller ange \u00e5tg\u00e4rder..."
               changed={
                 !!originalValues &&
                 isChanged(
-                  "atgarder_vid_modernisering",
+                  "modernization_measures",
                   formValues,
                   originalValues,
                 )
@@ -1208,18 +1208,18 @@ function RedigeraHiss() {
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("har_nodtelefon", formValues, originalValues)
+                isChanged("has_emergency_phone", formValues, originalValues)
               }
             >
-              <form.Field name="har_nodtelefon">
+              <form.Field name="has_emergency_phone">
                 {(field) => (
                   <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
-                    <Label htmlFor="har_nodtelefon" className="cursor-pointer">
+                    <Label htmlFor="has_emergency_phone" className="cursor-pointer">
                       <Phone className="mr-1.5 inline size-4" />
                       Har n\u00f6dtelefon
                     </Label>
                     <Switch
-                      id="har_nodtelefon"
+                      id="has_emergency_phone"
                       checked={field.state.value}
                       onCheckedChange={(val) => field.handleChange(val)}
                     />
@@ -1231,15 +1231,15 @@ function RedigeraHiss() {
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("nodtelefon_modell", formValues, originalValues)
+                isChanged("emergency_phone_model", formValues, originalValues)
               }
             >
-              <form.Field name="nodtelefon_modell">
+              <form.Field name="emergency_phone_model">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="nodtelefon_modell">Modell</Label>
+                    <Label htmlFor="emergency_phone_model">Modell</Label>
                     <Input
-                      id="nodtelefon_modell"
+                      id="emergency_phone_model"
                       className="h-11"
                       placeholder="Ange modell..."
                       value={field.state.value}
@@ -1253,15 +1253,15 @@ function RedigeraHiss() {
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("nodtelefon_typ", formValues, originalValues)
+                isChanged("emergency_phone_type", formValues, originalValues)
               }
             >
-              <form.Field name="nodtelefon_typ">
+              <form.Field name="emergency_phone_type">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="nodtelefon_typ">Typ</Label>
+                    <Label htmlFor="emergency_phone_type">Typ</Label>
                     <Input
-                      id="nodtelefon_typ"
+                      id="emergency_phone_type"
                       className="h-11"
                       placeholder="Ange typ..."
                       value={field.state.value}
@@ -1275,20 +1275,20 @@ function RedigeraHiss() {
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("behover_uppgradering", formValues, originalValues)
+                isChanged("needs_upgrade", formValues, originalValues)
               }
             >
-              <form.Field name="behover_uppgradering">
+              <form.Field name="needs_upgrade">
                 {(field) => (
                   <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
                     <Label
-                      htmlFor="behover_uppgradering"
+                      htmlFor="needs_upgrade"
                       className="cursor-pointer"
                     >
                       Beh\u00f6ver uppgradering
                     </Label>
                     <Switch
-                      id="behover_uppgradering"
+                      id="needs_upgrade"
                       checked={field.state.value}
                       onCheckedChange={(val) => field.handleChange(val)}
                     />
@@ -1300,15 +1300,15 @@ function RedigeraHiss() {
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("nodtelefon_pris", formValues, originalValues)
+                isChanged("emergency_phone_price", formValues, originalValues)
               }
             >
-              <form.Field name="nodtelefon_pris">
+              <form.Field name="emergency_phone_price">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="nodtelefon_pris">Pris</Label>
+                    <Label htmlFor="emergency_phone_price">Pris</Label>
                     <Input
-                      id="nodtelefon_pris"
+                      id="emergency_phone_price"
                       className="h-11"
                       type="number"
                       inputMode="numeric"
@@ -1327,18 +1327,18 @@ function RedigeraHiss() {
             <FieldWrapper
               changed={
                 !!originalValues &&
-                isChanged("kommentarer", formValues, originalValues)
+                isChanged("comments", formValues, originalValues)
               }
             >
-              <form.Field name="kommentarer">
+              <form.Field name="comments">
                 {(field) => (
                   <div className="space-y-1.5">
-                    <Label htmlFor="kommentarer">
+                    <Label htmlFor="comments">
                       <MessageSquare className="mr-1.5 inline size-4" />
                       Kommentarer
                     </Label>
                     <Textarea
-                      id="kommentarer"
+                      id="comments"
                       className="min-h-[120px]"
                       placeholder="Skriv eventuella kommentarer h\u00e4r..."
                       value={field.state.value}
@@ -1446,18 +1446,18 @@ function ComboboxField({
   form,
   name,
   label,
-  kategori,
+  category,
   placeholder,
   changed,
 }: {
   form: HissForm;
   name: keyof HissFormValues;
   label: string;
-  kategori: string;
+  category: string;
   placeholder: string;
   changed: boolean;
 }) {
-  const suggestions = useSuggestions(kategori);
+  const suggestions = useSuggestions(category);
   return (
     <FieldWrapper changed={changed}>
       <form.Field name={name}>
@@ -1487,25 +1487,25 @@ function HissnummerField({
   };
   currentHissId: string;
 }) {
-  const hissnummer = field.state.value;
+  const elevatorNumber = field.state.value;
   const checkResult = useQuery(
-    api.hissar.checkHissnummer,
-    hissnummer
-      ? { hissnummer, excludeId: currentHissId as never }
+    api.elevators.checkElevatorNumber,
+    elevatorNumber
+      ? { elevator_number: elevatorNumber, excludeId: currentHissId as never }
       : "skip",
   );
   const isDuplicate = checkResult?.exists === true;
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor="hissnummer">
+      <Label htmlFor="elevator_number">
         Hissnummer <span className="text-destructive">*</span>
       </Label>
       <Input
-        id="hissnummer"
+        id="elevator_number"
         className={cn("h-11", isDuplicate && "border-destructive")}
         placeholder="Ange hissnummer..."
-        value={hissnummer}
+        value={elevatorNumber}
         onChange={(e) => field.handleChange(e.target.value)}
       />
       {isDuplicate && (

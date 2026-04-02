@@ -46,7 +46,7 @@ type AnalysisResult = {
 type ImportResult = {
   created: number;
   updated: number;
-  errors: { hissnummer: string; error: string }[];
+  errors: { elevator_number: string; error: string }[];
   orgsCreated: string[];
   emailSent?: boolean;
 };
@@ -60,17 +60,17 @@ function ImportPage() {
   const [parseError, setParseError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [analysisArgs, setAnalysisArgs] = useState<{
-    hissnummerList: string[];
+    elevatorNumberList: string[];
     orgNames: string[];
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const confirmImport = useAction(api.importera.confirm);
+  const confirmImport = useAction(api.imports.confirm);
   const currentUser = useQuery(api.users.me) as { email?: string } | undefined;
 
   // Server-side analysis (reactive query, skipped until parse is done)
   const analysis = useQuery(
-    api.importera.analyze,
+    api.imports.analyze,
     analysisArgs ?? ("skip" as const),
   ) as AnalysisResult | undefined;
 
@@ -92,8 +92,8 @@ function ImportPage() {
       setParseResult(result);
 
       // Prepare analysis args — deduplicated
-      const hissnummerList = [
-        ...new Set(result.combined.map((e) => e.hissnummer)),
+      const elevatorNumberList = [
+        ...new Set(result.combined.map((e) => e.elevator_number)),
       ];
       const orgNames = [
         ...new Set(
@@ -103,7 +103,7 @@ function ImportPage() {
         ),
       ];
 
-      setAnalysisArgs({ hissnummerList, orgNames });
+      setAnalysisArgs({ elevatorNumberList, orgNames });
       setStatus("preview");
     } catch (e) {
       setParseError(
@@ -141,7 +141,7 @@ function ImportPage() {
         updated: 0,
         errors: [
           {
-            hissnummer: "",
+            elevator_number: "",
             error: e instanceof Error ? e.message : "Import misslyckades",
           },
         ],
@@ -328,24 +328,24 @@ function PreviewSection({
       <div className="grid gap-3 sm:grid-cols-3">
         <SheetCard
           title="Hissar"
-          found={parseResult.sheets.hissar.found}
-          count={parseResult.sheets.hissar.count}
+          found={parseResult.sheets.elevators.found}
+          count={parseResult.sheets.elevators.count}
           required
         />
         <SheetCard
           title="Nödtelefoner"
-          found={parseResult.sheets.nodtelefoner.found}
-          count={parseResult.sheets.nodtelefoner.count}
+          found={parseResult.sheets.emergencyPhones.found}
+          count={parseResult.sheets.emergencyPhones.count}
           extra={
-            parseResult.sheets.nodtelefoner.joined > 0
-              ? `${parseResult.sheets.nodtelefoner.joined} kopplade`
+            parseResult.sheets.emergencyPhones.joined > 0
+              ? `${parseResult.sheets.emergencyPhones.joined} kopplade`
               : undefined
           }
         />
         <SheetCard
           title="Rivna hissar"
-          found={parseResult.sheets.rivna.found}
-          count={parseResult.sheets.rivna.count}
+          found={parseResult.sheets.demolished.found}
+          count={parseResult.sheets.demolished.count}
         />
       </div>
 
@@ -644,9 +644,9 @@ function ResultSection({
                     key={i}
                     className="rounded px-2 py-1 text-xs odd:bg-muted/50"
                   >
-                    {err.hissnummer && (
+                    {err.elevator_number && (
                       <span className="font-mono text-muted-foreground">
-                        {err.hissnummer}:{" "}
+                        {err.elevator_number}:{" "}
                       </span>
                     )}
                     <span>{err.error}</span>

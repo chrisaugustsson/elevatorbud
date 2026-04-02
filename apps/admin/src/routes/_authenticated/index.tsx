@@ -24,11 +24,11 @@ export const Route = createFileRoute("/_authenticated/")({
 
 type DagensHiss = {
   _id: string;
-  hissnummer: string;
-  adress?: string;
-  organisationsnamn?: string;
-  skapad_datum: number;
-  senast_uppdaterad?: number;
+  elevator_number: string;
+  address?: string;
+  organizationName?: string;
+  created_at: number;
+  last_updated_at?: number;
 };
 
 function getTodayStart(): number {
@@ -64,7 +64,7 @@ function DailyOverview() {
   const [draftIds, setDraftIds] = useState<string[]>([]);
   const [newDraft, setNewDraft] = useState(false);
 
-  const dagensHissar = useQuery(api.hissar.dagensHissar, { todayStart }) as
+  const dagensHissar = useQuery(api.elevators.todaysElevators, { todayStart }) as
     | DagensHiss[]
     | undefined;
 
@@ -158,19 +158,19 @@ function DailyOverview() {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-foreground">
-                        {hiss.hissnummer}
+                        {hiss.elevator_number}
                       </p>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
-                        {hiss.adress && (
+                        {hiss.address && (
                           <span className="flex items-center gap-1">
                             <MapPin className="h-3 w-3" />
-                            {hiss.adress}
+                            {hiss.address}
                           </span>
                         )}
-                        {hiss.organisationsnamn && (
+                        {hiss.organizationName && (
                           <span className="flex items-center gap-1">
                             <Building2 className="h-3 w-3" />
-                            {hiss.organisationsnamn}
+                            {hiss.organizationName}
                           </span>
                         )}
                       </div>

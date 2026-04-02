@@ -51,7 +51,7 @@ function AuthenticatedLayout() {
     );
   }
 
-  if (user.roll !== "kund") {
+  if (user.role !== "customer") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
@@ -73,8 +73,8 @@ function AuthenticatedLayout() {
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
-          {user.organisation_id && (
-            <OrgDisplay organisationId={user.organisation_id} />
+          {user.organization_id && (
+            <OrgDisplay organisationId={user.organization_id} />
           )}
         </header>
         <div className="flex-1 overflow-auto p-6">

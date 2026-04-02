@@ -2,64 +2,64 @@ import * as XLSX from "xlsx";
 
 // --- Types ---
 
-export type ParsedHiss = {
+export type ParsedElevator = {
   // Identifiering
-  hissnummer: string;
-  adress?: string;
-  hissbeteckning?: string;
-  distrikt?: string;
+  elevator_number: string;
+  address?: string;
+  elevator_designation?: string;
+  district?: string;
 
   // Teknisk specifikation
-  hisstyp?: string;
-  fabrikat?: string;
-  byggar?: number;
-  hastighet?: string;
-  lyfthojd?: string;
-  marklast?: string;
-  antal_plan?: number;
-  antal_dorrar?: number;
+  elevator_type?: string;
+  manufacturer?: string;
+  build_year?: number;
+  speed?: string;
+  lift_height?: string;
+  load_capacity?: string;
+  floor_count?: number;
+  door_count?: number;
 
   // Dorrar och korg
-  typ_dorrar?: string;
-  genomgang?: boolean;
-  kollektiv?: string;
-  korgstorlek?: string;
-  dagoppning?: string;
-  barbeslag?: string;
-  dorrmaskin?: string;
+  door_type?: string;
+  passthrough?: boolean;
+  collective?: string;
+  cab_size?: string;
+  daylight_opening?: string;
+  grab_rail?: string;
+  door_machine?: string;
 
   // Maskineri
-  drivsystem?: string;
-  upphangning?: string;
-  maskinplacering?: string;
-  typ_maskin?: string;
-  typ_styrsystem?: string;
+  drive_system?: string;
+  suspension?: string;
+  machine_placement?: string;
+  machine_type?: string;
+  control_system_type?: string;
 
   // Besiktning och underhall
-  besiktningsorgan?: string;
-  besiktningsmanad?: string;
-  skotselforetag?: string;
-  schaktbelysning?: string;
+  inspection_authority?: string;
+  inspection_month?: string;
+  maintenance_company?: string;
+  shaft_lighting?: string;
 
   // Modernisering
-  moderniserar?: string;
-  garanti?: boolean;
-  rekommenderat_moderniserar?: string;
-  budget_belopp?: number;
-  atgarder_vid_modernisering?: string;
+  modernization_year?: string;
+  warranty?: boolean;
+  rekommenderat_modernization_year?: string;
+  budget_amount?: number;
+  modernization_measures?: string;
 
   // Nodtelefon
-  har_nodtelefon?: boolean;
-  nodtelefon_modell?: string;
-  nodtelefon_typ?: string;
-  behover_uppgradering?: boolean;
-  nodtelefon_pris?: number;
+  has_emergency_phone?: boolean;
+  emergency_phone_model?: string;
+  emergency_phone_type?: string;
+  needs_upgrade?: boolean;
+  emergency_phone_price?: number;
 
   // Kommentarer
-  kommentarer?: string;
+  comments?: string;
 
   // Status (set during import: 'aktiv' for Hissar, 'rivd' for Rivna hissar)
-  status?: "aktiv" | "rivd" | "arkiverad";
+  status?: "active" | "demolished" | "arkiverad";
 
   // Import metadata (not stored in DB, used during import processing)
   _organisation_namn?: string;
@@ -73,8 +73,8 @@ export type ImportWarning = {
   message: string;
 };
 
-export type HissarParseResult = {
-  elevators: ParsedHiss[];
+export type ElevatorParseResult = {
+  elevators: ParsedElevator[];
   warnings: ImportWarning[];
   invalidRows: { row: number; reason: string }[];
   sheetName: string;
@@ -89,107 +89,107 @@ type ColumnDef = {
   letter: string; // Excel column letter (for error messages)
   field: string; // Target field name or special parser key
   mandatory?: boolean;
-  parser?: "compound_marklast" | "compound_plan_dorrar" | "compound_korgstorlek" | "compound_dagoppning" | "compound_nodtelefon" | "byggar" | "moderniserar" | "boolean" | "number" | "budget";
+  parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_daylight_opening" | "compound_emergency_phone" | "build_year" | "modernization_year" | "boolean" | "number" | "budget";
 };
 
 // Standard Hisskompetens Excel column mapping for the "Hissar" sheet.
 // Headers are in row 2; data starts at row 3.
-const HISSAR_COLUMNS: ColumnDef[] = [
+const ELEVATOR_COLUMNS: ColumnDef[] = [
   { col: 0, letter: "A", field: "_organisation_namn" },
-  { col: 1, letter: "B", field: "distrikt" },
-  { col: 2, letter: "C", field: "hissnummer", mandatory: true },
-  { col: 3, letter: "D", field: "adress" },
-  { col: 4, letter: "E", field: "hissbeteckning" },
-  { col: 5, letter: "F", field: "hisstyp" },
-  { col: 6, letter: "G", field: "fabrikat" },
-  { col: 7, letter: "H", field: "hastighet" },
-  { col: 8, letter: "I", field: "lyfthojd" },
-  { col: 9, letter: "J", field: "byggar", mandatory: true, parser: "byggar" },
-  { col: 10, letter: "K", field: "marklast", parser: "compound_marklast" },
-  { col: 11, letter: "L", field: "plan_dorrar", mandatory: true, parser: "compound_plan_dorrar" },
-  { col: 12, letter: "M", field: "typ_dorrar" },
-  { col: 13, letter: "N", field: "genomgang", parser: "boolean" },
-  { col: 14, letter: "O", field: "kollektiv" },
-  { col: 15, letter: "P", field: "korgstorlek", parser: "compound_korgstorlek" },
-  { col: 16, letter: "Q", field: "dagoppning", parser: "compound_dagoppning" },
-  { col: 17, letter: "R", field: "barbeslag" },
-  { col: 18, letter: "S", field: "dorrmaskin" },
-  { col: 19, letter: "T", field: "drivsystem" },
-  { col: 20, letter: "U", field: "upphangning" },
-  { col: 21, letter: "V", field: "maskinplacering" },
-  { col: 22, letter: "W", field: "typ_maskin" },
-  { col: 23, letter: "X", field: "typ_styrsystem" },
-  { col: 24, letter: "Y", field: "besiktningsorgan" },
-  { col: 25, letter: "Z", field: "besiktningsmanad" },
-  { col: 26, letter: "AA", field: "skotselforetag" },
-  { col: 27, letter: "AB", field: "moderniserar", mandatory: true, parser: "moderniserar" },
-  { col: 28, letter: "AC", field: "garanti", parser: "boolean" },
-  { col: 29, letter: "AD", field: "rekommenderat_moderniserar" },
-  { col: 30, letter: "AE", field: "budget_belopp", parser: "budget" },
-  { col: 31, letter: "AF", field: "atgarder_vid_modernisering" },
-  { col: 32, letter: "AG", field: "schaktbelysning" },
-  { col: 33, letter: "AH", field: "nodtelefon", parser: "compound_nodtelefon" },
+  { col: 1, letter: "B", field: "district" },
+  { col: 2, letter: "C", field: "elevator_number", mandatory: true },
+  { col: 3, letter: "D", field: "address" },
+  { col: 4, letter: "E", field: "elevator_designation" },
+  { col: 5, letter: "F", field: "elevator_type" },
+  { col: 6, letter: "G", field: "manufacturer" },
+  { col: 7, letter: "H", field: "speed" },
+  { col: 8, letter: "I", field: "lift_height" },
+  { col: 9, letter: "J", field: "build_year", mandatory: true, parser: "build_year" },
+  { col: 10, letter: "K", field: "load_capacity", parser: "compound_load_capacity" },
+  { col: 11, letter: "L", field: "floors_doors", mandatory: true, parser: "compound_floors_doors" },
+  { col: 12, letter: "M", field: "door_type" },
+  { col: 13, letter: "N", field: "passthrough", parser: "boolean" },
+  { col: 14, letter: "O", field: "collective" },
+  { col: 15, letter: "P", field: "cab_size", parser: "compound_cab_size" },
+  { col: 16, letter: "Q", field: "daylight_opening", parser: "compound_daylight_opening" },
+  { col: 17, letter: "R", field: "grab_rail" },
+  { col: 18, letter: "S", field: "door_machine" },
+  { col: 19, letter: "T", field: "drive_system" },
+  { col: 20, letter: "U", field: "suspension" },
+  { col: 21, letter: "V", field: "machine_placement" },
+  { col: 22, letter: "W", field: "machine_type" },
+  { col: 23, letter: "X", field: "control_system_type" },
+  { col: 24, letter: "Y", field: "inspection_authority" },
+  { col: 25, letter: "Z", field: "inspection_month" },
+  { col: 26, letter: "AA", field: "maintenance_company" },
+  { col: 27, letter: "AB", field: "modernization_year", mandatory: true, parser: "modernization_year" },
+  { col: 28, letter: "AC", field: "warranty", parser: "boolean" },
+  { col: 29, letter: "AD", field: "rekommenderat_modernization_year" },
+  { col: 30, letter: "AE", field: "budget_amount", parser: "budget" },
+  { col: 31, letter: "AF", field: "modernization_measures" },
+  { col: 32, letter: "AG", field: "shaft_lighting" },
+  { col: 33, letter: "AH", field: "emergency_phone", parser: "compound_emergency_phone" },
 ];
 
 // --- Compound Field Parsers ---
 
 /**
- * Parses marklast compound format: '500*6' (last_kg * antal_personer)
+ * Parses load_capacity compound format: '500*6' (last_kg * antal_personer)
  * Stored as-is since schema field is string.
  */
-function parseMarklast(raw: string): { marklast?: string } {
+function parseLoadCapacity(raw: string): { load_capacity?: string } {
   const trimmed = raw.trim();
   if (!trimmed) return {};
-  return { marklast: trimmed };
+  return { load_capacity: trimmed };
 }
 
 /**
- * Parses plan/dorrar compound format: '10*10' → antal_plan and antal_dorrar
+ * Parses plan/doors compound format: '10*10' → floor_count and door_count
  */
-function parsePlanDorrar(raw: string): { antal_plan?: number; antal_dorrar?: number } {
+function parseFloorsDoors(raw: string): { floor_count?: number; door_count?: number } {
   const trimmed = raw.trim();
   if (!trimmed) return {};
 
   const parts = trimmed.split("*");
-  const result: { antal_plan?: number; antal_dorrar?: number } = {};
+  const result: { floor_count?: number; door_count?: number } = {};
 
   if (parts[0]) {
     const plan = parseInt(parts[0].trim(), 10);
-    if (!isNaN(plan)) result.antal_plan = plan;
+    if (!isNaN(plan)) result.floor_count = plan;
   }
   if (parts[1]) {
-    const dorrar = parseInt(parts[1].trim(), 10);
-    if (!isNaN(dorrar)) result.antal_dorrar = dorrar;
+    const doors = parseInt(parts[1].trim(), 10);
+    if (!isNaN(doors)) result.door_count = doors;
   }
 
   return result;
 }
 
 /**
- * Parses korgstorlek compound format: '1000*2050*2300' (bredd*djup*hojd)
+ * Parses cab_size compound format: '1000*2050*2300' (bredd*djup*hojd)
  * Stored as-is since schema field is string.
  */
-function parseKorgstorlek(raw: string): { korgstorlek?: string } {
+function parseCabSize(raw: string): { cab_size?: string } {
   const trimmed = raw.trim();
   if (!trimmed) return {};
-  return { korgstorlek: trimmed };
+  return { cab_size: trimmed };
 }
 
 /**
- * Parses dagoppning compound format: '900*2000' (bredd*hojd)
+ * Parses daylight_opening compound format: '900*2000' (bredd*hojd)
  * Stored as-is since schema field is string.
  */
-function parseDagoppning(raw: string): { dagoppning?: string } {
+function parseDaylightOpening(raw: string): { daylight_opening?: string } {
   const trimmed = raw.trim();
   if (!trimmed) return {};
-  return { dagoppning: trimmed };
+  return { daylight_opening: trimmed };
 }
 
 /**
- * Parses byggar (construction year).
+ * Parses build_year (construction year).
  * Handles 'Okant' / 'Okänt' → undefined
  */
-function parseByggar(raw: string): { byggar?: number } {
+function parseBuildYear(raw: string): { build_year?: number } {
   const trimmed = raw.trim();
   if (!trimmed) return {};
   const lower = trimmed.toLowerCase();
@@ -198,36 +198,36 @@ function parseByggar(raw: string): { byggar?: number } {
   }
   const year = parseInt(trimmed, 10);
   if (isNaN(year)) return {};
-  return { byggar: year };
+  return { build_year: year };
 }
 
 /**
- * Parses moderniserar field.
+ * Parses modernization_year field.
  * Handles 'Ej ombyggd' → 'Ej ombyggd'
  * Handles year with suffixes: '2007-vinga' → '2007-vinga'
  * Handles plain year: '2010' → '2010'
  */
-function parseModerniserar(raw: string): { moderniserar?: string } {
+function parseModernizationYear(raw: string): { modernization_year?: string } {
   const trimmed = raw.trim();
   if (!trimmed) return {};
   // Keep as-is — "Ej ombyggd", "2007-vinga", "2010" are all valid string values
-  return { moderniserar: trimmed };
+  return { modernization_year: trimmed };
 }
 
 /**
  * Parses nodtelefon compound cell.
- * Tries to extract: har_nodtelefon, modell, typ, behover_uppgradering, pris
+ * Tries to extract: has_emergency_phone, modell, typ, needs_upgrade, pris
  * Common formats:
  *   "Ja" / "Nej"
  *   "Ja, Modell X, Typ Y"
  *   Compound with semicolons or commas
  */
-function parseNodtelefon(raw: string): {
-  har_nodtelefon?: boolean;
-  nodtelefon_modell?: string;
-  nodtelefon_typ?: string;
-  behover_uppgradering?: boolean;
-  nodtelefon_pris?: number;
+function parseEmergencyPhone(raw: string): {
+  has_emergency_phone?: boolean;
+  emergency_phone_model?: string;
+  emergency_phone_type?: string;
+  needs_upgrade?: boolean;
+  emergency_phone_price?: number;
 } {
   const trimmed = raw.trim();
   if (!trimmed) return {};
@@ -236,45 +236,45 @@ function parseNodtelefon(raw: string): {
 
   // Simple yes/no
   if (lower === "nej" || lower === "n") {
-    return { har_nodtelefon: false };
+    return { has_emergency_phone: false };
   }
   if (lower === "ja" || lower === "j") {
-    return { har_nodtelefon: true };
+    return { has_emergency_phone: true };
   }
 
   // Try to parse compound format separated by comma or semicolon
   const parts = trimmed.split(/[;,]/).map((p) => p.trim()).filter(Boolean);
-  const result: ReturnType<typeof parseNodtelefon> = {};
+  const result: ReturnType<typeof parseEmergencyPhone> = {};
 
   if (parts.length > 0) {
     const first = parts[0].toLowerCase();
     if (first === "ja" || first === "j") {
-      result.har_nodtelefon = true;
+      result.has_emergency_phone = true;
     } else if (first === "nej" || first === "n") {
-      result.har_nodtelefon = false;
+      result.has_emergency_phone = false;
     } else {
       // First part is likely the model if not a yes/no
-      result.har_nodtelefon = true;
-      result.nodtelefon_modell = parts[0];
+      result.has_emergency_phone = true;
+      result.emergency_phone_model = parts[0];
     }
   }
-  if (parts.length > 1 && !result.nodtelefon_modell) {
-    result.nodtelefon_modell = parts[1];
+  if (parts.length > 1 && !result.emergency_phone_model) {
+    result.emergency_phone_model = parts[1];
   }
   if (parts.length > 2) {
-    result.nodtelefon_typ = parts[2];
+    result.emergency_phone_type = parts[2];
   }
   if (parts.length > 3) {
     const uppgr = parts[3].toLowerCase();
     if (uppgr === "ja" || uppgr === "j" || uppgr.includes("uppgr")) {
-      result.behover_uppgradering = true;
+      result.needs_upgrade = true;
     } else if (uppgr === "nej" || uppgr === "n") {
-      result.behover_uppgradering = false;
+      result.needs_upgrade = false;
     }
   }
   if (parts.length > 4) {
     const pris = parseFloat(parts[4].replace(/[^\d.]/g, ""));
-    if (!isNaN(pris)) result.nodtelefon_pris = pris;
+    if (!isNaN(pris)) result.emergency_phone_price = pris;
   }
 
   return result;
@@ -291,14 +291,14 @@ function parseBoolean(raw: string): boolean | undefined {
   return undefined;
 }
 
-function parseBudget(raw: string): { budget_belopp?: number } {
+function parseBudgetAmount(raw: string): { budget_amount?: number } {
   const trimmed = raw.trim();
   if (!trimmed) return {};
   // Remove common currency markers and spaces: "150 000 kr" → "150000"
   const cleaned = trimmed.replace(/\s/g, "").replace(/kr$/i, "").replace(/sek$/i, "");
   const num = parseFloat(cleaned);
   if (isNaN(num)) return {};
-  return { budget_belopp: num };
+  return { budget_amount: num };
 }
 
 // --- Cell Value Extraction ---
@@ -311,73 +311,73 @@ function getCellString(row: unknown[], colIndex: number): string {
 
 // --- Row Parser ---
 
-function parseHissarRow(
+function parseElevatorRow(
   row: unknown[],
   rowIndex: number, // 1-based Excel row number
   sheetName: string,
   warnings: ImportWarning[],
-): ParsedHiss | null {
-  const hissnummer = getCellString(row, 2); // Column C
-  if (!hissnummer) {
-    return null; // Skip rows without hissnummer
+): ParsedElevator | null {
+  const elevator_number = getCellString(row, 2); // Column C
+  if (!elevator_number) {
+    return null; // Skip rows without elevator_number
   }
 
-  const result: ParsedHiss = {
-    hissnummer,
+  const result: ParsedElevator = {
+    elevator_number,
     _source_row: rowIndex,
     _source_sheet: sheetName,
   };
 
-  for (const colDef of HISSAR_COLUMNS) {
+  for (const colDef of ELEVATOR_COLUMNS) {
     const raw = getCellString(row, colDef.col);
     if (!raw && !colDef.mandatory) continue;
 
     switch (colDef.parser) {
-      case "byggar": {
-        const parsed = parseByggar(raw);
-        if (parsed.byggar !== undefined) result.byggar = parsed.byggar;
+      case "build_year": {
+        const parsed = parseBuildYear(raw);
+        if (parsed.build_year !== undefined) result.build_year = parsed.build_year;
         break;
       }
-      case "compound_marklast": {
-        const parsed = parseMarklast(raw);
-        if (parsed.marklast !== undefined) result.marklast = parsed.marklast;
+      case "compound_load_capacity": {
+        const parsed = parseLoadCapacity(raw);
+        if (parsed.load_capacity !== undefined) result.load_capacity = parsed.load_capacity;
         break;
       }
-      case "compound_plan_dorrar": {
-        const parsed = parsePlanDorrar(raw);
-        if (parsed.antal_plan !== undefined) result.antal_plan = parsed.antal_plan;
-        if (parsed.antal_dorrar !== undefined) result.antal_dorrar = parsed.antal_dorrar;
-        if (raw && parsed.antal_plan === undefined && parsed.antal_dorrar === undefined) {
+      case "compound_floors_doors": {
+        const parsed = parseFloorsDoors(raw);
+        if (parsed.floor_count !== undefined) result.floor_count = parsed.floor_count;
+        if (parsed.door_count !== undefined) result.door_count = parsed.door_count;
+        if (raw && parsed.floor_count === undefined && parsed.door_count === undefined) {
           warnings.push({
             row: rowIndex,
             column: colDef.letter,
-            message: `Kunde inte tolka plan/dorrar-varde: "${raw}"`,
+            message: `Kunde inte tolka plan/doors-varde: "${raw}"`,
           });
         }
         break;
       }
-      case "compound_korgstorlek": {
-        const parsed = parseKorgstorlek(raw);
-        if (parsed.korgstorlek !== undefined) result.korgstorlek = parsed.korgstorlek;
+      case "compound_cab_size": {
+        const parsed = parseCabSize(raw);
+        if (parsed.cab_size !== undefined) result.cab_size = parsed.cab_size;
         break;
       }
-      case "compound_dagoppning": {
-        const parsed = parseDagoppning(raw);
-        if (parsed.dagoppning !== undefined) result.dagoppning = parsed.dagoppning;
+      case "compound_daylight_opening": {
+        const parsed = parseDaylightOpening(raw);
+        if (parsed.daylight_opening !== undefined) result.daylight_opening = parsed.daylight_opening;
         break;
       }
-      case "compound_nodtelefon": {
-        const parsed = parseNodtelefon(raw);
-        if (parsed.har_nodtelefon !== undefined) result.har_nodtelefon = parsed.har_nodtelefon;
-        if (parsed.nodtelefon_modell !== undefined) result.nodtelefon_modell = parsed.nodtelefon_modell;
-        if (parsed.nodtelefon_typ !== undefined) result.nodtelefon_typ = parsed.nodtelefon_typ;
-        if (parsed.behover_uppgradering !== undefined) result.behover_uppgradering = parsed.behover_uppgradering;
-        if (parsed.nodtelefon_pris !== undefined) result.nodtelefon_pris = parsed.nodtelefon_pris;
+      case "compound_emergency_phone": {
+        const parsed = parseEmergencyPhone(raw);
+        if (parsed.has_emergency_phone !== undefined) result.has_emergency_phone = parsed.has_emergency_phone;
+        if (parsed.emergency_phone_model !== undefined) result.emergency_phone_model = parsed.emergency_phone_model;
+        if (parsed.emergency_phone_type !== undefined) result.emergency_phone_type = parsed.emergency_phone_type;
+        if (parsed.needs_upgrade !== undefined) result.needs_upgrade = parsed.needs_upgrade;
+        if (parsed.emergency_phone_price !== undefined) result.emergency_phone_price = parsed.emergency_phone_price;
         break;
       }
-      case "moderniserar": {
-        const parsed = parseModerniserar(raw);
-        if (parsed.moderniserar !== undefined) result.moderniserar = parsed.moderniserar;
+      case "modernization_year": {
+        const parsed = parseModernizationYear(raw);
+        if (parsed.modernization_year !== undefined) result.modernization_year = parsed.modernization_year;
         break;
       }
       case "boolean": {
@@ -388,8 +388,8 @@ function parseHissarRow(
         break;
       }
       case "budget": {
-        const parsed = parseBudget(raw);
-        if (parsed.budget_belopp !== undefined) result.budget_belopp = parsed.budget_belopp;
+        const parsed = parseBudgetAmount(raw);
+        if (parsed.budget_amount !== undefined) result.budget_amount = parsed.budget_amount;
         break;
       }
       case "number": {
@@ -417,7 +417,7 @@ function parseHissarRow(
 function validateMandatoryColumns(
   headerRow: unknown[],
 ): { valid: boolean; missing: string[] } {
-  const mandatoryCols = HISSAR_COLUMNS.filter((c) => c.mandatory);
+  const mandatoryCols = ELEVATOR_COLUMNS.filter((c) => c.mandatory);
   const missing: string[] = [];
 
   for (const col of mandatoryCols) {
@@ -439,7 +439,7 @@ function validateMandatoryColumns(
  * - Parses compound fields, handles special values
  * - Returns structured elevator objects ready for Convex mutations
  */
-export function parseHissarSheet(workbook: XLSX.WorkBook): HissarParseResult {
+export function parseElevatorSheet(workbook: XLSX.WorkBook): ElevatorParseResult {
   const sheetName = "Hissar";
   const sheet = workbook.Sheets[sheetName];
 
@@ -481,7 +481,7 @@ export function parseHissarSheet(workbook: XLSX.WorkBook): HissarParseResult {
     });
   }
 
-  const elevators: ParsedHiss[] = [];
+  const elevators: ParsedElevator[] = [];
   const invalidRows: { row: number; reason: string }[] = [];
 
   // Data starts from row 3 (0-indexed: row 2)
@@ -494,16 +494,16 @@ export function parseHissarSheet(workbook: XLSX.WorkBook): HissarParseResult {
       continue;
     }
 
-    const hissnummer = getCellString(row, 2); // Column C
-    if (!hissnummer) {
+    const elevator_number = getCellString(row, 2); // Column C
+    if (!elevator_number) {
       invalidRows.push({
         row: excelRow,
-        reason: "Saknar hissnummer (kolumn C)",
+        reason: "Saknar elevator_number (kolumn C)",
       });
       continue;
     }
 
-    const parsed = parseHissarRow(row, excelRow, sheetName, warnings);
+    const parsed = parseElevatorRow(row, excelRow, sheetName, warnings);
     if (parsed) {
       elevators.push(parsed);
     }
@@ -542,37 +542,37 @@ export function validateWorkbookSheets(workbook: XLSX.WorkBook): {
 
 /**
  * Column mapping for the 'Nodtelefoner' sheet.
- * Column G (index 6) is hissnummer — the join key to Hissar.
+ * Column G (index 6) is elevator_number — the join key to Hissar.
  * Other columns contain expanded emergency phone data.
  */
-const NODTELEFONER_COLUMNS = [
+const EMERGENCY_PHONE_COLUMNS = [
   { col: 0, letter: "A", field: "_organisation_namn" },
   { col: 1, letter: "B", field: "_distrikt" }, // used for case-insensitive matching during join
   { col: 2, letter: "C", field: "_adress" },
-  { col: 3, letter: "D", field: "_hissbeteckning" },
-  { col: 4, letter: "E", field: "_hisstyp" },
-  { col: 5, letter: "F", field: "_fabrikat" },
-  { col: 6, letter: "G", field: "hissnummer" }, // JOIN KEY
-  { col: 7, letter: "H", field: "har_nodtelefon", parser: "boolean" as const },
-  { col: 8, letter: "I", field: "nodtelefon_modell" },
-  { col: 9, letter: "J", field: "nodtelefon_typ" },
-  { col: 10, letter: "K", field: "behover_uppgradering", parser: "boolean" as const },
-  { col: 11, letter: "L", field: "nodtelefon_pris", parser: "number" as const },
+  { col: 3, letter: "D", field: "_elevator_designation" },
+  { col: 4, letter: "E", field: "_elevator_type" },
+  { col: 5, letter: "F", field: "_manufacturer" },
+  { col: 6, letter: "G", field: "elevator_number" }, // JOIN KEY
+  { col: 7, letter: "H", field: "has_emergency_phone", parser: "boolean" as const },
+  { col: 8, letter: "I", field: "emergency_phone_model" },
+  { col: 9, letter: "J", field: "emergency_phone_type" },
+  { col: 10, letter: "K", field: "needs_upgrade", parser: "boolean" as const },
+  { col: 11, letter: "L", field: "emergency_phone_price", parser: "number" as const },
 ];
 
-type NodtelefonerEntry = {
-  hissnummer: string;
-  distrikt?: string;
-  har_nodtelefon?: boolean;
-  nodtelefon_modell?: string;
-  nodtelefon_typ?: string;
-  behover_uppgradering?: boolean;
-  nodtelefon_pris?: number;
+type EmergencyPhoneEntry = {
+  elevator_number: string;
+  district?: string;
+  has_emergency_phone?: boolean;
+  emergency_phone_model?: string;
+  emergency_phone_type?: string;
+  needs_upgrade?: boolean;
+  emergency_phone_price?: number;
   _source_row: number;
 };
 
-export type NodtelefonerParseResult = {
-  entries: NodtelefonerEntry[];
+export type EmergencyPhoneParseResult = {
+  entries: EmergencyPhoneEntry[];
   warnings: ImportWarning[];
   sheetName: string;
 };
@@ -580,10 +580,10 @@ export type NodtelefonerParseResult = {
 /**
  * Parses the 'Nodtelefoner' sheet from an Excel workbook.
  * - Reads column headers from row 2 (0-indexed row 1), data from row 3
- * - Column G (index 6) is hissnummer — used as join key
- * - Returns nodtelefon entries keyed by hissnummer for joining with Hissar data
+ * - Column G (index 6) is elevator_number — used as join key
+ * - Returns nodtelefon entries keyed by elevator_number for joining with Hissar data
  */
-export function parseNodtelefonerSheet(workbook: XLSX.WorkBook): NodtelefonerParseResult {
+export function parseEmergencyPhoneSheet(workbook: XLSX.WorkBook): EmergencyPhoneParseResult {
   const sheetName = "Nodtelefoner";
   const sheet = workbook.Sheets[sheetName];
 
@@ -605,7 +605,7 @@ export function parseNodtelefonerSheet(workbook: XLSX.WorkBook): NodtelefonerPar
     };
   }
 
-  const entries: NodtelefonerEntry[] = [];
+  const entries: EmergencyPhoneEntry[] = [];
   const warnings: ImportWarning[] = [];
 
   // Data starts from row 3 (0-indexed row 2), headers in row 2 (0-indexed row 1)
@@ -617,28 +617,28 @@ export function parseNodtelefonerSheet(workbook: XLSX.WorkBook): NodtelefonerPar
       continue;
     }
 
-    const hissnummer = getCellString(row, 6); // Column G
-    if (!hissnummer) {
+    const elevator_number = getCellString(row, 6); // Column G
+    if (!elevator_number) {
       warnings.push({
         row: excelRow,
         column: "G",
-        message: "Saknar hissnummer i Nodtelefoner-arket, rad hoppas over",
+        message: "Saknar elevator_number i Nodtelefoner-arket, rad hoppas over",
       });
       continue;
     }
 
-    const entry: NodtelefonerEntry = {
-      hissnummer,
+    const entry: EmergencyPhoneEntry = {
+      elevator_number,
       _source_row: excelRow,
     };
 
     // Parse distrikt for case-insensitive matching
     const distrikt = getCellString(row, 1); // Column B
-    if (distrikt) entry.distrikt = distrikt;
+    if (distrikt) entry.district = distrikt;
 
     // Parse nodtelefon fields
-    for (const colDef of NODTELEFONER_COLUMNS) {
-      if (colDef.field === "hissnummer" || colDef.field.startsWith("_")) continue;
+    for (const colDef of EMERGENCY_PHONE_COLUMNS) {
+      if (colDef.field === "elevator_number" || colDef.field.startsWith("_")) continue;
       const raw = getCellString(row, colDef.col);
       if (!raw) continue;
 
@@ -677,7 +677,7 @@ export function parseNodtelefonerSheet(workbook: XLSX.WorkBook): NodtelefonerPar
  * Rivna hissar uses the same column structure as Hissar but WITHOUT column AH (nodtelefon).
  * No column headers — data starts from row 1.
  */
-const RIVNA_HISSAR_COLUMNS: ColumnDef[] = HISSAR_COLUMNS.filter(
+const RIVNA_ELEVATOR_COLUMNS: ColumnDef[] = ELEVATOR_COLUMNS.filter(
   (col) => col.letter !== "AH",
 );
 
@@ -687,7 +687,7 @@ const RIVNA_HISSAR_COLUMNS: ColumnDef[] = HISSAR_COLUMNS.filter(
  * - No column headers — data starts from row 1
  * - All parsed elevators get status = 'rivd'
  */
-export function parseRivnaHissarSheet(workbook: XLSX.WorkBook): HissarParseResult {
+export function parseDemolishedSheet(workbook: XLSX.WorkBook): ElevatorParseResult {
   const sheetName = "Rivna hissar";
   const sheet = workbook.Sheets[sheetName];
 
@@ -705,7 +705,7 @@ export function parseRivnaHissarSheet(workbook: XLSX.WorkBook): HissarParseResul
     return { elevators: [], warnings: [], invalidRows: [], sheetName };
   }
 
-  const elevators: ParsedHiss[] = [];
+  const elevators: ParsedElevator[] = [];
   const warnings: ImportWarning[] = [];
   const invalidRows: { row: number; reason: string }[] = [];
 
@@ -718,16 +718,16 @@ export function parseRivnaHissarSheet(workbook: XLSX.WorkBook): HissarParseResul
       continue;
     }
 
-    const hissnummer = getCellString(row, 2); // Column C
-    if (!hissnummer) {
+    const elevator_number = getCellString(row, 2); // Column C
+    if (!elevator_number) {
       invalidRows.push({
         row: excelRow,
-        reason: "Saknar hissnummer (kolumn C) i Rivna hissar",
+        reason: "Saknar elevator_number (kolumn C) i Rivna hissar",
       });
       continue;
     }
 
-    const parsed = parseRivnaRow(row, excelRow, sheetName, warnings);
+    const parsed = parseDemolishedRow(row, excelRow, sheetName, warnings);
     if (parsed) {
       elevators.push(parsed);
     }
@@ -738,66 +738,66 @@ export function parseRivnaHissarSheet(workbook: XLSX.WorkBook): HissarParseResul
 
 /**
  * Parses a single row from the 'Rivna hissar' sheet.
- * Uses RIVNA_HISSAR_COLUMNS (same as HISSAR_COLUMNS minus AH).
+ * Uses RIVNA_ELEVATOR_COLUMNS (same as ELEVATOR_COLUMNS minus AH).
  * Sets status to 'rivd'.
  */
-function parseRivnaRow(
+function parseDemolishedRow(
   row: unknown[],
   rowIndex: number,
   sheetName: string,
   warnings: ImportWarning[],
-): ParsedHiss | null {
-  const hissnummer = getCellString(row, 2);
-  if (!hissnummer) return null;
+): ParsedElevator | null {
+  const elevator_number = getCellString(row, 2);
+  if (!elevator_number) return null;
 
-  const result: ParsedHiss = {
-    hissnummer,
-    status: "rivd",
+  const result: ParsedElevator = {
+    elevator_number,
+    status: "demolished",
     _source_row: rowIndex,
     _source_sheet: sheetName,
   };
 
-  for (const colDef of RIVNA_HISSAR_COLUMNS) {
+  for (const colDef of RIVNA_ELEVATOR_COLUMNS) {
     const raw = getCellString(row, colDef.col);
     if (!raw && !colDef.mandatory) continue;
 
     switch (colDef.parser) {
-      case "byggar": {
-        const parsed = parseByggar(raw);
-        if (parsed.byggar !== undefined) result.byggar = parsed.byggar;
+      case "build_year": {
+        const parsed = parseBuildYear(raw);
+        if (parsed.build_year !== undefined) result.build_year = parsed.build_year;
         break;
       }
-      case "compound_marklast": {
-        const parsed = parseMarklast(raw);
-        if (parsed.marklast !== undefined) result.marklast = parsed.marklast;
+      case "compound_load_capacity": {
+        const parsed = parseLoadCapacity(raw);
+        if (parsed.load_capacity !== undefined) result.load_capacity = parsed.load_capacity;
         break;
       }
-      case "compound_plan_dorrar": {
-        const parsed = parsePlanDorrar(raw);
-        if (parsed.antal_plan !== undefined) result.antal_plan = parsed.antal_plan;
-        if (parsed.antal_dorrar !== undefined) result.antal_dorrar = parsed.antal_dorrar;
-        if (raw && parsed.antal_plan === undefined && parsed.antal_dorrar === undefined) {
+      case "compound_floors_doors": {
+        const parsed = parseFloorsDoors(raw);
+        if (parsed.floor_count !== undefined) result.floor_count = parsed.floor_count;
+        if (parsed.door_count !== undefined) result.door_count = parsed.door_count;
+        if (raw && parsed.floor_count === undefined && parsed.door_count === undefined) {
           warnings.push({
             row: rowIndex,
             column: colDef.letter,
-            message: `Kunde inte tolka plan/dorrar-varde: "${raw}"`,
+            message: `Kunde inte tolka plan/doors-varde: "${raw}"`,
           });
         }
         break;
       }
-      case "compound_korgstorlek": {
-        const parsed = parseKorgstorlek(raw);
-        if (parsed.korgstorlek !== undefined) result.korgstorlek = parsed.korgstorlek;
+      case "compound_cab_size": {
+        const parsed = parseCabSize(raw);
+        if (parsed.cab_size !== undefined) result.cab_size = parsed.cab_size;
         break;
       }
-      case "compound_dagoppning": {
-        const parsed = parseDagoppning(raw);
-        if (parsed.dagoppning !== undefined) result.dagoppning = parsed.dagoppning;
+      case "compound_daylight_opening": {
+        const parsed = parseDaylightOpening(raw);
+        if (parsed.daylight_opening !== undefined) result.daylight_opening = parsed.daylight_opening;
         break;
       }
-      case "moderniserar": {
-        const parsed = parseModerniserar(raw);
-        if (parsed.moderniserar !== undefined) result.moderniserar = parsed.moderniserar;
+      case "modernization_year": {
+        const parsed = parseModernizationYear(raw);
+        if (parsed.modernization_year !== undefined) result.modernization_year = parsed.modernization_year;
         break;
       }
       case "boolean": {
@@ -808,8 +808,8 @@ function parseRivnaRow(
         break;
       }
       case "budget": {
-        const parsed = parseBudget(raw);
-        if (parsed.budget_belopp !== undefined) result.budget_belopp = parsed.budget_belopp;
+        const parsed = parseBudgetAmount(raw);
+        if (parsed.budget_amount !== undefined) result.budget_amount = parsed.budget_amount;
         break;
       }
       case "number": {
@@ -834,62 +834,62 @@ function parseRivnaRow(
 // --- Combined Import ---
 
 export type FullImportResult = {
-  hissar: ParsedHiss[];
-  rivna: ParsedHiss[];
-  combined: ParsedHiss[];
+  elevators: ParsedElevator[];
+  demolished: ParsedElevator[];
+  combined: ParsedElevator[];
   warnings: ImportWarning[];
   invalidRows: { row: number; sheet: string; reason: string }[];
   sheets: {
-    hissar: { found: boolean; count: number };
-    nodtelefoner: { found: boolean; count: number; joined: number };
-    rivna: { found: boolean; count: number };
+    elevators: { found: boolean; count: number };
+    emergencyPhones: { found: boolean; count: number; joined: number };
+    demolished: { found: boolean; count: number };
   };
 };
 
 /**
- * Joins Nodtelefoner data into Hissar elevators by hissnummer.
- * Uses case-insensitive district matching when multiple elevators share the same hissnummer.
+ * Joins Nodtelefoner data into Hissar elevators by elevator_number.
+ * Uses case-insensitive district matching when multiple elevators share the same elevator_number.
  */
-function joinNodtelefoner(
-  elevators: ParsedHiss[],
-  nodEntries: NodtelefonerEntry[],
+function joinEmergencyPhones(
+  elevators: ParsedElevator[],
+  nodEntries: EmergencyPhoneEntry[],
   warnings: ImportWarning[],
 ): number {
   if (nodEntries.length === 0) return 0;
 
-  // Build a lookup: hissnummer → elevator(s)
-  const byHissnummer = new Map<string, ParsedHiss[]>();
-  for (const hiss of elevators) {
-    const key = hiss.hissnummer.toLowerCase();
-    const existing = byHissnummer.get(key);
+  // Build a lookup: elevator_number → elevator(s)
+  const byElevatorNumber = new Map<string, ParsedElevator[]>();
+  for (const el of elevators) {
+    const key = el.elevator_number.toLowerCase();
+    const existing = byElevatorNumber.get(key);
     if (existing) {
-      existing.push(hiss);
+      existing.push(el);
     } else {
-      byHissnummer.set(key, [hiss]);
+      byElevatorNumber.set(key, [el]);
     }
   }
 
   let joined = 0;
 
   for (const entry of nodEntries) {
-    const candidates = byHissnummer.get(entry.hissnummer.toLowerCase());
+    const candidates = byElevatorNumber.get(entry.elevator_number.toLowerCase());
     if (!candidates || candidates.length === 0) {
       warnings.push({
         row: entry._source_row,
         column: "G",
-        message: `Nodtelefon-post med hissnummer "${entry.hissnummer}" hittades inte i Hissar-arket`,
+        message: `Nodtelefon-post med elevator_number "${entry.elevator_number}" hittades inte i Hissar-arket`,
       });
       continue;
     }
 
     // If multiple candidates, use case-insensitive district matching
-    let target: ParsedHiss;
+    let target: ParsedElevator;
     if (candidates.length === 1) {
       target = candidates[0];
-    } else if (entry.distrikt) {
-      const districtLower = entry.distrikt.toLowerCase();
+    } else if (entry.district) {
+      const districtLower = entry.district.toLowerCase();
       const match = candidates.find(
-        (h) => h.distrikt?.toLowerCase() === districtLower,
+        (h) => h.district?.toLowerCase() === districtLower,
       );
       if (match) {
         target = match;
@@ -899,7 +899,7 @@ function joinNodtelefoner(
         warnings.push({
           row: entry._source_row,
           column: "B",
-          message: `Flera hissar med nummer "${entry.hissnummer}", kunde inte matcha distrikt "${entry.distrikt}" — anvander forsta traffen`,
+          message: `Flera hissar med nummer "${entry.elevator_number}", kunde inte matcha distrikt "${entry.district}" — anvander forsta traffen`,
         });
       }
     } else {
@@ -907,11 +907,11 @@ function joinNodtelefoner(
     }
 
     // Merge nodtelefon fields into the elevator
-    if (entry.har_nodtelefon !== undefined) target.har_nodtelefon = entry.har_nodtelefon;
-    if (entry.nodtelefon_modell !== undefined) target.nodtelefon_modell = entry.nodtelefon_modell;
-    if (entry.nodtelefon_typ !== undefined) target.nodtelefon_typ = entry.nodtelefon_typ;
-    if (entry.behover_uppgradering !== undefined) target.behover_uppgradering = entry.behover_uppgradering;
-    if (entry.nodtelefon_pris !== undefined) target.nodtelefon_pris = entry.nodtelefon_pris;
+    if (entry.has_emergency_phone !== undefined) target.has_emergency_phone = entry.has_emergency_phone;
+    if (entry.emergency_phone_model !== undefined) target.emergency_phone_model = entry.emergency_phone_model;
+    if (entry.emergency_phone_type !== undefined) target.emergency_phone_type = entry.emergency_phone_type;
+    if (entry.needs_upgrade !== undefined) target.needs_upgrade = entry.needs_upgrade;
+    if (entry.emergency_phone_price !== undefined) target.emergency_phone_price = entry.emergency_phone_price;
     joined++;
   }
 
@@ -921,7 +921,7 @@ function joinNodtelefoner(
 /**
  * Parses an entire Excel import file with all three sheets:
  * - 'Hissar' (required): main elevator data
- * - 'Nodtelefoner' (optional): emergency phone data, joined via hissnummer
+ * - 'Nodtelefoner' (optional): emergency phone data, joined via elevator_number
  * - 'Rivna hissar' (optional): demolished elevators, same structure minus column AH, status='rivd'
  *
  * Returns combined results with sheet source metadata.
@@ -933,9 +933,9 @@ export function parseExcelImport(workbook: XLSX.WorkBook): FullImportResult {
   const allInvalidRows: { row: number; sheet: string; reason: string }[] = [];
 
   // 1. Parse Hissar sheet (required)
-  let hissarResult: HissarParseResult;
+  let hissarResult: ElevatorParseResult;
   if (validation.hasHissar) {
-    hissarResult = parseHissarSheet(workbook);
+    hissarResult = parseElevatorSheet(workbook);
     allWarnings.push(...hissarResult.warnings);
     allInvalidRows.push(
       ...hissarResult.invalidRows.map((r) => ({ ...r, sheet: "Hissar" })),
@@ -953,16 +953,16 @@ export function parseExcelImport(workbook: XLSX.WorkBook): FullImportResult {
   let nodJoinedCount = 0;
   let nodEntryCount = 0;
   if (validation.hasNodtelefoner) {
-    const nodResult = parseNodtelefonerSheet(workbook);
+    const nodResult = parseEmergencyPhoneSheet(workbook);
     nodEntryCount = nodResult.entries.length;
     allWarnings.push(...nodResult.warnings);
-    nodJoinedCount = joinNodtelefoner(hissarResult.elevators, nodResult.entries, allWarnings);
+    nodJoinedCount = joinEmergencyPhones(hissarResult.elevators, nodResult.entries, allWarnings);
   }
 
   // 3. Parse Rivna hissar sheet (optional)
-  let rivnaResult: HissarParseResult;
+  let rivnaResult: ElevatorParseResult;
   if (validation.hasRivna) {
-    rivnaResult = parseRivnaHissarSheet(workbook);
+    rivnaResult = parseDemolishedSheet(workbook);
     allWarnings.push(...rivnaResult.warnings);
     allInvalidRows.push(
       ...rivnaResult.invalidRows.map((r) => ({ ...r, sheet: "Rivna hissar" })),
@@ -975,19 +975,19 @@ export function parseExcelImport(workbook: XLSX.WorkBook): FullImportResult {
   const combined = [...hissarResult.elevators, ...rivnaResult.elevators];
 
   return {
-    hissar: hissarResult.elevators,
-    rivna: rivnaResult.elevators,
+    elevators: hissarResult.elevators,
+    demolished: rivnaResult.elevators,
     combined,
     warnings: allWarnings,
     invalidRows: allInvalidRows,
     sheets: {
-      hissar: { found: validation.hasHissar, count: hissarResult.elevators.length },
-      nodtelefoner: { found: validation.hasNodtelefoner, count: nodEntryCount, joined: nodJoinedCount },
-      rivna: { found: validation.hasRivna, count: rivnaResult.elevators.length },
+      elevators: { found: validation.hasHissar, count: hissarResult.elevators.length },
+      emergencyPhones: { found: validation.hasNodtelefoner, count: nodEntryCount, joined: nodJoinedCount },
+      demolished: { found: validation.hasRivna, count: rivnaResult.elevators.length },
     },
   };
 }
 
 // Re-export column definition for use in other parsers
-export { HISSAR_COLUMNS };
+export { ELEVATOR_COLUMNS };
 export type { ColumnDef };

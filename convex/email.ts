@@ -10,7 +10,7 @@ const FROM_ADDRESS = "Hisskompetens <noreply@hisskompetens.se>";
 export interface ImportResult {
   created: number;
   updated: number;
-  errors: { hissnummer: string; error: string }[];
+  errors: { elevator_number: string; error: string }[];
   orgsCreated: string[];
 }
 
@@ -43,7 +43,7 @@ function buildImportReportHtml(data: ImportResult, timestamp: string): string {
       .slice(0, 50)
       .map(
         (err) =>
-          `<p style="font-size:13px;color:#dc2626;margin:2px 0;padding-left:12px"><strong>${escapeHtml(err.hissnummer)}</strong>: ${escapeHtml(err.error)}</p>`,
+          `<p style="font-size:13px;color:#dc2626;margin:2px 0;padding-left:12px"><strong>${escapeHtml(err.elevator_number)}</strong>: ${escapeHtml(err.error)}</p>`,
       )
       .join("")}
     ${data.errors.length > 50 ? `<p style="font-size:14px;color:#374151;margin:4px 0">... och ${data.errors.length - 50} ytterligare fel</p>` : ""}

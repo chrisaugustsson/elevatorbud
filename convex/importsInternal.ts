@@ -2,7 +2,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { requireAdmin } from "./auth";
-import { autoAddForslagsvarden } from "./hissar";
+import { autoAddSuggestedValues } from "./elevators";
 
 export const checkAdmin = internalQuery({
   args: {},
@@ -13,9 +13,9 @@ export const checkAdmin = internalQuery({
 });
 
 export const createOrg = internalMutation({
-  args: { namn: v.string() },
+  args: { name: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("organisationer", { namn: args.namn });
+    return await ctx.db.insert("organizations", { name: args.name });
   },
 });
 
@@ -28,7 +28,7 @@ export const importBatch = internalMutation({
   handler: async (ctx, args) => {
     let created = 0;
     let updated = 0;
-    const errors: { hissnummer: string; error: string }[] = [];
+    const errors: { elevator_number: string; error: string }[] = [];
 
     for (const elevator of args.elevators) {
       try {
@@ -38,7 +38,7 @@ export const importBatch = internalMutation({
 
         if (!orgId) {
           errors.push({
-            hissnummer: elevator.hissnummer as string,
+            elevator_number: elevator.elevator_number as string,
             error: `Organisation "${orgName || "saknas"}" kunde inte matchas`,
           });
           continue;
@@ -61,48 +61,48 @@ export const importBatch = internalMutation({
           }
         }
 
-        // Check if hissnummer exists
+        // Check if elevator_number exists
         const existing = await ctx.db
-          .query("hissar")
-          .withIndex("by_hissnummer", (q: any) =>
-            q.eq("hissnummer", fields.hissnummer),
+          .query("elevators")
+          .withIndex("by_elevator_number", (q: any) =>
+            q.eq("elevator_number", fields.elevator_number),
           )
           .unique();
 
         if (existing) {
           // Update existing elevator
-          const { hissnummer, ...updateFields } = fields;
+          const { elevator_number, ...updateFields } = fields;
           await ctx.db.patch(existing._id, {
             ...updateFields,
-            organisation_id: orgId as Id<"organisationer">,
+            organization_id: orgId as Id<"organizations">,
             ...(importStatus
-              ? { status: importStatus as "aktiv" | "rivd" | "arkiverad" }
+              ? { status: importStatus as "active" | "demolished" | "archived" }
               : {}),
-            senast_uppdaterad_av: args.adminId as Id<"anvandare">,
-            senast_uppdaterad: Date.now(),
+            last_updated_by: args.adminId as Id<"users">,
+            last_updated_at: Date.now(),
           });
           updated++;
         } else {
-          // Auto-add new forslagsvarden values
-          await autoAddForslagsvarden(ctx, fields);
+          // Auto-add new suggested values
+          await autoAddSuggestedValues(ctx, fields);
 
           // Create new elevator
           const insertData = {
             ...fields,
-            organisation_id: orgId as Id<"organisationer">,
-            status: ((importStatus as string) || "aktiv") as
-              | "aktiv"
-              | "rivd"
-              | "arkiverad",
-            skapad_av: args.adminId as Id<"anvandare">,
-            skapad_datum: Date.now(),
+            organization_id: orgId as Id<"organizations">,
+            status: ((importStatus as string) || "active") as
+              | "active"
+              | "demolished"
+              | "archived",
+            created_by: args.adminId as Id<"users">,
+            created_at: Date.now(),
           } as any;
-          await ctx.db.insert("hissar", insertData);
+          await ctx.db.insert("elevators", insertData);
           created++;
         }
       } catch (e) {
         errors.push({
-          hissnummer: (elevator.hissnummer as string) || "okänt",
+          elevator_number: (elevator.elevator_number as string) || "unknown",
           error: e instanceof Error ? e.message : String(e),
         });
       }

@@ -7,7 +7,7 @@ export type DraftData<T> = {
 };
 
 export function getDraftKey(id?: string): string {
-  return id ? `${DRAFT_PREFIX}hiss-${id}` : `${DRAFT_PREFIX}ny-hiss`;
+  return id ? `${DRAFT_PREFIX}elevator-${id}` : `${DRAFT_PREFIX}new-elevator`;
 }
 
 export function saveDraft<T>(key: string, values: T, currentStep?: number): void {

@@ -53,23 +53,23 @@ type Anvandare = {
   _id: string;
   clerk_user_id: string;
   email: string;
-  namn: string;
-  roll: "admin" | "kund";
-  organisation_id?: string;
-  aktiv: boolean;
-  skapad_datum: string;
-  senaste_login?: string;
+  name: string;
+  role: "admin" | "customer";
+  organization_id?: string;
+  active: boolean;
+  created_at: string;
+  last_login?: string;
 };
 
 type Organisation = {
   _id: string;
-  namn: string;
+  name: string;
 };
 
 function Anvandare() {
   const { org: orgFromSearch, create: createFromSearch } = Route.useSearch();
   const navigate = useNavigate();
-  const orgs = useQuery(api.organisationer.list);
+  const orgs = useQuery(api.organizations.list);
 
   const [rollFilter, setRollFilter] = useState<string>("alla");
   const [orgFilter, setOrgFilter] = useState<string>(orgFromSearch ?? "alla");
@@ -89,30 +89,30 @@ function Anvandare() {
     }
   }, [createFromSearch, navigate, orgFromSearch]);
 
-  const users = useQuery(api.anvandare.list, {
-    roll:
+  const users = useQuery(api.userAdmin.list, {
+    role:
       rollFilter === "alla"
         ? undefined
-        : (rollFilter as "admin" | "kund"),
-    organisation_id:
+        : (rollFilter as "admin" | "customer"),
+    organization_id:
       orgFilter === "alla" ? undefined : (orgFilter as never),
     search: searchText || undefined,
   });
 
-  const createUser = useAction(api.anvandare.create);
-  const updateUser = useAction(api.anvandare.update);
+  const createUser = useAction(api.userAdmin.create);
+  const updateUser = useAction(api.userAdmin.update);
 
   const orgMap = new Map<string, string>();
   if (orgs) {
     for (const org of orgs as Organisation[]) {
-      orgMap.set(org._id, org.namn);
+      orgMap.set(org._id, org.name);
     }
   }
 
   const columnHelper = createColumnHelper<Anvandare>();
 
   const columns = [
-    columnHelper.accessor("namn", {
+    columnHelper.accessor("name", {
       header: ({ column }) => (
         <Button
           variant="ghost"
@@ -129,7 +129,7 @@ function Anvandare() {
     columnHelper.accessor("email", {
       header: "E-post",
     }),
-    columnHelper.accessor("roll", {
+    columnHelper.accessor("role", {
       header: "Roll",
       cell: (info) => (
         <Badge variant={info.getValue() === "admin" ? "default" : "secondary"}>
@@ -137,14 +137,14 @@ function Anvandare() {
         </Badge>
       ),
     }),
-    columnHelper.accessor("organisation_id", {
+    columnHelper.accessor("organization_id", {
       header: "Organisation",
       cell: (info) => {
         const orgId = info.getValue();
         return orgId ? orgMap.get(orgId) ?? "—" : "—";
       },
     }),
-    columnHelper.accessor("aktiv", {
+    columnHelper.accessor("active", {
       header: "Status",
       cell: (info) => (
         <Badge variant={info.getValue() ? "outline" : "destructive"}>
@@ -152,7 +152,7 @@ function Anvandare() {
         </Badge>
       ),
     }),
-    columnHelper.accessor("senaste_login", {
+    columnHelper.accessor("last_login", {
       header: "Senaste inloggning",
       cell: (info) => {
         const val = info.getValue();
@@ -210,7 +210,7 @@ function Anvandare() {
           <SelectContent>
             <SelectItem value="alla">Alla roller</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="kund">Kund</SelectItem>
+            <SelectItem value="customer">Kund</SelectItem>
           </SelectContent>
         </Select>
         <Select value={orgFilter} onValueChange={setOrgFilter}>
@@ -221,7 +221,7 @@ function Anvandare() {
             <SelectItem value="alla">Alla organisationer</SelectItem>
             {(orgs as Organisation[]).map((org) => (
               <SelectItem key={org._id} value={org._id}>
-                {org.namn}
+                {org.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -306,10 +306,10 @@ function CreateUserDialog({
   orgs: Organisation[];
   defaultOrgId?: string;
   onSubmit: (values: {
-    namn: string;
+    name: string;
     email: string;
-    roll: "admin" | "kund";
-    organisation_id?: string;
+    role: "admin" | "customer";
+    organization_id?: string;
   }) => Promise<void>;
 }) {
   if (!open) return null;
@@ -335,26 +335,26 @@ function CreateUserDialogInner({
   defaultOrgId?: string;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
-    namn: string;
+    name: string;
     email: string;
-    roll: "admin" | "kund";
-    organisation_id?: string;
+    role: "admin" | "customer";
+    organization_id?: string;
   }) => Promise<void>;
 }) {
   const form = useForm({
     defaultValues: {
-      namn: "",
+      name: "",
       email: "",
-      roll: defaultOrgId ? "kund" : ("admin" as "admin" | "kund"),
-      organisation_id: defaultOrgId ?? "",
+      role: defaultOrgId ? "customer" : ("admin" as "admin" | "customer"),
+      organization_id: defaultOrgId ?? "",
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
-        namn: value.namn,
+        name: value.name,
         email: value.email,
-        roll: value.roll,
-        organisation_id: value.organisation_id
-          ? (value.organisation_id as never)
+        role: value.role,
+        organization_id: value.organization_id
+          ? (value.organization_id as never)
           : undefined,
       });
       form.reset();
@@ -385,7 +385,7 @@ function CreateUserDialogInner({
           className="space-y-4"
         >
           <form.Field
-            name="namn"
+            name="name"
             validators={{
               onChange: ({ value }) =>
                 !value.trim() ? "Namn krävs" : undefined,
@@ -455,7 +455,7 @@ function CreateUserDialogInner({
             )}
           </form.Field>
 
-          <form.Field name="roll">
+          <form.Field name="role">
             {(field) => (
               <div className="space-y-2">
                 <Label>
@@ -464,7 +464,7 @@ function CreateUserDialogInner({
                 <Select
                   value={field.state.value}
                   onValueChange={(val) =>
-                    field.handleChange(val as "admin" | "kund")
+                    field.handleChange(val as "admin" | "customer")
                   }
                 >
                   <SelectTrigger>
@@ -472,22 +472,22 @@ function CreateUserDialogInner({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="kund">Kund</SelectItem>
+                    <SelectItem value="customer">Kund</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             )}
           </form.Field>
 
-          <form.Subscribe selector={(state) => state.values.roll}>
-            {(roll) =>
-              roll === "kund" ? (
+          <form.Subscribe selector={(state) => state.values.role}>
+            {(role) =>
+              role === "customer" ? (
                 <form.Field
-                  name="organisation_id"
+                  name="organization_id"
                   validators={{
                     onChange: ({ value }) => {
-                      const currentRoll = form.getFieldValue("roll");
-                      if (currentRoll === "kund" && !value)
+                      const currentRole = form.getFieldValue("role");
+                      if (currentRole === "customer" && !value)
                         return "Organisation krävs för kundanvändare";
                       return undefined;
                     },
@@ -509,7 +509,7 @@ function CreateUserDialogInner({
                         <SelectContent>
                           {orgs.map((org) => (
                             <SelectItem key={org._id} value={org._id}>
-                              {org.namn}
+                              {org.name}
                             </SelectItem>
                           ))}
                         </SelectContent>

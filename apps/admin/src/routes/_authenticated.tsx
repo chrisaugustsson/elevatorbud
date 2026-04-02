@@ -52,7 +52,7 @@ function AuthenticatedLayout() {
     );
   }
 
-  if (user.roll !== "admin") {
+  if (user.role !== "admin") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">

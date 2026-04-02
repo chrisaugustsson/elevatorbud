@@ -19,49 +19,49 @@ export const Route = createFileRoute("/_authenticated/hiss/$id")({
 
 type HissDoc = {
   _id: string;
-  hissnummer: string;
-  adress?: string;
-  hissbeteckning?: string;
-  distrikt?: string;
-  hisstyp?: string;
-  fabrikat?: string;
-  byggar?: number;
-  hastighet?: string;
-  lyfthojd?: string;
-  marklast?: string;
-  antal_plan?: number;
-  antal_dorrar?: number;
-  typ_dorrar?: string;
-  genomgang?: boolean;
-  kollektiv?: string;
-  korgstorlek?: string;
-  dagoppning?: string;
-  barbeslag?: string;
-  dorrmaskin?: string;
-  drivsystem?: string;
-  upphangning?: string;
-  maskinplacering?: string;
-  typ_maskin?: string;
-  typ_styrsystem?: string;
-  besiktningsorgan?: string;
-  besiktningsmanad?: string;
-  skotselforetag?: string;
-  schaktbelysning?: string;
-  moderniserar?: string;
-  garanti?: boolean;
-  rekommenderat_moderniserar?: string;
-  budget_belopp?: number;
-  atgarder_vid_modernisering?: string;
-  har_nodtelefon?: boolean;
-  nodtelefon_modell?: string;
-  nodtelefon_typ?: string;
-  behover_uppgradering?: boolean;
-  nodtelefon_pris?: number;
-  kommentarer?: string;
-  organisation_id: string;
-  status: "aktiv" | "rivd" | "arkiverad";
-  skapad_datum: number;
-  senast_uppdaterad?: number;
+  elevator_number: string;
+  address?: string;
+  elevator_designation?: string;
+  district?: string;
+  elevator_type?: string;
+  manufacturer?: string;
+  build_year?: number;
+  speed?: string;
+  lift_height?: string;
+  load_capacity?: string;
+  floor_count?: number;
+  door_count?: number;
+  door_type?: string;
+  passthrough?: boolean;
+  collective?: string;
+  cab_size?: string;
+  daylight_opening?: string;
+  grab_rail?: string;
+  door_machine?: string;
+  drive_system?: string;
+  suspension?: string;
+  machine_placement?: string;
+  machine_type?: string;
+  control_system_type?: string;
+  inspection_authority?: string;
+  inspection_month?: string;
+  maintenance_company?: string;
+  shaft_lighting?: string;
+  modernization_year?: string;
+  warranty?: boolean;
+  recommended_modernization_year?: string;
+  budget_amount?: number;
+  modernization_measures?: string;
+  has_emergency_phone?: boolean;
+  emergency_phone_model?: string;
+  emergency_phone_type?: string;
+  needs_upgrade?: boolean;
+  emergency_phone_price?: number;
+  comments?: string;
+  organization_id: string;
+  status: "active" | "demolished" | "archived";
+  created_at: number;
+  last_updated_at?: number;
 };
 
 function DetailField({
@@ -116,7 +116,7 @@ function DetailSection({
 
 function HissDetail() {
   const { id } = Route.useParams();
-  const hiss = useQuery(api.hissar.get, { id } as never) as
+  const hiss = useQuery(api.elevators.get, { id } as never) as
     | HissDoc
     | undefined;
 
@@ -125,12 +125,12 @@ function HissDetail() {
   }
 
   const statusLabel: Record<string, string> = {
-    aktiv: "Aktiv",
-    rivd: "Rivd",
-    arkiverad: "Arkiverad",
+    active: "Aktiv",
+    demolished: "Rivd",
+    archived: "Arkiverad",
   };
 
-  const statusVariant = hiss.status === "aktiv" ? "default" : "secondary";
+  const statusVariant = hiss.status === "active" ? "default" : "secondary";
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -142,13 +142,13 @@ function HissDetail() {
               <ArrowLeft className="size-4" />
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold">{hiss.hissnummer}</h1>
+          <h1 className="text-2xl font-bold">{hiss.elevator_number}</h1>
           <Badge variant={statusVariant}>
             {statusLabel[hiss.status] ?? hiss.status}
           </Badge>
         </div>
-        {hiss.adress && (
-          <p className="ml-10 text-sm text-muted-foreground">{hiss.adress}</p>
+        {hiss.address && (
+          <p className="ml-10 text-sm text-muted-foreground">{hiss.address}</p>
         )}
       </div>
 
@@ -156,71 +156,71 @@ function HissDetail() {
 
       {/* Identifiering */}
       <DetailSection title="Identifiering">
-        <DetailField label="Hissnummer" value={hiss.hissnummer} />
-        <DetailField label="Adress" value={hiss.adress} />
-        <DetailField label="Hissbeteckning" value={hiss.hissbeteckning} />
-        <DetailField label="Distrikt" value={hiss.distrikt} />
+        <DetailField label="Hissnummer" value={hiss.elevator_number} />
+        <DetailField label="Adress" value={hiss.address} />
+        <DetailField label="Hissbeteckning" value={hiss.elevator_designation} />
+        <DetailField label="Distrikt" value={hiss.district} />
       </DetailSection>
 
       {/* Teknisk specifikation */}
       <DetailSection title="Teknisk specifikation">
-        <DetailField label="Hisstyp" value={hiss.hisstyp} />
-        <DetailField label="Fabrikat" value={hiss.fabrikat} />
-        <DetailField label="Byggår" value={hiss.byggar} />
-        <DetailField label="Hastighet" value={hiss.hastighet} />
-        <DetailField label="Lyfthöjd" value={hiss.lyfthojd} />
-        <DetailField label="Marklast" value={hiss.marklast} />
-        <DetailField label="Antal plan" value={hiss.antal_plan} />
-        <DetailField label="Antal dörrar" value={hiss.antal_dorrar} />
+        <DetailField label="Hisstyp" value={hiss.elevator_type} />
+        <DetailField label="Fabrikat" value={hiss.manufacturer} />
+        <DetailField label="Byggår" value={hiss.build_year} />
+        <DetailField label="Hastighet" value={hiss.speed} />
+        <DetailField label="Lyfthöjd" value={hiss.lift_height} />
+        <DetailField label="Marklast" value={hiss.load_capacity} />
+        <DetailField label="Antal plan" value={hiss.floor_count} />
+        <DetailField label="Antal dörrar" value={hiss.door_count} />
       </DetailSection>
 
       {/* Dörrar och korg */}
       <DetailSection title="Dörrar och korg">
-        <DetailField label="Typ dörrar" value={hiss.typ_dorrar} />
-        <DetailField label="Genomgång" value={hiss.genomgang} />
-        <DetailField label="Kollektiv" value={hiss.kollektiv} />
-        <DetailField label="Korgstorlek" value={hiss.korgstorlek} />
-        <DetailField label="Dagöppning" value={hiss.dagoppning} />
-        <DetailField label="Bärbeslag" value={hiss.barbeslag} />
-        <DetailField label="Dörrmaskin" value={hiss.dorrmaskin} />
+        <DetailField label="Typ dörrar" value={hiss.door_type} />
+        <DetailField label="Genomgång" value={hiss.passthrough} />
+        <DetailField label="Kollektiv" value={hiss.collective} />
+        <DetailField label="Korgstorlek" value={hiss.cab_size} />
+        <DetailField label="Dagöppning" value={hiss.daylight_opening} />
+        <DetailField label="Bärbeslag" value={hiss.grab_rail} />
+        <DetailField label="Dörrmaskin" value={hiss.door_machine} />
       </DetailSection>
 
       {/* Maskineri */}
       <DetailSection title="Maskineri">
-        <DetailField label="Drivsystem" value={hiss.drivsystem} />
-        <DetailField label="Upphängning" value={hiss.upphangning} />
-        <DetailField label="Maskinplacering" value={hiss.maskinplacering} />
-        <DetailField label="Typ maskin" value={hiss.typ_maskin} />
-        <DetailField label="Typ styrsystem" value={hiss.typ_styrsystem} />
+        <DetailField label="Drivsystem" value={hiss.drive_system} />
+        <DetailField label="Upphängning" value={hiss.suspension} />
+        <DetailField label="Maskinplacering" value={hiss.machine_placement} />
+        <DetailField label="Typ maskin" value={hiss.machine_type} />
+        <DetailField label="Typ styrsystem" value={hiss.control_system_type} />
       </DetailSection>
 
       {/* Besiktning & underhåll */}
       <DetailSection title="Besiktning och underhåll">
-        <DetailField label="Besiktningsorgan" value={hiss.besiktningsorgan} />
-        <DetailField label="Besiktningsmånad" value={hiss.besiktningsmanad} />
-        <DetailField label="Skötselföretag" value={hiss.skotselforetag} />
-        <DetailField label="Schaktbelysning" value={hiss.schaktbelysning} />
+        <DetailField label="Besiktningsorgan" value={hiss.inspection_authority} />
+        <DetailField label="Besiktningsmånad" value={hiss.inspection_month} />
+        <DetailField label="Skötselföretag" value={hiss.maintenance_company} />
+        <DetailField label="Schaktbelysning" value={hiss.shaft_lighting} />
       </DetailSection>
 
       {/* Modernisering */}
       <DetailSection title="Modernisering">
-        <DetailField label="Moderniserad" value={hiss.moderniserar} />
-        <DetailField label="Garanti" value={hiss.garanti} />
+        <DetailField label="Moderniserad" value={hiss.modernization_year} />
+        <DetailField label="Garanti" value={hiss.warranty} />
         <DetailField
           label="Rekommenderat moderniseringsår"
-          value={hiss.rekommenderat_moderniserar}
+          value={hiss.recommended_modernization_year}
         />
         <DetailField
           label="Budget"
           value={
-            hiss.budget_belopp !== undefined
-              ? `${hiss.budget_belopp.toLocaleString("sv-SE")} kr`
+            hiss.budget_amount !== undefined
+              ? `${hiss.budget_amount.toLocaleString("sv-SE")} kr`
               : undefined
           }
         />
         <DetailField
           label="Åtgärder vid modernisering"
-          value={hiss.atgarder_vid_modernisering}
+          value={hiss.modernization_measures}
         />
       </DetailSection>
 
@@ -229,25 +229,25 @@ function HissDetail() {
         title="Nödtelefon"
         icon={<Phone className="size-4" />}
       >
-        <DetailField label="Har nödtelefon" value={hiss.har_nodtelefon} />
-        <DetailField label="Modell" value={hiss.nodtelefon_modell} />
-        <DetailField label="Typ" value={hiss.nodtelefon_typ} />
+        <DetailField label="Har nödtelefon" value={hiss.has_emergency_phone} />
+        <DetailField label="Modell" value={hiss.emergency_phone_model} />
+        <DetailField label="Typ" value={hiss.emergency_phone_type} />
         <DetailField
           label="Behöver uppgradering"
-          value={hiss.behover_uppgradering}
+          value={hiss.needs_upgrade}
         />
         <DetailField
           label="Pris"
           value={
-            hiss.nodtelefon_pris !== undefined
-              ? `${hiss.nodtelefon_pris.toLocaleString("sv-SE")} kr`
+            hiss.emergency_phone_price !== undefined
+              ? `${hiss.emergency_phone_price.toLocaleString("sv-SE")} kr`
               : undefined
           }
         />
       </DetailSection>
 
       {/* Kommentarer */}
-      {hiss.kommentarer && (
+      {hiss.comments && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -256,7 +256,7 @@ function HissDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="whitespace-pre-wrap text-sm">{hiss.kommentarer}</p>
+            <p className="whitespace-pre-wrap text-sm">{hiss.comments}</p>
           </CardContent>
         </Card>
       )}
@@ -265,12 +265,12 @@ function HissDetail() {
       <div className="text-xs text-muted-foreground">
         <p>
           Skapad:{" "}
-          {new Date(hiss.skapad_datum).toLocaleDateString("sv-SE")}
+          {new Date(hiss.created_at).toLocaleDateString("sv-SE")}
         </p>
-        {hiss.senast_uppdaterad && (
+        {hiss.last_updated_at && (
           <p>
             Senast uppdaterad:{" "}
-            {new Date(hiss.senast_uppdaterad).toLocaleDateString("sv-SE")}
+            {new Date(hiss.last_updated_at).toLocaleDateString("sv-SE")}
           </p>
         )}
       </div>

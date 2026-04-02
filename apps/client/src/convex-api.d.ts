@@ -7,47 +7,47 @@ declare module "@convex/_generated/api" {
     users: {
       me: FunctionReference<"query", "public">;
     };
-    organisationer: {
+    organizations: {
       list: FunctionReference<"query", "public">;
       get: FunctionReference<"query", "public">;
       create: FunctionReference<"mutation", "public">;
       update: FunctionReference<"mutation", "public">;
     };
-    anvandare: {
+    userAdmin: {
       create: FunctionReference<"action", "public">;
       update: FunctionReference<"action", "public">;
-      inaktivera: FunctionReference<"action", "public">;
+      deactivate: FunctionReference<"action", "public">;
       remove: FunctionReference<"action", "public">;
       list: FunctionReference<"query", "public">;
       get: FunctionReference<"query", "public">;
-      listByOrganisation: FunctionReference<"query", "public">;
+      listByOrganization: FunctionReference<"query", "public">;
     };
-    hissar: {
+    elevators: {
       list: FunctionReference<"query", "public">;
       exportData: FunctionReference<"query", "public">;
       stats: FunctionReference<"query", "public">;
       chartData: FunctionReference<"query", "public">;
-      moderniseringTidslinje: FunctionReference<"query", "public">;
-      moderniseringBudget: FunctionReference<"query", "public">;
-      moderniseringPrioritetslista: FunctionReference<"query", "public">;
-      moderniseringAtgarder: FunctionReference<"query", "public">;
-      besiktningskalender: FunctionReference<"query", "public">;
-      besiktningslista: FunctionReference<"query", "public">;
-      skotselforetag: FunctionReference<"query", "public">;
-      nodtelefonstatus: FunctionReference<"query", "public">;
-      dagensHissar: FunctionReference<"query", "public">;
+      modernizationTimeline: FunctionReference<"query", "public">;
+      modernizationBudget: FunctionReference<"query", "public">;
+      modernizationPriorityList: FunctionReference<"query", "public">;
+      modernizationMeasures: FunctionReference<"query", "public">;
+      inspectionCalendar: FunctionReference<"query", "public">;
+      inspectionList: FunctionReference<"query", "public">;
+      maintenanceCompanies: FunctionReference<"query", "public">;
+      emergencyPhoneStatus: FunctionReference<"query", "public">;
+      todaysElevators: FunctionReference<"query", "public">;
       get: FunctionReference<"query", "public">;
-      checkHissnummer: FunctionReference<"query", "public">;
+      checkElevatorNumber: FunctionReference<"query", "public">;
       search: FunctionReference<"query", "public">;
       create: FunctionReference<"mutation", "public">;
       update: FunctionReference<"mutation", "public">;
       archive: FunctionReference<"mutation", "public">;
     };
-    importera: {
+    imports: {
       analyze: FunctionReference<"query", "public">;
       confirm: FunctionReference<"action", "public">;
     };
-    forslagsvarden: {
+    suggestedValues: {
       list: FunctionReference<"query", "public">;
       create: FunctionReference<"mutation", "public">;
       update: FunctionReference<"mutation", "public">;
@@ -67,17 +67,17 @@ declare module "@convex/_generated/api" {
       upsertFromClerk: FunctionReference<"mutation", "internal">;
       deleteFromClerk: FunctionReference<"mutation", "internal">;
     };
-    importeraInternal: {
+    importsInternal: {
       checkAdmin: FunctionReference<"query", "internal">;
       createOrg: FunctionReference<"mutation", "internal">;
       importBatch: FunctionReference<"mutation", "internal">;
     };
-    anvandareInternal: {
+    userAdminInternal: {
       checkAdmin: FunctionReference<"query", "internal">;
-      insertAnvandare: FunctionReference<"mutation", "internal">;
-      updateAnvandare: FunctionReference<"mutation", "internal">;
-      inaktiveraAnvandare: FunctionReference<"mutation", "internal">;
-      removeAnvandare: FunctionReference<"mutation", "internal">;
+      insertUser: FunctionReference<"mutation", "internal">;
+      updateUser: FunctionReference<"mutation", "internal">;
+      deactivateUser: FunctionReference<"mutation", "internal">;
+      removeUser: FunctionReference<"mutation", "internal">;
       getInternal: FunctionReference<"query", "internal">;
     };
   };

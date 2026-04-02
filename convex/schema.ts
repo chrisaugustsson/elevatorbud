@@ -2,102 +2,102 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  hissar: defineTable({
-    // Identifiering
-    hissnummer: v.string(),
-    adress: v.optional(v.string()),
-    hissbeteckning: v.optional(v.string()),
-    distrikt: v.optional(v.string()),
+  elevators: defineTable({
+    // Identification
+    elevator_number: v.string(),
+    address: v.optional(v.string()),
+    elevator_designation: v.optional(v.string()),
+    district: v.optional(v.string()),
 
-    // Teknisk specifikation
-    hisstyp: v.optional(v.string()),
-    fabrikat: v.optional(v.string()),
-    byggar: v.optional(v.number()),
-    hastighet: v.optional(v.string()),
-    lyfthojd: v.optional(v.string()),
-    marklast: v.optional(v.string()),
-    antal_plan: v.optional(v.number()),
-    antal_dorrar: v.optional(v.number()),
+    // Technical specification
+    elevator_type: v.optional(v.string()),
+    manufacturer: v.optional(v.string()),
+    build_year: v.optional(v.number()),
+    speed: v.optional(v.string()),
+    lift_height: v.optional(v.string()),
+    load_capacity: v.optional(v.string()),
+    floor_count: v.optional(v.number()),
+    door_count: v.optional(v.number()),
 
-    // Dörrar och korg
-    typ_dorrar: v.optional(v.string()),
-    genomgang: v.optional(v.boolean()),
-    kollektiv: v.optional(v.string()),
-    korgstorlek: v.optional(v.string()),
-    dagoppning: v.optional(v.string()),
-    barbeslag: v.optional(v.string()),
-    dorrmaskin: v.optional(v.string()),
+    // Doors and cab
+    door_type: v.optional(v.string()),
+    passthrough: v.optional(v.boolean()),
+    collective: v.optional(v.string()),
+    cab_size: v.optional(v.string()),
+    daylight_opening: v.optional(v.string()),
+    grab_rail: v.optional(v.string()),
+    door_machine: v.optional(v.string()),
 
-    // Maskineri
-    drivsystem: v.optional(v.string()),
-    upphangning: v.optional(v.string()),
-    maskinplacering: v.optional(v.string()),
-    typ_maskin: v.optional(v.string()),
-    typ_styrsystem: v.optional(v.string()),
+    // Machinery
+    drive_system: v.optional(v.string()),
+    suspension: v.optional(v.string()),
+    machine_placement: v.optional(v.string()),
+    machine_type: v.optional(v.string()),
+    control_system_type: v.optional(v.string()),
 
-    // Besiktning och underhåll
-    besiktningsorgan: v.optional(v.string()),
-    besiktningsmanad: v.optional(v.string()),
-    skotselforetag: v.optional(v.string()),
-    schaktbelysning: v.optional(v.string()),
+    // Inspection and maintenance
+    inspection_authority: v.optional(v.string()),
+    inspection_month: v.optional(v.string()),
+    maintenance_company: v.optional(v.string()),
+    shaft_lighting: v.optional(v.string()),
 
-    // Modernisering
-    moderniserar: v.optional(v.string()),
-    garanti: v.optional(v.boolean()),
-    rekommenderat_moderniserar: v.optional(v.string()),
-    budget_belopp: v.optional(v.number()),
-    atgarder_vid_modernisering: v.optional(v.string()),
+    // Modernization
+    modernization_year: v.optional(v.string()),
+    warranty: v.optional(v.boolean()),
+    recommended_modernization_year: v.optional(v.string()),
+    budget_amount: v.optional(v.number()),
+    modernization_measures: v.optional(v.string()),
 
-    // Nödtelefon
-    har_nodtelefon: v.optional(v.boolean()),
-    nodtelefon_modell: v.optional(v.string()),
-    nodtelefon_typ: v.optional(v.string()),
-    behover_uppgradering: v.optional(v.boolean()),
-    nodtelefon_pris: v.optional(v.number()),
+    // Emergency phone
+    has_emergency_phone: v.optional(v.boolean()),
+    emergency_phone_model: v.optional(v.string()),
+    emergency_phone_type: v.optional(v.string()),
+    needs_upgrade: v.optional(v.boolean()),
+    emergency_phone_price: v.optional(v.number()),
 
-    // Kommentarer
-    kommentarer: v.optional(v.string()),
+    // Comments
+    comments: v.optional(v.string()),
 
     // Metadata
-    organisation_id: v.id("organisationer"),
+    organization_id: v.id("organizations"),
     status: v.union(
-      v.literal("aktiv"),
-      v.literal("rivd"),
-      v.literal("arkiverad"),
+      v.literal("active"),
+      v.literal("demolished"),
+      v.literal("archived"),
     ),
-    skapad_av: v.optional(v.id("anvandare")),
-    skapad_datum: v.number(),
-    senast_uppdaterad_av: v.optional(v.id("anvandare")),
-    senast_uppdaterad: v.optional(v.number()),
+    created_by: v.optional(v.id("users")),
+    created_at: v.number(),
+    last_updated_by: v.optional(v.id("users")),
+    last_updated_at: v.optional(v.number()),
   })
-    .index("by_organisation_id", ["organisation_id"])
-    .index("by_hissnummer", ["hissnummer"]),
+    .index("by_organization_id", ["organization_id"])
+    .index("by_elevator_number", ["elevator_number"]),
 
-  organisationer: defineTable({
-    namn: v.string(),
-    organisationsnummer: v.optional(v.string()),
-    kontaktperson: v.optional(v.string()),
-    telefonnummer: v.optional(v.string()),
+  organizations: defineTable({
+    name: v.string(),
+    organization_number: v.optional(v.string()),
+    contact_person: v.optional(v.string()),
+    phone_number: v.optional(v.string()),
     email: v.optional(v.string()),
   }),
 
-  anvandare: defineTable({
+  users: defineTable({
     clerk_user_id: v.string(),
     email: v.string(),
-    namn: v.string(),
-    roll: v.union(v.literal("admin"), v.literal("kund")),
-    organisation_id: v.optional(v.id("organisationer")),
-    aktiv: v.boolean(),
-    skapad_datum: v.number(),
-    senaste_login: v.optional(v.number()),
+    name: v.string(),
+    role: v.union(v.literal("admin"), v.literal("customer")),
+    organization_id: v.optional(v.id("organizations")),
+    active: v.boolean(),
+    created_at: v.number(),
+    last_login: v.optional(v.number()),
   }).index("by_clerk_user_id", ["clerk_user_id"]),
 
-  forslagsvarden: defineTable({
-    kategori: v.string(),
-    varde: v.string(),
-    aktiv: v.boolean(),
-    skapad_datum: v.number(),
-  }).index("by_kategori", ["kategori"]),
+  suggested_values: defineTable({
+    category: v.string(),
+    value: v.string(),
+    active: v.boolean(),
+    created_at: v.number(),
+  }).index("by_category", ["category"]),
 
   pages: defineTable({
     slug: v.string(),

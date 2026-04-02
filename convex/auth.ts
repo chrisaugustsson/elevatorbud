@@ -5,7 +5,7 @@ type Ctx = QueryCtx | MutationCtx;
 
 async function userByClerkId(ctx: Ctx, clerkUserId: string) {
   return await ctx.db
-    .query("anvandare")
+    .query("users")
     .withIndex("by_clerk_user_id", (q) => q.eq("clerk_user_id", clerkUserId))
     .unique();
 }
@@ -23,7 +23,7 @@ export async function requireAdmin(ctx: Ctx) {
   if (!user) {
     throw new Error("Ej autentiserad");
   }
-  if (user.roll !== "admin") {
+  if (user.role !== "admin") {
     throw new Error("Kräver admin-behörighet");
   }
   return user;
@@ -31,16 +31,16 @@ export async function requireAdmin(ctx: Ctx) {
 
 export async function requireTenantAccess(
   ctx: Ctx,
-  organisationId: Id<"organisationer">,
+  organizationId: Id<"organizations">,
 ) {
   const user = await getCurrentUser(ctx);
   if (!user) {
     throw new Error("Ej autentiserad");
   }
-  if (user.roll === "admin") {
+  if (user.role === "admin") {
     return user;
   }
-  if (user.organisation_id !== organisationId) {
+  if (user.organization_id !== organizationId) {
     throw new Error("Ingen åtkomst till denna organisation");
   }
   return user;

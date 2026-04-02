@@ -6,15 +6,15 @@ import type { Id } from "@convex/_generated/dataModel";
 export function OrgDisplay({
   organisationId,
 }: {
-  organisationId: Id<"organisationer">;
+  organisationId: Id<"organizations">;
 }) {
-  const org = useQuery(api.organisationer.get, { id: organisationId });
+  const org = useQuery(api.organizations.get, { id: organisationId });
 
   return (
     <div className="flex items-center gap-2 text-sm text-muted-foreground">
       <Building2 className="size-4" />
       <span className="font-medium text-foreground">
-        {org?.namn ?? "Laddar..."}
+        {org?.name ?? "Laddar..."}
       </span>
     </div>
   );

@@ -25,11 +25,11 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const { selectedOrgId } = useSelectedOrg();
   const orgFilter = selectedOrgId
-    ? ({ organisation_id: selectedOrgId } as never)
+    ? ({ organization_id: selectedOrgId } as never)
     : {};
 
-  const stats = useQuery(api.hissar.stats, orgFilter);
-  const chartData = useQuery(api.hissar.chartData, orgFilter);
+  const stats = useQuery(api.elevators.stats, orgFilter);
+  const chartData = useQuery(api.elevators.chartData, orgFilter);
 
   if (stats === undefined || chartData === undefined) {
     return <DashboardSkeleton />;
@@ -38,35 +38,35 @@ function Dashboard() {
   const kpiItems: KpiItem[] = [
     {
       title: "Totalt antal hissar",
-      value: stats.totalAntal,
+      value: stats.totalCount,
       icon: <Building2 className="h-4 w-4" />,
     },
     {
       title: "Medelålder",
-      value: `${stats.medelAlder} år`,
+      value: `${stats.averageAge} år`,
       icon: <Clock className="h-4 w-4" />,
     },
     {
       title: "Modernisering inom 3 år",
-      value: stats.moderniseringInom3Ar,
+      value: stats.modernizationWithin3Years,
       description: "Rekommenderad modernisering",
       icon: <Hammer className="h-4 w-4" />,
     },
     {
       title: "Budget innevarande år",
-      value: `${(stats.totalBudgetInnevarandeAr / 1000).toFixed(0)} tkr`,
+      value: `${(stats.totalBudgetCurrentYear / 1000).toFixed(0)} tkr`,
       icon: <TrendingUp className="h-4 w-4" />,
     },
     {
       title: "Utan modernisering",
-      value: stats.utanModernisering,
+      value: stats.withoutModernization,
       description: "Ej ombyggda",
       icon: <AlertTriangle className="h-4 w-4" />,
     },
     {
       title: "Senaste inventering",
-      value: stats.senastInventering
-        ? new Date(stats.senastInventering).toLocaleDateString("sv-SE")
+      value: stats.lastInventory
+        ? new Date(stats.lastInventory).toLocaleDateString("sv-SE")
         : "–",
       icon: <Calendar className="h-4 w-4" />,
     },
@@ -78,7 +78,7 @@ function Dashboard() {
 
       <KpiCards items={kpiItems} />
 
-      {stats.totalAntal === 0 ? (
+      {stats.totalCount === 0 ? (
         <div className="py-12 text-center text-muted-foreground">
           Inga hissar registrerade ännu. Skapa en hiss via &quot;Ny hiss&quot;
           för att se statistik.
@@ -87,7 +87,7 @@ function Dashboard() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <DashboardBarChart
             title="Hissar per distrikt"
-            data={chartData.perDistrikt}
+            data={chartData.byDistrict}
             color="var(--color-chart-1, #2563eb)"
           />
 
@@ -99,24 +99,24 @@ function Dashboard() {
 
           <DashboardPieChart
             title="Hisstyper"
-            data={chartData.perHisstyp}
+            data={chartData.byElevatorType}
           />
 
           <DashboardBarChart
             title="Topp 10 fabrikat"
-            data={chartData.topFabrikat}
+            data={chartData.topManufacturers}
             color="var(--color-chart-3, #d97706)"
           />
 
           <DashboardBarChart
             title="Moderniseringstidslinje"
-            data={chartData.moderniseringTidslinje}
+            data={chartData.modernizationTimeline}
             color="var(--color-chart-4, #dc2626)"
           />
 
           <DashboardPieChart
             title="Skötselföretag"
-            data={chartData.perSkotselforetag}
+            data={chartData.byMaintenanceCompany}
             innerRadius={60}
           />
         </div>

@@ -42,65 +42,65 @@ export const Route = createFileRoute("/_authenticated/admin/referensdata")({
   component: Referensdata,
 });
 
-const KATEGORIER = [
-  "hisstyp",
-  "fabrikat",
-  "distrikt",
-  "skotselforetag",
-  "besiktningsorgan",
-  "hissbeteckning",
-  "typ_dorrar",
-  "kollektiv",
-  "drivsystem",
-  "maskinplacering",
-  "atgarder_vid_modernisering",
+const CATEGORIES = [
+  "elevator_type",
+  "manufacturer",
+  "district",
+  "maintenance_company",
+  "inspection_authority",
+  "elevator_designation",
+  "door_type",
+  "collective",
+  "drive_system",
+  "machine_placement",
+  "modernization_measures",
 ] as const;
 
-type Kategori = (typeof KATEGORIER)[number];
+type Category = (typeof CATEGORIES)[number];
 
-const KATEGORI_NAMN: Record<Kategori, string> = {
-  hisstyp: "Hisstyp",
-  fabrikat: "Fabrikat",
-  distrikt: "Distrikt",
-  skotselforetag: "Skötselföretag",
-  besiktningsorgan: "Besiktningsorgan",
-  hissbeteckning: "Hissbeteckning",
-  typ_dorrar: "Typ dörrar",
-  kollektiv: "Kollektiv",
-  drivsystem: "Drivsystem",
-  maskinplacering: "Maskinplacering",
-  atgarder_vid_modernisering: "Åtgärder vid modernisering",
+const CATEGORY_LABELS: Record<Category, string> = {
+  elevator_type: "Hisstyp",
+  manufacturer: "Fabrikat",
+  district: "Distrikt",
+  maintenance_company: "Skötselföretag",
+  inspection_authority: "Besiktningsorgan",
+  elevator_designation: "Hissbeteckning",
+  door_type: "Typ dörrar",
+  collective: "Kollektiv",
+  drive_system: "Drivsystem",
+  machine_placement: "Maskinplacering",
+  modernization_measures: "Åtgärder vid modernisering",
 };
 
-type Forslagsvarde = {
+type SuggestedValue = {
   _id: string;
-  kategori: string;
-  varde: string;
-  aktiv: boolean;
-  skapad_datum: number;
+  category: string;
+  value: string;
+  active: boolean;
+  created_at: number;
 };
 
 function Referensdata() {
-  const [selectedKategori, setSelectedKategori] = useState<Kategori>("hisstyp");
+  const [selectedCategory, setSelectedCategory] = useState<Category>("elevator_type");
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [renameItem, setRenameItem] = useState<Forslagsvarde | null>(null);
-  const [mergeItem, setMergeItem] = useState<Forslagsvarde | null>(null);
+  const [renameItem, setRenameItem] = useState<SuggestedValue | null>(null);
+  const [mergeItem, setMergeItem] = useState<SuggestedValue | null>(null);
 
-  const values = useQuery(api.forslagsvarden.list, {
-    kategori: selectedKategori,
+  const values = useQuery(api.suggestedValues.list, {
+    category: selectedCategory,
   });
-  const createValue = useMutation(api.forslagsvarden.create);
-  const updateValue = useMutation(api.forslagsvarden.update);
-  const mergeValue = useMutation(api.forslagsvarden.merge);
-  const deactivateValue = useMutation(api.forslagsvarden.deactivate);
+  const createValue = useMutation(api.suggestedValues.create);
+  const updateValue = useMutation(api.suggestedValues.update);
+  const mergeValue = useMutation(api.suggestedValues.merge);
+  const deactivateValue = useMutation(api.suggestedValues.deactivate);
 
-  const filteredValues = (values as Forslagsvarde[] | undefined)?.filter(
-    (item) => item.varde.toLowerCase().includes(search.toLowerCase()),
+  const filteredValues = (values as SuggestedValue[] | undefined)?.filter(
+    (item) => item.value.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const activeCount = filteredValues?.filter((v) => v.aktiv).length ?? 0;
-  const inactiveCount = filteredValues?.filter((v) => !v.aktiv).length ?? 0;
+  const activeCount = filteredValues?.filter((v) => v.active).length ?? 0;
+  const inactiveCount = filteredValues?.filter((v) => !v.active).length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -113,11 +113,11 @@ function Referensdata() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
         <div className="space-y-2 sm:w-64">
-          <Label>Kategori</Label>
+          <Label>Category</Label>
           <Select
-            value={selectedKategori}
+            value={selectedCategory}
             onValueChange={(val) => {
-              setSelectedKategori(val as Kategori);
+              setSelectedCategory(val as Category);
               setSearch("");
             }}
           >
@@ -125,9 +125,9 @@ function Referensdata() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {KATEGORIER.map((kat) => (
+              {CATEGORIES.map((kat) => (
                 <SelectItem key={kat} value={kat}>
-                  {KATEGORI_NAMN[kat]}
+                  {CATEGORY_LABELS[kat]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -164,13 +164,13 @@ function Referensdata() {
                 <Card
                   key={item._id}
                   className={
-                    !item.aktiv ? "border-dashed opacity-60" : undefined
+                    !item.active ? "border-dashed opacity-60" : undefined
                   }
                 >
                   <CardContent className="flex items-center justify-between py-3">
                     <div className="flex items-center gap-3">
-                      <span className="font-medium">{item.varde}</span>
-                      {!item.aktiv && (
+                      <span className="font-medium">{item.value}</span>
+                      {!item.active && (
                         <Badge variant="secondary">Inaktiv</Badge>
                       )}
                     </div>
@@ -183,7 +183,7 @@ function Referensdata() {
                       >
                         <Pencil className="size-4" />
                       </Button>
-                      {item.aktiv && (
+                      {item.active && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -193,7 +193,7 @@ function Referensdata() {
                           <Merge className="size-4" />
                         </Button>
                       )}
-                      {item.aktiv && (
+                      {item.active && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -226,9 +226,9 @@ function Referensdata() {
       <CreateValueDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        kategori={selectedKategori}
-        onSubmit={async (varde) => {
-          await createValue({ kategori: selectedKategori, varde });
+        category={selectedCategory}
+        onSubmit={async (val) => {
+          await createValue({ category: selectedCategory, value: val });
           setCreateOpen(false);
         }}
       />
@@ -240,7 +240,7 @@ function Referensdata() {
         }}
         onSubmit={async (newVarde) => {
           if (!renameItem) return;
-          await updateValue({ id: renameItem._id as never, varde: newVarde });
+          await updateValue({ id: renameItem._id as never, value: newVarde });
           setRenameItem(null);
         }}
       />
@@ -248,7 +248,7 @@ function Referensdata() {
       <MergeDialog
         item={mergeItem}
         allValues={
-          (values as Forslagsvarde[] | undefined)?.filter((v) => v.aktiv) ?? []
+          (values as SuggestedValue[] | undefined)?.filter((v) => v.active) ?? []
         }
         onOpenChange={(open) => {
           if (!open) setMergeItem(null);
@@ -269,18 +269,18 @@ function Referensdata() {
 function CreateValueDialog({
   open,
   onOpenChange,
-  kategori,
+  category,
   onSubmit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  kategori: Kategori;
-  onSubmit: (varde: string) => Promise<void>;
+  category: Category;
+  onSubmit: (value: string) => Promise<void>;
 }) {
   const form = useForm({
-    defaultValues: { varde: "" },
+    defaultValues: { value: "" },
     onSubmit: async ({ value }) => {
-      await onSubmit(value.varde.trim());
+      await onSubmit(value.value.trim());
       form.reset();
     },
   });
@@ -298,7 +298,7 @@ function CreateValueDialog({
           <DialogTitle>Nytt värde</DialogTitle>
           <DialogDescription>
             Lägg till ett nytt förslagsvärde i kategorin{" "}
-            <strong>{KATEGORI_NAMN[kategori]}</strong>.
+            <strong>{CATEGORY_LABELS[category]}</strong>.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -310,7 +310,7 @@ function CreateValueDialog({
           className="space-y-4"
         >
           <form.Field
-            name="varde"
+            name="value"
             validators={{
               onChange: ({ value }) =>
                 !value.trim() ? "Värde krävs" : undefined,
@@ -371,7 +371,7 @@ function RenameDialog({
   onOpenChange,
   onSubmit,
 }: {
-  item: Forslagsvarde | null;
+  item: SuggestedValue | null;
   onOpenChange: (open: boolean) => void;
   onSubmit: (newVarde: string) => Promise<void>;
 }) {
@@ -392,14 +392,14 @@ function RenameDialogInner({
   onOpenChange,
   onSubmit,
 }: {
-  item: Forslagsvarde;
+  item: SuggestedValue;
   onOpenChange: (open: boolean) => void;
   onSubmit: (newVarde: string) => Promise<void>;
 }) {
   const form = useForm({
-    defaultValues: { varde: item.varde },
+    defaultValues: { value: item.value },
     onSubmit: async ({ value }) => {
-      await onSubmit(value.varde.trim());
+      await onSubmit(value.value.trim());
     },
   });
 
@@ -409,7 +409,7 @@ function RenameDialogInner({
         <DialogHeader>
           <DialogTitle>Byt namn</DialogTitle>
           <DialogDescription>
-            Byt namn på <strong>{item.varde}</strong>. Alla hissar med detta
+            Byt namn på <strong>{item.value}</strong>. Alla hissar med detta
             värde uppdateras automatiskt.
           </DialogDescription>
         </DialogHeader>
@@ -422,11 +422,11 @@ function RenameDialogInner({
           className="space-y-4"
         >
           <form.Field
-            name="varde"
+            name="value"
             validators={{
               onChange: ({ value }) => {
                 if (!value.trim()) return "Värde krävs";
-                if (value.trim() === item.varde)
+                if (value.trim() === item.value)
                   return "Ange ett nytt värde";
                 return undefined;
               },
@@ -487,8 +487,8 @@ function MergeDialog({
   onOpenChange,
   onSubmit,
 }: {
-  item: Forslagsvarde | null;
-  allValues: Forslagsvarde[];
+  item: SuggestedValue | null;
+  allValues: SuggestedValue[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (targetId: string) => Promise<void>;
 }) {
@@ -511,8 +511,8 @@ function MergeDialogInner({
   onOpenChange,
   onSubmit,
 }: {
-  item: Forslagsvarde;
-  allValues: Forslagsvarde[];
+  item: SuggestedValue;
+  allValues: SuggestedValue[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (targetId: string) => Promise<void>;
 }) {
@@ -528,9 +528,9 @@ function MergeDialogInner({
         <DialogHeader>
           <DialogTitle>Slå ihop värden</DialogTitle>
           <DialogDescription>
-            Slå ihop <strong>{item.varde}</strong> med ett annat värde. Alla
+            Slå ihop <strong>{item.value}</strong> med ett annat värde. Alla
             hissar med detta värde uppdateras till målvärdet och{" "}
-            <strong>{item.varde}</strong> tas bort.
+            <strong>{item.value}</strong> tas bort.
           </DialogDescription>
         </DialogHeader>
 
@@ -544,7 +544,7 @@ function MergeDialogInner({
               <SelectContent>
                 {targets.map((t) => (
                   <SelectItem key={t._id} value={t._id}>
-                    {t.varde}
+                    {t.value}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -555,11 +555,11 @@ function MergeDialogInner({
             <Card className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
               <CardContent className="py-3 text-sm">
                 <p>
-                  <strong>{item.varde}</strong> → <strong>{targetItem.varde}</strong>
+                  <strong>{item.value}</strong> → <strong>{targetItem.value}</strong>
                 </p>
                 <p className="mt-1 text-muted-foreground">
-                  Alla hissar med värdet &quot;{item.varde}&quot; ändras till
-                  &quot;{targetItem.varde}&quot;.
+                  Alla hissar med värdet &quot;{item.value}&quot; ändras till
+                  &quot;{targetItem.value}&quot;.
                 </p>
               </CardContent>
             </Card>
