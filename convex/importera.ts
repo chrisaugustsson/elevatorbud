@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { requireAdmin } from "./auth";
 import { anyApi } from "convex/server";
 import type { FunctionReference } from "convex/server";
+import { sendImportReport } from "./email";
 
 const internalRef = anyApi as unknown as {
   importeraInternal: {
@@ -84,6 +85,7 @@ export const confirm = action({
     elevators: v.array(v.any()),
     existingOrgMapping: v.any(),
     newOrgNames: v.array(v.string()),
+    adminEmail: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // 1. Check admin
@@ -132,11 +134,24 @@ export const confirm = action({
       allErrors.push(...result.errors);
     }
 
+    // Send import report email if admin email provided
+    let emailSent = false;
+    if (args.adminEmail) {
+      const emailResult = await sendImportReport(args.adminEmail, {
+        created: totalCreated,
+        updated: totalUpdated,
+        errors: allErrors,
+        orgsCreated,
+      });
+      emailSent = emailResult.success;
+    }
+
     return {
       created: totalCreated,
       updated: totalUpdated,
       errors: allErrors,
       orgsCreated,
+      emailSent,
     };
   },
 });

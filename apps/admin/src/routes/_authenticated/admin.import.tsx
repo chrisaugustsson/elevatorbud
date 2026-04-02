@@ -48,6 +48,7 @@ type ImportResult = {
   updated: number;
   errors: { hissnummer: string; error: string }[];
   orgsCreated: string[];
+  emailSent?: boolean;
 };
 
 type ImportStatus = "idle" | "parsing" | "preview" | "importing" | "complete";
@@ -65,6 +66,7 @@ function ImportPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const confirmImport = useAction(api.importera.confirm);
+  const currentUser = useQuery(api.users.me) as { email?: string } | undefined;
 
   // Server-side analysis (reactive query, skipped until parse is done)
   const analysis = useQuery(
@@ -129,6 +131,7 @@ function ImportPage() {
         elevators: parseResult.combined as any,
         existingOrgMapping: analysis.orgMatches as any,
         newOrgNames: analysis.newOrgNames,
+        adminEmail: currentUser?.email,
       });
       setImportResult(result as ImportResult);
       setStatus("complete");
@@ -146,7 +149,7 @@ function ImportPage() {
       });
       setStatus("complete");
     }
-  }, [parseResult, analysis, confirmImport]);
+  }, [parseResult, analysis, confirmImport, currentUser]);
 
   const handleReset = useCallback(() => {
     setStatus("idle");
@@ -618,6 +621,17 @@ function ResultSection({
                   <li key={name}>• {name}</li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {result.emailSent && (
+            <div className="mt-4 rounded-md border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  Importrapport skickad via e-post
+                </p>
+              </div>
             </div>
           )}
 
