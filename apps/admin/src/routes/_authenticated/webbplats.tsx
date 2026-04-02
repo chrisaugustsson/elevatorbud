@@ -10,6 +10,7 @@ import {
 import { StartsidaForm } from "../../components/cms/startsida-form";
 import { OmOssForm } from "../../components/cms/om-oss-form";
 import { TjansterForm } from "../../components/cms/tjanster-form";
+import { KontaktForm } from "../../components/cms/kontakt-form";
 
 const pages = [
   { slug: "startsida", label: "Startsida" },
@@ -91,6 +92,14 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
     return (
       <div className="py-4">
         <TjansterForm page={page} />
+      </div>
+    );
+  }
+
+  if (slug === "kontakt") {
+    return (
+      <div className="py-4">
+        <KontaktForm page={page} />
       </div>
     );
   }
