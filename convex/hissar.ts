@@ -16,7 +16,7 @@ const KATEGORI_FALT = [
   "atgarder_vid_modernisering",
 ] as const;
 
-async function autoAddForslagsvarden(
+export async function autoAddForslagsvarden(
   ctx: { db: any },
   fields: Record<string, unknown>,
 ) {

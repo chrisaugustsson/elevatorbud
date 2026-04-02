@@ -42,6 +42,10 @@ declare module "@convex/_generated/api" {
       create: FunctionReference<"mutation", "public">;
       update: FunctionReference<"mutation", "public">;
     };
+    importera: {
+      analyze: FunctionReference<"query", "public">;
+      confirm: FunctionReference<"action", "public">;
+    };
     forslagsvarden: {
       list: FunctionReference<"query", "public">;
       create: FunctionReference<"mutation", "public">;
@@ -55,6 +59,11 @@ declare module "@convex/_generated/api" {
     users: {
       upsertFromClerk: FunctionReference<"mutation", "internal">;
       deleteFromClerk: FunctionReference<"mutation", "internal">;
+    };
+    importeraInternal: {
+      checkAdmin: FunctionReference<"query", "internal">;
+      createOrg: FunctionReference<"mutation", "internal">;
+      importBatch: FunctionReference<"mutation", "internal">;
     };
     anvandareInternal: {
       checkAdmin: FunctionReference<"query", "internal">;
