@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "dist",
+    "paths": {
+      "@elevatorbud/ui/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}
