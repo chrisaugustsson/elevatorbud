@@ -13,6 +13,7 @@ import {
   useAuth,
 } from "@elevatorbud/auth";
 import { Toaster } from "@elevatorbud/ui/components/ui/sonner";
+import { ThemeProvider } from "@elevatorbud/ui/hooks/use-theme";
 import appCss from "../styles/app.css?url";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL as string;
@@ -37,12 +38,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <ClerkProvider>
-          <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-            {children}
-            <Toaster />
-          </ConvexProviderWithClerk>
-        </ClerkProvider>
+        <ThemeProvider>
+          <ClerkProvider>
+            <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+              {children}
+              <Toaster />
+            </ConvexProviderWithClerk>
+          </ClerkProvider>
+        </ThemeProvider>
         <Scripts />
       </body>
     </html>

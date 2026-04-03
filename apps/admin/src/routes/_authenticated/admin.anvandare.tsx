@@ -56,6 +56,7 @@ import {
   UserCheck,
   Trash2,
 } from "lucide-react";
+import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import { useUser } from "@elevatorbud/auth";
 
 export const Route = createFileRoute("/_authenticated/admin/anvandare")({
@@ -269,8 +270,47 @@ function Anvandare() {
 
   if (users === undefined || orgs === undefined) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">Laddar användare...</p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-8 w-40" />
+            <Skeleton className="mt-2 h-4 w-72" />
+          </div>
+          <Skeleton className="h-9 w-36" />
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <Skeleton className="h-9 w-full max-w-sm" />
+          <Skeleton className="h-9 w-[140px]" />
+          <Skeleton className="h-9 w-[200px]" />
+        </div>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {["w-32", "w-48", "w-16", "w-32", "w-16", "w-28", "w-16"].map(
+                  (w, i) => (
+                    <TableHead key={i}>
+                      <Skeleton className={`h-4 ${w}`} />
+                    </TableHead>
+                  ),
+                )}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-44" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-8 w-16" /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     );
   }

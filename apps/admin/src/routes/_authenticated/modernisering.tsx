@@ -107,7 +107,7 @@ function Modernisering() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       <h1 className="text-2xl font-bold text-foreground">
         Moderniseringsplanering
       </h1>

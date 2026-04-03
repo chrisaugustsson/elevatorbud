@@ -59,6 +59,7 @@ import {
   Database,
   MoreHorizontal,
 } from "lucide-react";
+import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated/admin/referensdata")({
   component: Referensdata,
@@ -260,9 +261,29 @@ function Referensdata() {
       </div>
 
       {values === undefined ? (
-        <div className="flex items-center justify-center py-12">
-          <p className="text-muted-foreground">Laddar värden...</p>
-        </div>
+        <>
+          <Skeleton className="h-4 w-24" />
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead><Skeleton className="h-4 w-20" /></TableHead>
+                  <TableHead><Skeleton className="h-4 w-16" /></TableHead>
+                  <TableHead><Skeleton className="h-4 w-8" /></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="ml-auto h-8 w-8" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       ) : (
         <>
           <div className="flex gap-3 text-sm text-muted-foreground">

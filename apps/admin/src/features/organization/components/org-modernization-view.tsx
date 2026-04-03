@@ -9,7 +9,6 @@ import {
 import { PeriodSummaryCards } from "../../modernization/components/period-summary-cards";
 import { TimelineChart } from "../../modernization/components/timeline-chart";
 import { BudgetOverview } from "../../modernization/components/budget-overview";
-import { MeasuresCard } from "../../modernization/components/measures-card";
 import { PriorityList } from "../../modernization/components/priority-list";
 import { ModernizationSkeleton } from "../../modernization/components/modernization-skeleton";
 
@@ -26,8 +25,6 @@ export function OrgModernizationView({
 
   const tidslinje = useQuery(api.elevators.modernization.timeline, orgFilter);
   const budget = useQuery(api.elevators.modernization.budget, orgFilter);
-  const atgarder = useQuery(api.elevators.modernization.measures, orgFilter);
-
   const prioritetslistaArgs = useMemo(() => {
     const base = { organization_id: organizationId as never };
     if (selectedPeriod) {
@@ -48,7 +45,6 @@ export function OrgModernizationView({
   if (
     tidslinje === undefined ||
     budget === undefined ||
-    atgarder === undefined ||
     prioritetslista === undefined
   ) {
     return <ModernizationSkeleton />;
@@ -105,7 +101,7 @@ export function OrgModernizationView({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       <PeriodSummaryCards
         periods={periodSummary}
         selectedPeriod={selectedPeriod}
@@ -119,10 +115,6 @@ export function OrgModernizationView({
         budgetCumulative={budgetCumulative}
         budgetPerDistrikt={budgetPerDistrikt}
         budgetPerTyp={budgetPerTyp}
-      />
-
-      <MeasuresCard
-        measures={atgarder as { measure: string; count: number }[]}
       />
 
       <PriorityList

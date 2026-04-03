@@ -33,6 +33,7 @@ import {
 } from "@elevatorbud/ui/components/ui/dialog";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, ArrowUpDown, Building2, UserPlus } from "lucide-react";
+import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 
 export const Route = createFileRoute(
   "/_authenticated/admin/organisationer/",
@@ -129,8 +130,41 @@ function Organisationer() {
 
   if (orgs === undefined) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">Laddar organisationer...</p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="mt-2 h-4 w-80" />
+          </div>
+          <Skeleton className="h-9 w-40" />
+        </div>
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-9 w-full max-w-sm" />
+        </div>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {["w-24", "w-28", "w-32", "w-44", "w-20"].map((w, i) => (
+                  <TableHead key={i}>
+                    <Skeleton className={`h-4 ${w}`} />
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-8" /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     );
   }

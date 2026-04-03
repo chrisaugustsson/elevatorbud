@@ -79,7 +79,7 @@ export function BudgetOverview({
             {budgetCumulative.length === 0 ? (
               <EmptyBudget />
             ) : (
-              <div className="h-[300px] w-full">
+              <div className="h-[300px] w-full overflow-hidden">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={budgetCumulative}
@@ -94,7 +94,7 @@ export function BudgetOverview({
                       tick={{ fontSize: 12 }}
                       angle={-45}
                       textAnchor="end"
-                      interval={0}
+                      interval="preserveStartEnd"
                       height={60}
                     />
                     <YAxis tick={{ fontSize: 12 }} />
@@ -143,7 +143,7 @@ export function BudgetOverview({
             {budgetPerDistrikt.length === 0 ? (
               <EmptyBudget />
             ) : (
-              <div className="h-[300px] w-full">
+              <div className="h-[300px] w-full overflow-hidden">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={budgetPerDistrikt}
@@ -158,7 +158,7 @@ export function BudgetOverview({
                       tick={{ fontSize: 12 }}
                       angle={-45}
                       textAnchor="end"
-                      interval={0}
+                      interval="preserveStartEnd"
                       height={60}
                     />
                     <YAxis tick={{ fontSize: 12 }} />
@@ -189,7 +189,7 @@ export function BudgetOverview({
             {budgetPerTyp.length === 0 ? (
               <EmptyBudget />
             ) : (
-              <div className="h-[300px] w-full">
+              <div className="h-[300px] w-full overflow-hidden">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={budgetPerTyp}
@@ -204,7 +204,7 @@ export function BudgetOverview({
                       tick={{ fontSize: 12 }}
                       angle={-45}
                       textAnchor="end"
-                      interval={0}
+                      interval="preserveStartEnd"
                       height={60}
                     />
                     <YAxis tick={{ fontSize: 12 }} />

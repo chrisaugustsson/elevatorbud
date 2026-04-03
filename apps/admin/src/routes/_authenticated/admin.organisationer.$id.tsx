@@ -24,7 +24,6 @@ import {
   TrendingUp,
   AlertTriangle,
   Calendar,
-  ArrowUpDown,
   Users,
   ClipboardList,
   Wrench,
@@ -40,11 +39,14 @@ export const Route = createFileRoute(
   component: OrganisationDetail,
 });
 
-const tabSlugs = ["oversikt", "hissar", "anvandare"] as const;
+const tabSlugs = [
+  "oversikt",
+  "hissar",
+  "modernisering",
+  "underhall",
+  "anvandare",
+] as const;
 type TabSlug = (typeof tabSlugs)[number];
-
-const hissarSubTabs = ["register", "modernisering", "underhall"] as const;
-type HissarSubTab = (typeof hissarSubTabs)[number];
 
 function getInitialTab(): TabSlug {
   if (typeof window === "undefined") return "oversikt";
@@ -54,21 +56,10 @@ function getInitialTab(): TabSlug {
   return "oversikt";
 }
 
-function getInitialHissarSubTab(): HissarSubTab {
-  if (typeof window === "undefined") return "register";
-  const params = new URLSearchParams(window.location.search);
-  const sub = params.get("sub");
-  if (sub && hissarSubTabs.includes(sub as HissarSubTab))
-    return sub as HissarSubTab;
-  return "register";
-}
-
 function OrganisationDetail() {
   const { id } = Route.useParams();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabSlug>(getInitialTab);
-  const [hissarSubTab, setHissarSubTab] =
-    useState<HissarSubTab>(getInitialHissarSubTab);
 
   const org = useQuery(api.organizations.get, { id } as never) as
     | {
@@ -115,17 +106,6 @@ function OrganisationDetail() {
     setActiveTab(tab);
     const url = new URL(window.location.href);
     url.searchParams.set("tab", tab);
-    if (tab !== "hissar") {
-      url.searchParams.delete("sub");
-    }
-    window.history.replaceState({}, "", url.toString());
-  }
-
-  function handleHissarSubTabChange(value: string) {
-    const sub = value as HissarSubTab;
-    setHissarSubTab(sub);
-    const url = new URL(window.location.href);
-    url.searchParams.set("sub", sub);
     window.history.replaceState({}, "", url.toString());
   }
 
@@ -192,7 +172,7 @@ function OrganisationDetail() {
     : [];
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
@@ -218,11 +198,22 @@ function OrganisationDetail() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList variant="line">
+        <TabsList variant="line" className="-mx-6 px-6">
           <TabsTrigger value="oversikt">Översikt</TabsTrigger>
           <TabsTrigger value="hissar" className="flex items-center gap-1.5">
-            <ArrowUpDown className="size-3.5" />
+            <ClipboardList className="size-3.5" />
             Hissar
+          </TabsTrigger>
+          <TabsTrigger
+            value="modernisering"
+            className="flex items-center gap-1.5"
+          >
+            <Hammer className="size-3.5" />
+            Modernisering
+          </TabsTrigger>
+          <TabsTrigger value="underhall" className="flex items-center gap-1.5">
+            <Wrench className="size-3.5" />
+            Underhåll
           </TabsTrigger>
           <TabsTrigger value="anvandare" className="flex items-center gap-1.5">
             <Users className="size-3.5" />
@@ -267,42 +258,18 @@ function OrganisationDetail() {
         </TabsContent>
 
         {/* Hissar tab */}
-        <TabsContent value="hissar" className="space-y-4">
-          <Tabs value={hissarSubTab} onValueChange={handleHissarSubTabChange}>
-            <TabsList variant="line">
-              <TabsTrigger
-                value="register"
-                className="flex items-center gap-1.5"
-              >
-                <ClipboardList className="size-3.5" />
-                Register
-              </TabsTrigger>
-              <TabsTrigger
-                value="modernisering"
-                className="flex items-center gap-1.5"
-              >
-                <Hammer className="size-3.5" />
-                Modernisering
-              </TabsTrigger>
-              <TabsTrigger
-                value="underhall"
-                className="flex items-center gap-1.5"
-              >
-                <Wrench className="size-3.5" />
-                Underhåll
-              </TabsTrigger>
-            </TabsList>
+        <TabsContent value="hissar">
+          <OrgRegisterView organizationId={id} />
+        </TabsContent>
 
-            <TabsContent value="register">
-              <OrgRegisterView organizationId={id} />
-            </TabsContent>
-            <TabsContent value="modernisering">
-              <OrgModernizationView organizationId={id} />
-            </TabsContent>
-            <TabsContent value="underhall">
-              <OrgMaintenanceView organizationId={id} />
-            </TabsContent>
-          </Tabs>
+        {/* Modernisering tab */}
+        <TabsContent value="modernisering">
+          <OrgModernizationView organizationId={id} />
+        </TabsContent>
+
+        {/* Underhåll tab */}
+        <TabsContent value="underhall">
+          <OrgMaintenanceView organizationId={id} />
         </TabsContent>
 
         {/* Användare tab */}
