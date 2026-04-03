@@ -1,0 +1,137 @@
+{
+  "project": "Hisskompetens",
+  "branchName": "ralph/cms-admin",
+  "description": "CMS admin UI for editing the 4 landing pages (Startsida, Om oss, Tjänster, Kontakt) — tab-based editor with fixed form fields per page, save, and publish toggle",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Ny sidebar-länk Webbplats",
+      "description": "As an admin, I want a 'Webbplats' link in the sidebar so that I can navigate to the CMS editor.",
+      "acceptanceCriteria": [
+        "New sidebar group 'Webbplats' with a Globe icon added below the main nav group",
+        "Links to /webbplats route",
+        "Active state highlights correctly when on /webbplats",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Follow existing sidebar patterns in the admin app. The route does not need to exist yet — just the sidebar link."
+    },
+    {
+      "id": "US-002",
+      "title": "CMS-sida med flikar för de 4 sidorna",
+      "description": "As an admin, I want to see tabs for Startsida, Om oss, Tjänster, and Kontakt so that I can switch between pages to edit.",
+      "acceptanceCriteria": [
+        "Route /webbplats created at apps/admin/src/routes/_authenticated/webbplats.tsx",
+        "4 tabs rendered: Startsida, Om oss, Tjänster, Kontakt",
+        "Each tab loads the corresponding page data from api.cms.getPage using the slug (startsida, om-oss, tjanster, kontakt)",
+        "When no CMS data exists yet, the form fields are empty (not pre-filled with fallback content)",
+        "Active tab persists via URL search param (e.g. ?sida=om-oss)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Use shadcn/ui Tabs component. Use TanStack Router search params for active tab. Each tab should render a placeholder for now — the actual form content comes in US-003 through US-006."
+    },
+    {
+      "id": "US-003",
+      "title": "Formulär för Startsida",
+      "description": "As an admin, I want a form with fields matching the Startsida sections so that I can edit its content.",
+      "acceptanceCriteria": [
+        "Hero section: text input for title, textarea for subtitle, text input for CTA text, text input for CTA href",
+        "Features section: text input for section title, textarea for section subtitle, plus 6 fixed item groups each with text input for title, textarea for description, icon selector dropdown (ClipboardCheck, Wrench, BarChart3, Shield, Building2, Phone)",
+        "Stats section: 4 fixed item groups each with text input for value (mapped to item title), text input for label (mapped to item description)",
+        "CTA section: text input for title, textarea for subtitle, text input for CTA text, text input for CTA href",
+        "Each section is a visually distinct Card with a section heading",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Section types in the CMS: hero (order 0), features (order 1), stats (order 2), cta (order 3). Stats maps value→item.title, label→item.description. Use shadcn Card, Input, Textarea, Label, Select components."
+    },
+    {
+      "id": "US-004",
+      "title": "Formulär för Om oss",
+      "description": "As an admin, I want a form with fields matching the Om oss sections so that I can edit its content.",
+      "acceptanceCriteria": [
+        "Hero section: text input for title, textarea for subtitle",
+        "Mission section: text input for title, textarea for content",
+        "Values section: text input for section title, plus 4 fixed item groups each with text input for title, textarea for description, icon selector (Target, Eye, Users, Award)",
+        "Story section: text input for title, textarea for content (paragraphs separated by blank lines \\n\\n)",
+        "Each section is a visually distinct Card with a section heading",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Section types: hero (order 0), mission (order 1), values (order 2), story (order 3). Story content uses the 'content' field with \\n\\n paragraph separators."
+    },
+    {
+      "id": "US-005",
+      "title": "Formulär för Tjänster",
+      "description": "As an admin, I want a form with fields matching the Tjänster sections so that I can edit its content.",
+      "acceptanceCriteria": [
+        "Hero section: text input for title, textarea for subtitle",
+        "Services section: 6 fixed service groups each with text input for title, textarea for description, icon selector (ClipboardCheck, Wrench, BarChart3, Shield, Building2, Phone)",
+        "Each section is a visually distinct Card with a section heading",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Section types: hero (order 0), services (order 1). The hardcoded CTA at the bottom of the Tjänster page is NOT part of the CMS — do not add fields for it. Per-service feature bullet lists are also excluded from CMS."
+    },
+    {
+      "id": "US-006",
+      "title": "Formulär för Kontakt",
+      "description": "As an admin, I want a form with fields matching the Kontakt sections so that I can edit its content.",
+      "acceptanceCriteria": [
+        "Hero section: text input for title, textarea for subtitle",
+        "Contact section: text input for section title, textarea for section subtitle, plus 4 fixed item groups each with text input for title, text input for description, icon selector (Mail, Phone, MapPin, Clock)",
+        "Form section: text input for title, textarea for subtitle",
+        "Each section is a visually distinct Card with a section heading",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Section types: hero (order 0), contact (order 1), form (order 2). Contact items use text input (not textarea) for description since they are short values like email/phone."
+    },
+    {
+      "id": "US-007",
+      "title": "Spara innehåll",
+      "description": "As an admin, I want to save my edits so that the landing page reflects the new content.",
+      "acceptanceCriteria": [
+        "Spara button at the bottom of the form",
+        "If no page exists in the database for this slug, calls api.cms.createPage with the form data",
+        "If a page already exists, calls api.cms.updatePage with the changed data",
+        "Form data is converted to the correct sections array format (each section has id, type, order, and relevant fields matching sectionValidator in convex/cms.ts)",
+        "Shows a success toast after successful save",
+        "Shows an error toast if save fails",
+        "Button shows loading state while saving",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "Use useMutation from convex/react. The sections array must match sectionValidator: { id, type, title?, subtitle?, content?, items?, cta?, imageUrl?, order }. Determine create vs update by checking if the useQuery result for the current slug returned a document (has _id)."
+    },
+    {
+      "id": "US-008",
+      "title": "Publicera/avpublicera toggle",
+      "description": "As an admin, I want to toggle whether a page is published so that I can prepare content before making it live.",
+      "acceptanceCriteria": [
+        "Switch/toggle labeled 'Publicerad' in the form header area next to the page title",
+        "Toggle state is saved together with the page content when clicking Spara",
+        "Visual indicator showing current publish state (green badge 'Publicerad' / gray badge 'Utkast')",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "The published field is a boolean on the pages table. Include it in the createPage/updatePage payload alongside sections. Use shadcn Switch component."
+    }
+  ]
+}

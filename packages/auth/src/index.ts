@@ -1,5 +1,10 @@
-export { ConvexClerkProvider } from "./provider";
 export {
+  ConvexClerkProvider,
+  ConvexProviderWithClerk,
+  ConvexReactClient,
+} from "./provider";
+export {
+  ClerkProvider,
   SignIn,
   SignUp,
   UserButton,
