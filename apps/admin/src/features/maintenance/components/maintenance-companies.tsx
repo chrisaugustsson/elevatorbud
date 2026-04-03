@@ -43,7 +43,7 @@ export function MaintenanceCompanies({
         Skötselföretag
       </h2>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="space-y-6">
         {/* Count per company */}
         <Card>
           <CardHeader>
@@ -109,7 +109,7 @@ export function MaintenanceCompanies({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="sticky left-0 bg-background">
+                      <TableHead className="sticky left-0 z-10 bg-background">
                         Företag
                       </TableHead>
                       {foretagData.districts.map((d) => (
@@ -128,7 +128,7 @@ export function MaintenanceCompanies({
                   <TableBody>
                     {foretagData.companies.map((f) => (
                       <TableRow key={f.name}>
-                        <TableCell className="sticky left-0 bg-background font-medium text-sm">
+                        <TableCell className="sticky left-0 z-10 bg-background font-medium text-sm">
                           {f.name}
                         </TableCell>
                         {f.byDistrict.map((pd) => (
