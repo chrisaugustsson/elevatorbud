@@ -31,10 +31,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@elevatorbud/ui/components/ui/dialog";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, ArrowUpDown, Building2, UserPlus } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/admin/organisationer")({
+export const Route = createFileRoute(
+  "/_authenticated/admin/organisationer/",
+)({
   component: Organisationer,
 });
 
@@ -107,6 +109,7 @@ function Organisationer() {
   const orgs = useQuery(api.organizations.list);
   const createOrg = useMutation(api.organizations.create);
   const updateOrg = useMutation(api.organizations.update);
+  const navigate = useNavigate();
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -183,7 +186,12 @@ function Organisationer() {
                 <TableRow
                   key={row.id}
                   className="cursor-pointer"
-                  onClick={() => setEditOrg(row.original)}
+                  onClick={() =>
+                    navigate({
+                      to: "/admin/organisationer/$id" as string,
+                      params: { id: row.original._id },
+                    })
+                  }
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
