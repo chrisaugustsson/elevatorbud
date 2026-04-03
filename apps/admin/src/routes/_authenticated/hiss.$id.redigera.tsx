@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useForm } from "@tanstack/react-form";
@@ -41,6 +41,7 @@ export const Route = createFileRoute("/_authenticated/hiss/$id/redigera")({
 
 function RedigeraHiss() {
   const { id } = Route.useParams();
+  const router = useRouter();
   const hiss = useQuery(api.elevators.crud.get, { id: id as never });
   const orgs = useQuery(api.organizations.list);
   const updateHiss = useMutation(api.elevators.crud.update);
@@ -147,10 +148,10 @@ function RedigeraHiss() {
             Hiss {(hiss as { elevator_number: string }).elevator_number} har uppdaterats.
           </p>
           <div className="mt-4 flex gap-3">
-            <Link to="/sok">
+            <Link to="/hiss/$id" params={{ id }}>
               <Button variant="outline" className="h-12 text-base">
                 <ArrowLeft className="mr-1 size-5" />
-                Tillbaka till sök
+                Tillbaka till hiss
               </Button>
             </Link>
             <Button
@@ -193,11 +194,14 @@ function RedigeraHiss() {
       <div className="border-b bg-background px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/sok">
-              <Button variant="ghost" size="sm" className="h-9 px-2">
-                <ArrowLeft className="size-5" />
-              </Button>
-            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 px-2"
+              onClick={() => router.history.back()}
+            >
+              <ArrowLeft className="size-5" />
+            </Button>
             <div>
               <h1 className="text-lg font-semibold">Redigera hiss</h1>
               <p className="text-sm text-muted-foreground">
@@ -286,17 +290,16 @@ function RedigeraHiss() {
       {/* Save bar */}
       <div className="sticky bottom-0 border-t bg-background px-4 py-3">
         <div className="flex gap-3">
-          <Link to="/sok" className="flex-1">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-12 w-full text-base"
-              disabled={isSubmitting}
-            >
-              <ArrowLeft className="mr-1 size-5" />
-              Avbryt
-            </Button>
-          </Link>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 flex-1 text-base"
+            disabled={isSubmitting}
+            onClick={() => router.history.back()}
+          >
+            <ArrowLeft className="mr-1 size-5" />
+            Avbryt
+          </Button>
           <Button
             type="button"
             className="h-12 flex-1 text-base"
