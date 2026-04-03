@@ -1,6 +1,8 @@
 import {
   BarChart3,
   Building2,
+  ChevronsLeft,
+  ChevronsRight,
   ClipboardList,
   Database,
   Globe,
@@ -22,7 +24,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@elevatorbud/ui/components/ui/sidebar";
+import { Button } from "@elevatorbud/ui/components/ui/button";
 import { UserButton } from "@elevatorbud/auth";
 
 const mainNav = [
@@ -46,6 +50,7 @@ const adminNav = [
 export function AppSidebar() {
   const routerState = useRouterState();
   const pathname = routerState.location.pathname;
+  const { toggleSidebar, state } = useSidebar();
 
   return (
     <Sidebar collapsible="icon">
@@ -57,6 +62,21 @@ export function AppSidebar() {
           <span className="truncate font-semibold text-sm group-data-[collapsible=icon]:hidden">
             Hisskompetens
           </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-auto size-7 shrink-0 group-data-[collapsible=icon]:ml-0"
+            onClick={toggleSidebar}
+          >
+            {state === "expanded" ? (
+              <ChevronsLeft className="size-4" />
+            ) : (
+              <ChevronsRight className="size-4" />
+            )}
+            <span className="sr-only">
+              {state === "expanded" ? "Fäll ihop sidopanel" : "Expandera sidopanel"}
+            </span>
+          </Button>
         </div>
       </SidebarHeader>
       <SidebarContent>

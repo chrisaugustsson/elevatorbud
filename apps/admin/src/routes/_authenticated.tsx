@@ -5,9 +5,7 @@ import { api } from "@convex/_generated/api";
 import {
   SidebarProvider,
   SidebarInset,
-  SidebarTrigger,
 } from "@elevatorbud/ui/components/ui/sidebar";
-import { Separator } from "@elevatorbud/ui/components/ui/separator";
 import { AppSidebar } from "../shared/components/app-sidebar";
 import { OrgSelector } from "../shared/components/org-selector";
 import { OrgProvider } from "../shared/lib/org-context";
@@ -73,8 +71,6 @@ function AuthenticatedLayout() {
         <AppSidebar />
         <SidebarInset>
           <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
             <OrgSelector />
           </header>
           <div className="flex-1 overflow-auto p-6">
