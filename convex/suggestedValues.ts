@@ -150,3 +150,18 @@ export const deactivate = mutation({
     return id;
   },
 });
+
+export const activate = mutation({
+  args: {
+    id: v.id("suggested_values"),
+  },
+  handler: async (ctx, { id }) => {
+    await requireAdmin(ctx);
+    const existing = await ctx.db.get(id);
+    if (!existing) {
+      throw new Error("Förslagsvärdet hittades inte");
+    }
+    await ctx.db.patch(id, { active: true });
+    return id;
+  },
+});
