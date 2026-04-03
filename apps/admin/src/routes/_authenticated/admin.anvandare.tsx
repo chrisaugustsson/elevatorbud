@@ -39,7 +39,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@elevatorbud/ui/components/ui/select";
-import { Plus, ArrowUpDown, Users, Pencil } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@elevatorbud/ui/components/ui/dropdown-menu";
+import {
+  Plus,
+  ArrowUpDown,
+  Users,
+  Pencil,
+  MoreHorizontal,
+  UserX,
+  UserCheck,
+  Trash2,
+} from "lucide-react";
+import { useUser } from "@elevatorbud/auth";
 
 export const Route = createFileRoute("/_authenticated/admin/anvandare")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -111,8 +128,17 @@ function Anvandare() {
     search: debouncedSearch || undefined,
   });
 
+  const { user: currentClerkUser } = useUser();
   const createUser = useAction(api.userAdmin.create);
   const updateUser = useAction(api.userAdmin.update);
+  const deactivateUser = useAction(api.userAdmin.deactivate);
+  const activateUser = useAction(api.userAdmin.activate);
+  const removeUser = useAction(api.userAdmin.remove);
+  const [deactivatingUser, setDeactivatingUser] = useState<Anvandare | null>(
+    null,
+  );
+  const [deletingUser, setDeletingUser] = useState<Anvandare | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const orgMap = new Map<string, string>();
   if (orgs) {
@@ -175,17 +201,58 @@ function Anvandare() {
     columnHelper.display({
       id: "actions",
       header: "",
-      cell: (info) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          onClick={() => setEditingUser(info.row.original)}
-          title="Redigera användare"
-        >
-          <Pencil className="size-4" />
-        </Button>
-      ),
+      cell: (info) => {
+        const row = info.row.original;
+        const isSelf =
+          currentClerkUser?.id === row.clerk_user_id;
+        return (
+          <div className="flex items-center justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={() => setEditingUser(row)}
+              title="Redigera användare"
+            >
+              <Pencil className="size-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-8">
+                  <MoreHorizontal className="size-4" />
+                  <span className="sr-only">Åtgärder</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => setDeactivatingUser(row)}
+                >
+                  {row.active ? (
+                    <>
+                      <UserX className="mr-2 size-4" />
+                      Inaktivera
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="mr-2 size-4" />
+                      Aktivera
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={isSelf}
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setDeletingUser(row)}
+                >
+                  <Trash2 className="mr-2 size-4" />
+                  {isSelf ? "Kan inte ta bort dig själv" : "Ta bort"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
     }),
   ];
 
@@ -279,7 +346,12 @@ function Anvandare() {
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  className={
+                    !row.original.active ? "opacity-50" : undefined
+                  }
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(
@@ -329,6 +401,109 @@ function Anvandare() {
           setEditingUser(null);
         }}
       />
+
+      {/* Deactivate / Activate confirmation dialog */}
+      <Dialog
+        open={!!deactivatingUser}
+        onOpenChange={(open) => {
+          if (!open) setDeactivatingUser(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {deactivatingUser?.active
+                ? "Inaktivera användare"
+                : "Aktivera användare"}
+            </DialogTitle>
+            <DialogDescription>
+              {deactivatingUser?.active
+                ? `Är du säker på att du vill inaktivera ${deactivatingUser?.name}? Användaren kommer inte längre kunna logga in.`
+                : `Är du säker på att du vill aktivera ${deactivatingUser?.name}?`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeactivatingUser(null)}
+              disabled={actionLoading}
+            >
+              Avbryt
+            </Button>
+            <Button
+              variant={deactivatingUser?.active ? "destructive" : "default"}
+              disabled={actionLoading}
+              onClick={async () => {
+                if (!deactivatingUser) return;
+                setActionLoading(true);
+                try {
+                  if (deactivatingUser.active) {
+                    await deactivateUser({
+                      id: deactivatingUser._id as never,
+                    });
+                  } else {
+                    await activateUser({
+                      id: deactivatingUser._id as never,
+                    });
+                  }
+                } finally {
+                  setActionLoading(false);
+                  setDeactivatingUser(null);
+                }
+              }}
+            >
+              {actionLoading
+                ? "Sparar..."
+                : deactivatingUser?.active
+                  ? "Inaktivera"
+                  : "Aktivera"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog
+        open={!!deletingUser}
+        onOpenChange={(open) => {
+          if (!open) setDeletingUser(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ta bort användare</DialogTitle>
+            <DialogDescription>
+              Är du säker på att du vill ta bort {deletingUser?.name}? Denna
+              åtgärd kan inte ångras.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeletingUser(null)}
+              disabled={actionLoading}
+            >
+              Avbryt
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={actionLoading}
+              onClick={async () => {
+                if (!deletingUser) return;
+                setActionLoading(true);
+                try {
+                  await removeUser({ id: deletingUser._id as never });
+                } finally {
+                  setActionLoading(false);
+                  setDeletingUser(null);
+                }
+              }}
+            >
+              {actionLoading ? "Tar bort..." : "Ta bort"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

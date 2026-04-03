@@ -72,6 +72,18 @@ export const deactivateUser = internalMutation({
   },
 });
 
+export const activateUser = internalMutation({
+  args: { id: v.id("users") },
+  handler: async (ctx, { id }) => {
+    const existing = await ctx.db.get(id);
+    if (!existing) {
+      throw new Error("Användaren hittades inte");
+    }
+    await ctx.db.patch(id, { active: true });
+    return existing.clerk_user_id;
+  },
+});
+
 export const removeUser = internalMutation({
   args: { id: v.id("users") },
   handler: async (ctx, { id }) => {

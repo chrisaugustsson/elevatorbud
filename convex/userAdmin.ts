@@ -13,6 +13,7 @@ const internalRef = anyApi as unknown as {
     insertUser: FunctionReference<"mutation", "internal">;
     updateUser: FunctionReference<"mutation", "internal">;
     deactivateUser: FunctionReference<"mutation", "internal">;
+    activateUser: FunctionReference<"mutation", "internal">;
     removeUser: FunctionReference<"mutation", "internal">;
   };
 };
@@ -123,6 +124,21 @@ export const deactivate = action({
 
     const clerk = getClerkClient();
     await clerk.users.banUser(clerkUserId);
+  },
+});
+
+export const activate = action({
+  args: { id: v.id("users") },
+  handler: async (ctx, { id }) => {
+    await ctx.runQuery(internalRef.userAdminInternal.checkAdmin);
+
+    const clerkUserId = await ctx.runMutation(
+      internalRef.userAdminInternal.activateUser,
+      { id },
+    );
+
+    const clerk = getClerkClient();
+    await clerk.users.unbanUser(clerkUserId);
   },
 });
 
