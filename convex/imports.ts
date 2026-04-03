@@ -39,8 +39,11 @@ export const analyze = query({
     }
 
     // Match org names to existing orgs (case-insensitive)
+    // Use parallel arrays instead of Record to avoid Convex field name
+    // restrictions on non-ASCII characters in Swedish org names.
     const allOrgs = await ctx.db.query("organizations").collect();
-    const orgMatches: Record<string, string> = {};
+    const orgMatchNames: string[] = [];
+    const orgMatchIds: string[] = [];
     const newOrgNames: string[] = [];
 
     for (const name of args.orgNames) {
@@ -49,7 +52,8 @@ export const analyze = query({
         (o) => o.name.toLowerCase() === name.toLowerCase(),
       );
       if (match) {
-        orgMatches[name] = match._id as string;
+        orgMatchNames.push(name);
+        orgMatchIds.push(match._id as string);
       } else {
         newOrgNames.push(name);
       }
@@ -64,12 +68,13 @@ export const analyze = query({
 
     return {
       existingElevatorNumbers,
-      orgMatches,
+      orgMatchNames,
+      orgMatchIds,
       newOrgNames,
       summary: {
         newElevators: newCount,
         updatedElevators: updateCount,
-        matchedOrgs: Object.keys(orgMatches).length,
+        matchedOrgs: orgMatchNames.length,
         newOrgs: newOrgNames.length,
       },
     };
@@ -83,7 +88,8 @@ export const analyze = query({
 export const confirm = action({
   args: {
     elevators: v.array(v.any()),
-    existingOrgMapping: v.any(),
+    existingOrgMatchNames: v.array(v.string()),
+    existingOrgMatchIds: v.array(v.string()),
     newOrgNames: v.array(v.string()),
     adminEmail: v.optional(v.string()),
   },
@@ -94,10 +100,11 @@ export const confirm = action({
       {},
     )) as { adminId: string };
 
-    // 2. Create new orgs and build complete mapping
-    const orgMapping: Record<string, string> = {
-      ...(args.existingOrgMapping as Record<string, string>),
-    };
+    // 2. Create new orgs and build complete mapping as parallel arrays
+    // (Convex doesn't allow non-ASCII chars in object keys, so we can't
+    // pass a Record<orgName, orgId> through runMutation)
+    const orgMappingNames = [...args.existingOrgMatchNames];
+    const orgMappingIds = [...args.existingOrgMatchIds];
     const orgsCreated: string[] = [];
 
     for (const name of args.newOrgNames) {
@@ -105,7 +112,8 @@ export const confirm = action({
         internalRef.importsInternal.createOrg,
         { name },
       );
-      orgMapping[name] = orgId as string;
+      orgMappingNames.push(name);
+      orgMappingIds.push(orgId as string);
       orgsCreated.push(name);
     }
 
@@ -121,7 +129,8 @@ export const confirm = action({
         internalRef.importsInternal.importBatch,
         {
           elevators: batch,
-          orgMapping,
+          orgMappingNames,
+          orgMappingIds,
           adminId,
         },
       )) as {

@@ -22,10 +22,17 @@ export const createOrg = internalMutation({
 export const importBatch = internalMutation({
   args: {
     elevators: v.array(v.any()),
-    orgMapping: v.any(),
+    orgMappingNames: v.array(v.string()),
+    orgMappingIds: v.array(v.string()),
     adminId: v.any(),
   },
   handler: async (ctx, args) => {
+    // Reconstruct org mapping from parallel arrays
+    const orgMapping: Record<string, string> = {};
+    for (let i = 0; i < args.orgMappingNames.length; i++) {
+      orgMapping[args.orgMappingNames[i]] = args.orgMappingIds[i];
+    }
+
     let created = 0;
     let updated = 0;
     const errors: { elevator_number: string; error: string }[] = [];
@@ -33,8 +40,7 @@ export const importBatch = internalMutation({
     for (const elevator of args.elevators) {
       try {
         const orgName = elevator._organisation_namn as string | undefined;
-        const mapping = args.orgMapping as Record<string, string>;
-        const orgId = orgName ? mapping[orgName] : undefined;
+        const orgId = orgName ? orgMapping[orgName] : undefined;
 
         if (!orgId) {
           errors.push({

@@ -6,10 +6,16 @@ import {
   createRootRoute,
 } from "@tanstack/react-router";
 import * as React from "react";
-import { ConvexClerkProvider } from "@elevatorbud/auth";
+import {
+  ClerkProvider,
+  ConvexProviderWithClerk,
+  ConvexReactClient,
+  useAuth,
+} from "@elevatorbud/auth";
 import appCss from "../styles/app.css?url";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL as string;
+const convex = new ConvexReactClient(convexUrl);
 
 export const Route = createRootRoute({
   head: () => ({
@@ -20,18 +26,8 @@ export const Route = createRootRoute({
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),
-  component: RootComponent,
+  shellComponent: RootDocument,
 });
-
-function RootComponent() {
-  return (
-    <RootDocument>
-      <ConvexClerkProvider convexUrl={convexUrl}>
-        <Outlet />
-      </ConvexClerkProvider>
-    </RootDocument>
-  );
-}
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
@@ -40,7 +36,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <ClerkProvider>
+          <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+            {children}
+          </ConvexProviderWithClerk>
+        </ClerkProvider>
         <Scripts />
       </body>
     </html>

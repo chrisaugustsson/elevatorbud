@@ -5,12 +5,20 @@ export type { ExportColumn } from "./export";
 
 export {
   parseElevatorSheet,
+  parseElevatorSheetWithMapping,
   parseEmergencyPhoneSheet,
   parseDemolishedSheet,
   parseExcelImport,
   readWorkbook,
   validateWorkbookSheets,
   ELEVATOR_COLUMNS,
+  HEADER_ALIASES,
+  TARGET_FIELDS,
+  autoMapSheet,
+  autoMapColumns,
+  detectHeaderRow,
+  getSheetData,
+  parseExcelImportWithMapping,
 } from "./excel-import";
 export type {
   ParsedElevator,
@@ -19,4 +27,7 @@ export type {
   EmergencyPhoneParseResult,
   FullImportResult,
   ColumnDef,
+  ColumnMapping,
+  AutoMapResult,
+  HeaderAlias,
 } from "./excel-import";
