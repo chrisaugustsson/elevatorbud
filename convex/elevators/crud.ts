@@ -1,15 +1,17 @@
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
-import { requireAdmin, getCurrentUser } from "../auth";
-import { autoAddSuggestedValues } from "./helpers";
+import { requireAdmin, requireAuth } from "../auth";
+import { autoAddSuggestedValues, queryElevators, enrichWithOrgName } from "./helpers";
 
 export const get = query({
   args: { id: v.id("elevators") },
   handler: async (ctx, { id }) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
+    const user = await requireAuth(ctx);
     const elevator = await ctx.db.get(id);
     if (!elevator) throw new Error("Hissen hittades inte");
+    if (user.role !== "admin" && user.organization_id !== elevator.organization_id) {
+      throw new Error("Ingen åtkomst till denna hiss");
+    }
     return elevator;
   },
 });
@@ -17,8 +19,7 @@ export const get = query({
 export const checkElevatorNumber = query({
   args: { elevator_number: v.string(), excludeId: v.optional(v.id("elevators")) },
   handler: async (ctx, { elevator_number, excludeId }) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
+    const user = await requireAuth(ctx);
     if (!elevator_number) return { exists: false };
     const existing = await ctx.db
       .query("elevators")
@@ -26,6 +27,9 @@ export const checkElevatorNumber = query({
       .unique();
     if (!existing) return { exists: false };
     if (excludeId && existing._id === excludeId) return { exists: false };
+    if (user.role !== "admin" && user.organization_id !== existing.organization_id) {
+      return { exists: false };
+    }
     return { exists: true };
   },
 });
@@ -33,16 +37,10 @@ export const checkElevatorNumber = query({
 export const search = query({
   args: { search: v.string() },
   handler: async (ctx, { search }) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
-
     if (!search.trim()) return [];
 
+    const allElevators = await queryElevators(ctx);
     const searchLower = search.toLowerCase().trim();
-
-    const allElevators = await ctx.db
-      .query("elevators")
-      .collect();
 
     const matches = allElevators
       .filter(
@@ -53,19 +51,13 @@ export const search = query({
       )
       .slice(0, 20);
 
-    const results = await Promise.all(
-      matches.map(async (h) => {
-        const org = await ctx.db.get(h.organization_id);
-        return {
-          _id: h._id,
-          elevator_number: h.elevator_number,
-          address: h.address,
-          organizationName: org?.name,
-        };
-      }),
-    );
-
-    return results;
+    const enriched = await enrichWithOrgName(ctx, matches);
+    return enriched.map((h) => ({
+      _id: h._id,
+      elevator_number: h.elevator_number,
+      address: h.address,
+      organizationName: h.organizationName,
+    }));
   },
 });
 

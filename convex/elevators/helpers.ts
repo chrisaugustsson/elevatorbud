@@ -1,4 +1,11 @@
 import { v } from "convex/values";
+import { MutationCtx, QueryCtx } from "../_generated/server";
+import { Doc, Id } from "../_generated/dataModel";
+import { requireAuth, getOrgScope } from "../auth";
+
+type Elevator = Doc<"elevators">;
+
+const NOT_MODERNIZED = "Ej ombyggd";
 
 const CATEGORY_FIELDS = [
   "elevator_type",
@@ -15,7 +22,7 @@ const CATEGORY_FIELDS = [
 ] as const;
 
 export async function autoAddSuggestedValues(
-  ctx: { db: any },
+  ctx: MutationCtx,
   fields: Record<string, unknown>,
 ) {
   for (const category of CATEGORY_FIELDS) {
@@ -24,11 +31,11 @@ export async function autoAddSuggestedValues(
 
     const existing = await ctx.db
       .query("suggested_values")
-      .withIndex("by_category", (q: any) => q.eq("category", category))
+      .withIndex("by_category", (q) => q.eq("category", category))
       .collect();
 
     const alreadyExists = existing.some(
-      (f: any) => f.value.toLowerCase() === value.toLowerCase(),
+      (f) => f.value.toLowerCase() === value.toLowerCase(),
     );
 
     if (!alreadyExists) {
@@ -40,6 +47,60 @@ export async function autoAddSuggestedValues(
       });
     }
   }
+}
+
+/**
+ * Authenticates the user, resolves org scope, and fetches elevators.
+ * Customers always get their own org's elevators; admins get all or filtered by argsOrgId.
+ */
+export async function queryElevators(
+  ctx: QueryCtx,
+  argsOrgId?: Id<"organizations">,
+) {
+  const user = await requireAuth(ctx);
+  const orgId = getOrgScope(user, argsOrgId);
+
+  if (orgId) {
+    return ctx.db
+      .query("elevators")
+      .withIndex("by_organization_id", (q) =>
+        q.eq("organization_id", orgId),
+      )
+      .collect();
+  }
+  return ctx.db.query("elevators").collect();
+}
+
+/**
+ * Looks up organization names for a list of elevators using a local cache.
+ * Safe: cache is per-call (no cross-request or cross-user leakage).
+ */
+export async function enrichWithOrgName<T extends { organization_id: Id<"organizations"> }>(
+  ctx: QueryCtx,
+  items: T[],
+): Promise<Array<T & { organizationName: string }>> {
+  const cache = new Map<string, Promise<string>>();
+  return Promise.all(
+    items.map(async (item) => {
+      const key = item.organization_id as string;
+      let promise = cache.get(key);
+      if (!promise) {
+        promise = ctx.db.get(item.organization_id).then((org) => org?.name ?? "Okänd");
+        cache.set(key, promise);
+      }
+      const name = await promise;
+      return { ...item, organizationName: name };
+    }),
+  );
+}
+
+/**
+ * Parses a modernization year string to a number, or returns null.
+ */
+export function parseModernizationYear(yearStr?: string): number | null {
+  if (!yearStr) return null;
+  const year = parseInt(yearStr, 10);
+  return isNaN(year) ? null : year;
 }
 
 // Shared filter args schema for list and export queries
@@ -66,7 +127,7 @@ export const filterArgs = {
 
 // Shared filter logic used by both list and exportData queries
 export async function fetchAndFilter(
-  ctx: any,
+  ctx: QueryCtx,
   args: {
     search?: string;
     district?: string[];
@@ -78,31 +139,21 @@ export async function fetchAndFilter(
     buildYearMax?: number;
     modernized?: boolean;
     status?: "active" | "demolished" | "archived" | "all";
-    organization_id?: any;
+    organization_id?: Id<"organizations">;
   },
 ) {
-  let allElevators;
-  if (args.organization_id) {
-    allElevators = await ctx.db
-      .query("elevators")
-      .withIndex("by_organization_id", (q: any) =>
-        q.eq("organization_id", args.organization_id!),
-      )
-      .collect();
-  } else {
-    allElevators = await ctx.db.query("elevators").collect();
-  }
+  const allElevators = await queryElevators(ctx, args.organization_id);
 
   const statusFilter = args.status ?? "active";
-  let filtered = statusFilter === "all"
+  let filtered: Elevator[] = statusFilter === "all"
     ? allElevators
-    : allElevators.filter((h: any) => h.status === statusFilter);
+    : allElevators.filter((h) => h.status === statusFilter);
 
   if (args.search) {
     const s = args.search.toLowerCase().trim();
     if (s) {
       filtered = filtered.filter(
-        (h: any) =>
+        (h) =>
           h.elevator_number.toLowerCase().includes(s) ||
           (h.address && h.address.toLowerCase().includes(s)) ||
           (h.district && h.district.toLowerCase().includes(s)) ||
@@ -115,54 +166,54 @@ export async function fetchAndFilter(
   if (args.district && args.district.length > 0) {
     const set = new Set(args.district.map((d) => d.toLowerCase()));
     filtered = filtered.filter(
-      (h: any) => h.district && set.has(h.district.toLowerCase()),
+      (h) => h.district && set.has(h.district.toLowerCase()),
     );
   }
   if (args.elevator_type && args.elevator_type.length > 0) {
     const set = new Set(args.elevator_type.map((d) => d.toLowerCase()));
     filtered = filtered.filter(
-      (h: any) => h.elevator_type && set.has(h.elevator_type.toLowerCase()),
+      (h) => h.elevator_type && set.has(h.elevator_type.toLowerCase()),
     );
   }
   if (args.manufacturer && args.manufacturer.length > 0) {
     const set = new Set(args.manufacturer.map((d) => d.toLowerCase()));
     filtered = filtered.filter(
-      (h: any) => h.manufacturer && set.has(h.manufacturer.toLowerCase()),
+      (h) => h.manufacturer && set.has(h.manufacturer.toLowerCase()),
     );
   }
   if (args.maintenance_company && args.maintenance_company.length > 0) {
     const set = new Set(args.maintenance_company.map((d) => d.toLowerCase()));
     filtered = filtered.filter(
-      (h: any) => h.maintenance_company && set.has(h.maintenance_company.toLowerCase()),
+      (h) => h.maintenance_company && set.has(h.maintenance_company.toLowerCase()),
     );
   }
   if (args.inspection_authority && args.inspection_authority.length > 0) {
     const set = new Set(args.inspection_authority.map((d) => d.toLowerCase()));
     filtered = filtered.filter(
-      (h: any) =>
+      (h) =>
         h.inspection_authority && set.has(h.inspection_authority.toLowerCase()),
     );
   }
 
   if (args.buildYearMin !== undefined) {
     filtered = filtered.filter(
-      (h: any) => h.build_year !== undefined && h.build_year >= args.buildYearMin!,
+      (h) => h.build_year !== undefined && h.build_year >= args.buildYearMin!,
     );
   }
   if (args.buildYearMax !== undefined) {
     filtered = filtered.filter(
-      (h: any) => h.build_year !== undefined && h.build_year <= args.buildYearMax!,
+      (h) => h.build_year !== undefined && h.build_year <= args.buildYearMax!,
     );
   }
 
   if (args.modernized !== undefined) {
     if (args.modernized) {
       filtered = filtered.filter(
-        (h: any) => h.modernization_year && h.modernization_year !== "Ej ombyggd",
+        (h) => h.modernization_year && h.modernization_year !== NOT_MODERNIZED,
       );
     } else {
       filtered = filtered.filter(
-        (h: any) => !h.modernization_year || h.modernization_year === "Ej ombyggd",
+        (h) => !h.modernization_year || h.modernization_year === NOT_MODERNIZED,
       );
     }
   }

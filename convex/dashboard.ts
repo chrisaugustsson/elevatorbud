@@ -1,11 +1,11 @@
 import { query } from "./_generated/server";
-import { getCurrentUser } from "./auth";
+import { requireAdmin } from "./auth";
+import { enrichWithOrgName, parseModernizationYear } from "./elevators/helpers";
 
 export const overview = query({
   args: {},
   handler: async (ctx) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
+    await requireAdmin(ctx);
 
     const allElevators = await ctx.db.query("elevators").collect();
     const active = allElevators.filter((h) => h.status === "active");
@@ -52,34 +52,21 @@ export const overview = query({
       .sort((a, b) => (b.last_updated_at ?? 0) - (a.last_updated_at ?? 0))
       .slice(0, 10);
 
-    const orgCache = new Map<string, string>();
-    const recentActivity = await Promise.all(
-      withUpdates.map(async (h) => {
-        const orgKey = h.organization_id as string;
-        let orgName = orgCache.get(orgKey);
-        if (!orgName) {
-          const org = await ctx.db.get(h.organization_id);
-          orgName = (org as { name: string } | null)?.name ?? "Okänd";
-          orgCache.set(orgKey, orgName);
-        }
-        return {
-          _id: h._id,
-          elevator_number: h.elevator_number,
-          address: h.address,
-          organizationName: orgName,
-          organization_id: h.organization_id,
-          last_updated_at: h.last_updated_at!,
-        };
-      }),
-    );
+    const enriched = await enrichWithOrgName(ctx, withUpdates);
+    const recentActivity = enriched.map((h) => ({
+      _id: h._id,
+      elevator_number: h.elevator_number,
+      address: h.address,
+      organizationName: h.organizationName,
+      organization_id: h.organization_id,
+      last_updated_at: h.last_updated_at!,
+    }));
 
     // Modernization within 3 years
     const currentYear = new Date().getFullYear();
     const modernizationSoon = active.filter((h) => {
-      if (!h.recommended_modernization_year) return false;
-      const year = parseInt(h.recommended_modernization_year, 10);
-      if (isNaN(year)) return false;
-      return year >= currentYear && year <= currentYear + 3;
+      const year = parseModernizationYear(h.recommended_modernization_year);
+      return year !== null && year >= currentYear && year <= currentYear + 3;
     }).length;
 
     return {

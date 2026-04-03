@@ -1,12 +1,14 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { getCurrentUser } from "./auth";
+import { Doc } from "./_generated/dataModel";
+import { requireAuth, getOrgScope } from "./auth";
+import { queryElevators, enrichWithOrgName } from "./elevators/helpers";
 
 export const global = query({
   args: { search: v.string() },
   handler: async (ctx, { search }) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
+    const user = await requireAuth(ctx);
+    const orgId = getOrgScope(user, undefined);
 
     const trimmed = search.trim();
     if (!trimmed) {
@@ -15,8 +17,14 @@ export const global = query({
 
     const searchLower = trimmed.toLowerCase();
 
-    // Search organizations by name
-    const allOrgs = await ctx.db.query("organizations").collect();
+    // Search organizations — customers only see their own org
+    let allOrgs: Doc<"organizations">[];
+    if (orgId) {
+      const org = await ctx.db.get(orgId);
+      allOrgs = org ? [org] : [];
+    } else {
+      allOrgs = await ctx.db.query("organizations").collect();
+    }
     const matchingOrgs = allOrgs.filter((org) =>
       org.name.toLowerCase().includes(searchLower),
     );
@@ -24,13 +32,8 @@ export const global = query({
     // Build set of matching org IDs for elevator org-name matching
     const matchingOrgIds = new Set(matchingOrgs.map((org) => org._id));
 
-    // Build org name lookup for enriching elevator results
-    const orgNameMap = new Map(
-      allOrgs.map((org) => [org._id as string, org.name]),
-    );
-
-    // Search elevators by elevator_number, address, district, or organization name
-    const allElevators = await ctx.db.query("elevators").collect();
+    // Search elevators — customers only see their org's elevators
+    const allElevators = await queryElevators(ctx, orgId);
     const matchingElevators = allElevators
       .filter((e) => {
         if (e.status !== "active") return false;
@@ -43,13 +46,15 @@ export const global = query({
       })
       .slice(0, 10);
 
+    const enrichedElevators = await enrichWithOrgName(ctx, matchingElevators);
+
     return {
-      elevators: matchingElevators.map((e) => ({
+      elevators: enrichedElevators.map((e) => ({
         _id: e._id,
         elevator_number: e.elevator_number,
         address: e.address,
         district: e.district,
-        organizationName: orgNameMap.get(e.organization_id as string) ?? null,
+        organizationName: e.organizationName,
       })),
       organizations: matchingOrgs.slice(0, 10).map((org) => ({
         _id: org._id,

@@ -1,25 +1,12 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
-import { getCurrentUser } from "../auth";
+import { requireAuth, getOrgScope } from "../auth";
+import { queryElevators, enrichWithOrgName } from "./helpers";
 
 export const inspectionCalendar = query({
   args: { organization_id: v.optional(v.id("organizations")) },
   handler: async (ctx, { organization_id }) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
-
-    let elevators;
-    if (organization_id) {
-      elevators = await ctx.db
-        .query("elevators")
-        .withIndex("by_organization_id", (q) =>
-          q.eq("organization_id", organization_id),
-        )
-        .collect();
-    } else {
-      elevators = await ctx.db.query("elevators").collect();
-    }
-
+    const elevators = await queryElevators(ctx, organization_id);
     const active = elevators.filter((h) => h.status === "active");
 
     const MONTHS = [
@@ -47,21 +34,7 @@ export const inspectionCalendar = query({
 export const companies = query({
   args: { organization_id: v.optional(v.id("organizations")) },
   handler: async (ctx, { organization_id }) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
-
-    let elevators;
-    if (organization_id) {
-      elevators = await ctx.db
-        .query("elevators")
-        .withIndex("by_organization_id", (q) =>
-          q.eq("organization_id", organization_id),
-        )
-        .collect();
-    } else {
-      elevators = await ctx.db.query("elevators").collect();
-    }
-
+    const elevators = await queryElevators(ctx, organization_id);
     const active = elevators.filter((h) => h.status === "active");
 
     const byCompany: Record<string, number> = {};
@@ -101,21 +74,7 @@ export const companies = query({
 export const emergencyPhoneStatus = query({
   args: { organization_id: v.optional(v.id("organizations")) },
   handler: async (ctx, { organization_id }) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
-
-    let elevators;
-    if (organization_id) {
-      elevators = await ctx.db
-        .query("elevators")
-        .withIndex("by_organization_id", (q) =>
-          q.eq("organization_id", organization_id),
-        )
-        .collect();
-    } else {
-      elevators = await ctx.db.query("elevators").collect();
-    }
-
+    const elevators = await queryElevators(ctx, organization_id);
     const active = elevators.filter((h) => h.status === "active");
 
     let withEmergencyPhone = 0;
@@ -171,46 +130,22 @@ export const inspectionList = query({
     month: v.string(),
   },
   handler: async (ctx, { organization_id, month }) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
-
-    let elevators;
-    if (organization_id) {
-      elevators = await ctx.db
-        .query("elevators")
-        .withIndex("by_organization_id", (q) =>
-          q.eq("organization_id", organization_id),
-        )
-        .collect();
-    } else {
-      elevators = await ctx.db.query("elevators").collect();
-    }
+    const elevators = await queryElevators(ctx, organization_id);
 
     const active = elevators.filter(
       (h) => h.status === "active" && h.inspection_month === month,
     );
 
-    const orgCache = new Map<string, string>();
-    const results = await Promise.all(
-      active.map(async (h) => {
-        const orgKey = h.organization_id.toString();
-        let orgName = orgCache.get(orgKey);
-        if (!orgName) {
-          const org = await ctx.db.get(h.organization_id);
-          orgName = (org as { name: string } | null)?.name || "Okänd";
-          orgCache.set(orgKey, orgName);
-        }
-        return {
-          _id: h._id,
-          elevator_number: h.elevator_number,
-          address: h.address,
-          district: h.district,
-          inspection_authority: h.inspection_authority,
-          organization_id: h.organization_id,
-          organizationName: orgName,
-        };
-      }),
-    );
+    const enriched = await enrichWithOrgName(ctx, active);
+    const results = enriched.map((h) => ({
+      _id: h._id,
+      elevator_number: h.elevator_number,
+      address: h.address,
+      district: h.district,
+      inspection_authority: h.inspection_authority,
+      organization_id: h.organization_id,
+      organizationName: h.organizationName,
+    }));
 
     return results.sort((a, b) =>
       a.elevator_number.localeCompare(b.elevator_number, "sv"),
@@ -221,35 +156,36 @@ export const inspectionList = query({
 export const todaysElevators = query({
   args: { todayStart: v.number() },
   handler: async (ctx, { todayStart }) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
+    const user = await requireAuth(ctx);
+    const orgId = getOrgScope(user, undefined);
+    const todayEnd = todayStart + 86_400_000; // 24 hours in ms
 
-    const allElevators = await ctx.db.query("elevators").collect();
+    const allElevators = orgId
+      ? await ctx.db
+          .query("elevators")
+          .withIndex("by_organization_id", (q) => q.eq("organization_id", orgId))
+          .collect()
+      : await ctx.db.query("elevators").collect();
 
     const today = allElevators.filter((h) => {
       const createdToday =
-        h.created_by === user._id && h.created_at >= todayStart;
+        h.created_by === user._id && h.created_at >= todayStart && h.created_at < todayEnd;
       const updatedToday =
         h.last_updated_by === user._id &&
         h.last_updated_at !== undefined &&
-        h.last_updated_at >= todayStart;
+        h.last_updated_at >= todayStart &&
+        h.last_updated_at < todayEnd;
       return createdToday || updatedToday;
     });
 
-    const results = await Promise.all(
-      today.map(async (h) => {
-        const org = await ctx.db.get(h.organization_id);
-        return {
-          _id: h._id,
-          elevator_number: h.elevator_number,
-          address: h.address,
-          organizationName: org?.name,
-          created_at: h.created_at,
-          last_updated_at: h.last_updated_at,
-        };
-      }),
-    );
-
-    return results;
+    const enriched = await enrichWithOrgName(ctx, today);
+    return enriched.map((h) => ({
+      _id: h._id,
+      elevator_number: h.elevator_number,
+      address: h.address,
+      organizationName: h.organizationName,
+      created_at: h.created_at,
+      last_updated_at: h.last_updated_at,
+    }));
   },
 });

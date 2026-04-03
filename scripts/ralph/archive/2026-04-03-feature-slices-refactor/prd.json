@@ -1,0 +1,216 @@
+{
+  "project": "Hisskompetens",
+  "branchName": "ralph/feature-slices-refactor",
+  "description": "Feature Slices Architecture & Large File Refactor — restructure apps to use feature slices, split oversized files, and split Convex backend",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Split convex/elevators.ts into domain modules",
+      "description": "As a developer, I want the 36 KB backend file split into domain-focused modules in convex/elevators/ so queries are easy to find.",
+      "acceptanceCriteria": [
+        "convex/elevators.ts removed and replaced with convex/elevators/ directory",
+        "convex/elevators/crud.ts contains: get, search, create, update, archive, checkElevatorNumber",
+        "convex/elevators/listing.ts contains: list, exportData",
+        "convex/elevators/analytics.ts contains: stats, chartData",
+        "convex/elevators/modernization.ts contains: timeline, budget, priorityList, measures (no 'modernization' prefix on function names)",
+        "convex/elevators/maintenance.ts contains: inspectionCalendar, companies, emergencyPhoneStatus, inspectionList, todaysElevators",
+        "convex/elevators/helpers.ts contains: autoAddSuggestedValues, fetchAndFilter, filterArgs schema, org name cache (internal helpers, not exported via api)",
+        "All frontend imports in both admin and client apps updated to new API paths (e.g. api.elevators.get -> api.elevators.crud.get, api.elevators.list -> api.elevators.listing.list, etc.)",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Do this FIRST while frontend files are still monoliths — fewer files to update API paths in. Grep for all 'api.elevators.' references across both apps. Convex file-based routing maps convex/elevators/crud.ts -> api.elevators.crud.get. The helpers.ts file should use internalQuery/internalMutation or just be a regular TS file with exported helpers — check how the existing code uses these functions."
+    },
+    {
+      "id": "US-002",
+      "title": "Admin app feature/shared folder structure",
+      "description": "As a developer, I want the admin app restructured with features/ and shared/ directories so code is organized by domain.",
+      "acceptanceCriteria": [
+        "src/features/ directory created with slices: elevator/, maintenance/, modernization/, register/, import/, cms/",
+        "Each feature slice has components/ subdirectory (others created as needed, not empty)",
+        "src/shared/components/, src/shared/hooks/, src/shared/lib/ directories created",
+        "Existing src/components/ files moved to src/shared/components/ (except CMS form components)",
+        "CMS form components (startsida-form.tsx, om-oss-form.tsx, tjanster-form.tsx, kontakt-form.tsx) moved to src/features/cms/components/",
+        "Existing src/lib/ files moved to src/shared/lib/",
+        "All imports updated to new paths — no broken references",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Only move existing shared files (components/, lib/) into shared/. Do NOT extract feature-specific code from route files yet — that happens in later stories (US-005 through US-010). CMS forms are already domain-specific so they go directly into features/cms/."
+    },
+    {
+      "id": "US-003",
+      "title": "Client app feature/shared folder structure",
+      "description": "As a developer, I want the client app restructured with features/ and shared/ directories so code is organized by domain.",
+      "acceptanceCriteria": [
+        "src/features/ directory created with slices: elevator/, maintenance/, modernization/, register/",
+        "Each feature slice has components/ subdirectory (others created as needed, not empty)",
+        "src/shared/components/, src/shared/hooks/, src/shared/lib/ directories created",
+        "Existing src/components/ files moved to src/shared/components/",
+        "Existing src/lib/ files moved to src/shared/lib/",
+        "All imports updated to new paths — no broken references",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Same pattern as admin app (US-002). Only move existing shared files, do not extract feature-specific code from route files yet."
+    },
+    {
+      "id": "US-004",
+      "title": "Move reusable UI components to packages/ui",
+      "description": "As a developer, I want generic UI components in the shared package so both apps can import them.",
+      "acceptanceCriteria": [
+        "MultiSelectFilter component added to packages/ui/src/components/ui/ with generic props (no domain-specific logic)",
+        "SortHeader component added to packages/ui/src/components/ui/ with generic props",
+        "StatCard component added to packages/ui/src/components/ui/ with generic props",
+        "UploadZone component added to packages/ui/src/components/ui/ with generic props",
+        "All 4 components exported from package index",
+        "Imports in admin and client apps updated to use @elevatorbud/ui imports",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Find these components in admin/client route files. Generalize their props (remove domain-specific types, use generic names). Add to packages/ui following existing shadcn component patterns. Update all import sites in both apps."
+    },
+    {
+      "id": "US-005",
+      "title": "Split elevator edit form into section components",
+      "description": "As a developer, I want the 52 KB edit form split into focused section components so each is easy to understand and modify.",
+      "acceptanceCriteria": [
+        "hiss.$id.redigera.tsx route file is a thin orchestrator that imports and composes section components",
+        "Extracted to features/elevator/components/: BasicInfoSection, TechnicalSpecsSection, DoorsAndCabSection, MachinerySection, InspectionSection, ModernizationSection, EmergencyPhoneSection, CommentsSection",
+        "useSuggestions hook extracted to features/elevator/hooks/use-suggestions.ts",
+        "Draft persistence logic extracted to features/elevator/hooks/use-draft-persistence.ts",
+        "Form converters (serverToFormValues, toOptionalString, toOptionalNumber) extracted to features/elevator/utils/form-converters.ts",
+        "Form values type extracted to features/elevator/types.ts",
+        "Route file under 10 KB",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Section components receive the TanStack Form instance via props and render fields. These same section components will be reused by the wizard in US-006. Keep localStorage draft keys stable (draft-hiss-{id}). All paths are relative to apps/admin/src/."
+    },
+    {
+      "id": "US-006",
+      "title": "Split new elevator wizard into step components",
+      "description": "As a developer, I want the 48 KB wizard split into step components and a reusable wizard shell.",
+      "acceptanceCriteria": [
+        "ny.tsx route file is a thin orchestrator importing wizard and step components",
+        "Wizard container extracted to features/elevator/components/ElevatorWizard.tsx (step navigation, progress indicator)",
+        "Each of the 9 steps extracted as separate components in features/elevator/components/wizard-steps/",
+        "Step components reuse the same section components from US-005 where fields overlap",
+        "Review step (Step 9) is its own component showing a summary",
+        "Shared hooks (useSuggestions, useDraftPersistence) reused from US-005 extractions",
+        "Route file under 5 KB",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Depends on US-005 — reuse the same section components extracted there. The wizard renders one section per step; the edit page renders all sections. Keep localStorage draft key stable (draft-ny-hiss)."
+    },
+    {
+      "id": "US-007",
+      "title": "Split admin import page into stage components",
+      "description": "As a developer, I want the 32 KB import wizard split into stage components.",
+      "acceptanceCriteria": [
+        "admin.import.tsx route file is a thin orchestrator",
+        "Extracted to features/import/components/: UploadStage, ColumnMappingStage, PreviewStage, ImportingStage, ResultStage",
+        "Import state machine logic extracted to features/import/hooks/use-import-machine.ts",
+        "StatCard and UploadZone imported from @elevatorbud/ui (moved in US-004)",
+        "Route file under 5 KB",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "StatCard and UploadZone should already be in packages/ui from US-004 — import from @elevatorbud/ui. Focus on extracting the 5 import stages and the state machine hook."
+    },
+    {
+      "id": "US-008",
+      "title": "Split admin register page into feature components",
+      "description": "As a developer, I want the admin register page split so the route file is a thin orchestrator.",
+      "acceptanceCriteria": [
+        "admin register.tsx route file composes feature components from features/register/",
+        "Table, filter, and search logic extracted to features/register/components/",
+        "MultiSelectFilter and SortHeader imported from @elevatorbud/ui (moved in US-004)",
+        "Route file under 10 KB",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Admin register has edit links and org context that client version does not — keep admin-specific logic in admin feature components. Do NOT share components with client app."
+    },
+    {
+      "id": "US-009",
+      "title": "Split admin maintenance page into feature components",
+      "description": "As a developer, I want the admin maintenance page split so the route file is a thin orchestrator.",
+      "acceptanceCriteria": [
+        "admin underhall.tsx route file composes feature components from features/maintenance/",
+        "Chart components and data cards extracted to features/maintenance/components/",
+        "Route file under 10 KB",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "Admin maintenance page may have org selector context. Keep admin-specific logic in admin feature components, do NOT share with client app."
+    },
+    {
+      "id": "US-010",
+      "title": "Split admin modernization page into feature components",
+      "description": "As a developer, I want the admin modernization page split so the route file is a thin orchestrator.",
+      "acceptanceCriteria": [
+        "admin modernisering.tsx route file composes feature components from features/modernization/",
+        "Timeline chart, budget breakdown, and priority list extracted to features/modernization/components/",
+        "Route file under 10 KB",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "Admin modernization page may have org selector context. Keep admin-specific logic in admin feature components, do NOT share with client app."
+    },
+    {
+      "id": "US-011",
+      "title": "Split client register page into feature components",
+      "description": "As a developer, I want the client register page split so the route file is a thin orchestrator.",
+      "acceptanceCriteria": [
+        "client register.tsx route file composes feature components from features/register/",
+        "Table, filter, and search logic extracted to features/register/components/",
+        "MultiSelectFilter and SortHeader imported from @elevatorbud/ui (moved in US-004)",
+        "Route file under 10 KB",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "Client register is read-only — no edit buttons, no org selector. Components are duplicated from admin pattern, NOT shared between apps."
+    },
+    {
+      "id": "US-012",
+      "title": "Split client maintenance page into feature components",
+      "description": "As a developer, I want the client maintenance page split so the route file is a thin orchestrator.",
+      "acceptanceCriteria": [
+        "client underhall.tsx route file composes feature components from features/maintenance/",
+        "Chart components and data cards extracted to features/maintenance/components/",
+        "Route file under 10 KB",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "Client maintenance is tenant-isolated — no org selector. Components duplicated from admin pattern, NOT shared between apps."
+    },
+    {
+      "id": "US-013",
+      "title": "Split client modernization page into feature components",
+      "description": "As a developer, I want the client modernization page split so the route file is a thin orchestrator.",
+      "acceptanceCriteria": [
+        "client modernisering.tsx route file composes feature components from features/modernization/",
+        "Timeline chart, budget breakdown, and priority list extracted to features/modernization/components/",
+        "Route file under 10 KB",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "Client modernization is tenant-isolated — no org selector. Components duplicated from admin pattern, NOT shared between apps."
+    }
+  ]
+}

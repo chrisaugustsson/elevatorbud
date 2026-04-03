@@ -1,7 +1,6 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
-import { getCurrentUser } from "../auth";
-import { filterArgs, fetchAndFilter } from "./helpers";
+import { filterArgs, fetchAndFilter, enrichWithOrgName } from "./helpers";
 
 export const list = query({
   args: {
@@ -12,15 +11,12 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
-
     const filtered = await fetchAndFilter(ctx, args);
     const totalCount = filtered.length;
 
     const sortField = args.sort || "elevator_number";
     const sortOrder = args.order || "asc";
-    filtered.sort((a: any, b: any) => {
+    filtered.sort((a, b) => {
       const aVal = (a as Record<string, unknown>)[sortField];
       const bVal = (b as Record<string, unknown>)[sortField];
 
@@ -42,22 +38,7 @@ export const list = query({
     const page = args.page ?? 0;
     const offset = page * limit;
     const pageData = filtered.slice(offset, offset + limit);
-
-    const orgCache = new Map<string, string>();
-    const results = await Promise.all(
-      pageData.map(async (h: any) => {
-        let orgName = orgCache.get(h.organization_id);
-        if (orgName === undefined) {
-          const org = await ctx.db.get(h.organization_id) as { name: string } | null;
-          orgName = org?.name ?? "Okänd";
-          orgCache.set(h.organization_id, orgName!);
-        }
-        return {
-          ...h,
-          organizationName: orgName,
-        };
-      }),
-    );
+    const results = await enrichWithOrgName(ctx, pageData);
 
     return {
       data: results,
@@ -72,31 +53,12 @@ export const list = query({
 export const exportData = query({
   args: filterArgs,
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
-
     const filtered = await fetchAndFilter(ctx, args);
 
-    filtered.sort((a: any, b: any) =>
-      String(a.elevator_number).localeCompare(String(b.elevator_number), "sv"),
+    filtered.sort((a, b) =>
+      a.elevator_number.localeCompare(b.elevator_number, "sv"),
     );
 
-    const orgCache = new Map<string, string>();
-    const results = await Promise.all(
-      filtered.map(async (h: any) => {
-        let orgName = orgCache.get(h.organization_id);
-        if (orgName === undefined) {
-          const org = await ctx.db.get(h.organization_id) as { name: string } | null;
-          orgName = org?.name ?? "Okänd";
-          orgCache.set(h.organization_id, orgName!);
-        }
-        return {
-          ...h,
-          organizationName: orgName,
-        };
-      }),
-    );
-
-    return results;
+    return enrichWithOrgName(ctx, filtered);
   },
 });
