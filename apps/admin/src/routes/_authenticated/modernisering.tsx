@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import {
   PERIODS,
@@ -16,6 +17,7 @@ import { ModernizationSkeleton } from "../../features/modernization/components/m
 
 export const Route = createFileRoute("/_authenticated/modernisering")({
   component: Modernisering,
+  pendingComponent: ModernizationSkeleton,
 });
 
 function Modernisering() {
@@ -23,9 +25,23 @@ function Modernisering() {
     null,
   );
 
-  const tidslinje = useQuery(api.elevators.modernization.timeline, {});
-  const budget = useQuery(api.elevators.modernization.budget, {});
-  const atgarder = useQuery(api.elevators.modernization.measures, {});
+  const tidslinjeOpts = convexQuery(api.elevators.modernization.timeline, {});
+  const { data: tidslinje } = useSuspenseQuery({
+    queryKey: tidslinjeOpts.queryKey,
+    staleTime: tidslinjeOpts.staleTime,
+  });
+
+  const budgetOpts = convexQuery(api.elevators.modernization.budget, {});
+  const { data: budget } = useSuspenseQuery({
+    queryKey: budgetOpts.queryKey,
+    staleTime: budgetOpts.staleTime,
+  });
+
+  const atgarderOpts = convexQuery(api.elevators.modernization.measures, {});
+  const { data: atgarder } = useSuspenseQuery({
+    queryKey: atgarderOpts.queryKey,
+    staleTime: atgarderOpts.staleTime,
+  });
 
   const prioritetslistaArgs = useMemo(() => {
     if (selectedPeriod) {
@@ -37,19 +53,14 @@ function Modernisering() {
     return {};
   }, [selectedPeriod]);
 
-  const prioritetslista = useQuery(
+  const prioritetslistaOpts = convexQuery(
     api.elevators.modernization.priorityList,
     prioritetslistaArgs as never,
   );
-
-  if (
-    tidslinje === undefined ||
-    budget === undefined ||
-    atgarder === undefined ||
-    prioritetslista === undefined
-  ) {
-    return <ModernizationSkeleton />;
-  }
+  const { data: prioritetslista } = useSuspenseQuery({
+    queryKey: prioritetslistaOpts.queryKey,
+    staleTime: prioritetslistaOpts.staleTime,
+  });
 
   // Timeline chart data with color coding
   const tidslinjeData = tidslinje.map((t: { year: string; count: number }) => ({
