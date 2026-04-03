@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef } from "react";
-import { useQuery, useAction } from "convex/react";
+import { useQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
+import { useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import {
   readWorkbook,
@@ -60,12 +62,16 @@ export function useImportMachine() {
   const [sheetData, setSheetData] = useState<unknown[][]>([]);
 
   const confirmImport = useAction(api.imports.confirm);
-  const currentUser = useQuery(api.users.me) as { email?: string } | undefined;
+  const { data: currentUser } = useQuery({
+    ...convexQuery(api.users.me, {}),
+  }) as { data: { email?: string } | undefined };
 
-  const analysis = useQuery(
-    api.imports.analyze,
-    analysisArgs ?? ("skip" as const),
-  ) as AnalysisResult | undefined;
+  const { data: analysis } = useQuery({
+    ...convexQuery(
+      api.imports.analyze,
+      analysisArgs ?? "skip",
+    ),
+  }) as { data: AnalysisResult | undefined };
 
   const handleFileSelect = useCallback(async (file: File) => {
     if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {

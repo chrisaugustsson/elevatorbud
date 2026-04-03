@@ -1,4 +1,5 @@
-import { useQuery } from "convex/react";
+import { useQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { Label } from "@elevatorbud/ui/components/ui/label";
 import { Input } from "@elevatorbud/ui/components/ui/input";
@@ -16,12 +17,14 @@ export function HissnummerField({
   currentHissId: string;
 }) {
   const elevatorNumber = field.state.value;
-  const checkResult = useQuery(
-    api.elevators.crud.checkElevatorNumber,
-    elevatorNumber
-      ? { elevator_number: elevatorNumber, excludeId: currentHissId as never }
-      : "skip",
-  );
+  const { data: checkResult } = useQuery({
+    ...convexQuery(
+      api.elevators.crud.checkElevatorNumber,
+      elevatorNumber
+        ? { elevator_number: elevatorNumber, excludeId: currentHissId as never }
+        : "skip",
+    ),
+  }) as { data: { exists: boolean } | undefined };
   const isDuplicate = checkResult?.exists === true;
 
   return (
