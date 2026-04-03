@@ -5,8 +5,8 @@ import {
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { auth } from "@elevatorbud/auth/server";
-import { ConvexHttpClient } from "convex/browser";
-import { useQuery } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import {
   SidebarProvider,
@@ -18,49 +18,27 @@ import { AppSidebar } from "../shared/components/app-sidebar";
 import { GlobalSearch } from "../shared/components/global-search";
 
 const authGuard = createServerFn().handler(async () => {
-  const { isAuthenticated, userId, getToken } = await auth();
+  const { isAuthenticated } = await auth();
 
   if (!isAuthenticated) {
     throw redirect({ to: "/login" });
   }
-
-  // Prefetch user from Convex server-side to avoid client loading flash
-  try {
-    const token = await getToken({ template: "convex" });
-    if (token) {
-      const httpClient = new ConvexHttpClient(
-        import.meta.env.VITE_CONVEX_URL as string,
-      );
-      httpClient.setAuth(token);
-      const user = await httpClient.query(api.users.me);
-      return { userId, user };
-    }
-  } catch {
-    // Fall back to client-side fetch
-  }
-
-  return { userId, user: undefined as undefined };
 });
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: () => authGuard(),
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData(convexQuery(api.users.me, {}));
+  },
   component: AuthenticatedLayout,
 });
 
 function AuthenticatedLayout() {
-  const { user: prefetchedUser } = Route.useRouteContext();
-  const liveUser = useQuery(api.users.me);
-
-  // Use live subscription once available, fall back to server-prefetched data
-  const user = liveUser !== undefined ? liveUser : prefetchedUser;
-
-  if (user === undefined) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground">Laddar användare...</div>
-      </div>
-    );
-  }
+  const userQuery = convexQuery(api.users.me, {});
+  const { data: user } = useSuspenseQuery({
+    queryKey: userQuery.queryKey,
+    staleTime: userQuery.staleTime,
+  });
 
   if (user === null) {
     return (
