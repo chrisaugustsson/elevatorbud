@@ -181,3 +181,21 @@ Started: fre  3 apr. 2026 12:21:09 CEST
   - When chart + table compete for horizontal space, vertical stacking is usually the better choice — tables with many columns need full width
   - Sticky columns need `z-index` (z-10) to render above other cells during horizontal scroll
 ---
+
+## 2026-04-03 - US-012
+- Created `convex/search.ts` with a `global` query function for cross-entity search
+- Searches elevators by: elevator_number, address, district, and organization name (via org ID lookup)
+- Searches organizations by: name
+- Returns results grouped by type: `{ elevators: [...], organizations: [...] }`
+- Each type limited to 10 results for performance
+- Case-insensitive matching, empty query returns empty results (no table scan)
+- Updated `convex-api.d.ts` in both admin and client apps with `search.global` type
+- Files changed:
+  - `convex/search.ts` — new file with global search query
+  - `apps/admin/src/convex-api.d.ts` — added search.global type
+  - `apps/client/src/convex-api.d.ts` — added search.global type
+- **Learnings for future iterations:**
+  - No full-text search indexes exist on elevators/organizations — using collect + filter pattern consistent with existing codebase
+  - For org-name search on elevators: pre-compute matching org IDs into a Set, then check elevator's organization_id membership
+  - Convex Id types need `as string` cast when used as Map keys due to branded type
+---

@@ -205,7 +205,7 @@
         "Typecheck passes"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": "Check if Convex search indexes exist on the elevators and organizations tables. If not, add them. Use Convex's built-in search index feature or filter-based approach depending on what's available. Update convex-api.d.ts in admin app with the new query."
     },
     {
