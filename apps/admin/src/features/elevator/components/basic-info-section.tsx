@@ -53,7 +53,7 @@ export function BasicInfoSection({
               onValueChange={(val) => field.handleChange(val)}
             >
               <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="V\u00e4lj organisation..." />
+                <SelectValue placeholder="Välj organisation..." />
               </SelectTrigger>
               <SelectContent>
                 {orgs?.map((org: { _id: string; name: string }) => (
@@ -109,7 +109,7 @@ export function BasicInfoSection({
           name="elevator_designation"
           label="Hissbeteckning"
           category="elevator_designation"
-          placeholder="V\u00e4lj eller ange beteckning..."
+          placeholder="Välj eller ange beteckning..."
           changed={
             !!originalValues &&
             isChanged("elevator_designation", formValues, originalValues)
@@ -121,7 +121,7 @@ export function BasicInfoSection({
           name="district"
           label="Distrikt"
           category="district"
-          placeholder="V\u00e4lj eller ange distrikt..."
+          placeholder="Välj eller ange distrikt..."
           changed={
             !!originalValues &&
             isChanged("district", formValues, originalValues)

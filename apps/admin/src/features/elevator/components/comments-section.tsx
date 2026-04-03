@@ -35,7 +35,7 @@ export function CommentsSection({
               <Textarea
                 id="comments"
                 className="min-h-[120px]"
-                placeholder="Skriv eventuella kommentarer h\u00e4r..."
+                placeholder="Skriv eventuella kommentarer här..."
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}
               />

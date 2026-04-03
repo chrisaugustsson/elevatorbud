@@ -1,5 +1,6 @@
 import { query, action } from "./_generated/server";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 import { requireAdmin } from "./auth";
 import { anyApi } from "convex/server";
 import type { FunctionReference } from "convex/server";
@@ -31,7 +32,7 @@ export const analyze = query({
     for (const nr of args.elevatorNumberList) {
       const existing = await ctx.db
         .query("elevators")
-        .withIndex("by_elevator_number", (q: any) => q.eq("elevator_number", nr))
+        .withIndex("by_elevator_number", (q) => q.eq("elevator_number", nr))
         .unique();
       if (existing) {
         existingElevatorNumbers[nr] = existing._id as string;
@@ -87,7 +88,7 @@ export const analyze = query({
  */
 export const confirm = action({
   args: {
-    elevators: v.array(v.any()),
+    elevators: v.array(v.record(v.string(), v.any())),
     existingOrgMatchNames: v.array(v.string()),
     existingOrgMatchIds: v.array(v.string()),
     newOrgNames: v.array(v.string()),
@@ -98,7 +99,7 @@ export const confirm = action({
     const { adminId } = (await ctx.runQuery(
       internalRef.importsInternal.checkAdmin,
       {},
-    )) as { adminId: string };
+    )) as { adminId: Id<"users"> };
 
     // 2. Create new orgs and build complete mapping as parallel arrays
     // (Convex doesn't allow non-ASCII chars in object keys, so we can't

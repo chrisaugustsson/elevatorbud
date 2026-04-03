@@ -1,143 +1,278 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { useSelectedOrg } from "../../shared/lib/org-context";
-import { KpiCards } from "@elevatorbud/ui/components/dashboard/kpi-cards";
-import type { KpiItem } from "@elevatorbud/ui/components/dashboard/kpi-cards";
-import {
-  DashboardBarChart,
-  DashboardPieChart,
-} from "@elevatorbud/ui/components/dashboard/charts";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@elevatorbud/ui/components/ui/card";
+import {
   Building2,
-  Calendar,
+  Upload,
+  Database,
+  Plus,
+  ArrowRight,
   Clock,
+  MapPin,
   Hammer,
-  TrendingUp,
-  AlertTriangle,
+  CalendarCheck,
 } from "lucide-react";
+import { Button } from "@elevatorbud/ui/components/ui/button";
+
+type DashboardData = {
+  totalElevators: number;
+  totalOrganizations: number;
+  upcomingInspections: number;
+  modernizationSoon: number;
+  topOrganizations: {
+    _id: string;
+    name: string;
+    elevatorCount: number;
+  }[];
+  recentActivity: {
+    _id: string;
+    elevator_number: string;
+    address?: string;
+    organizationName: string;
+    organization_id: string;
+    last_updated_at: number;
+  }[];
+};
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
 function Dashboard() {
-  const { selectedOrgId } = useSelectedOrg();
-  const orgFilter = selectedOrgId
-    ? ({ organization_id: selectedOrgId } as never)
-    : {};
+  const data = useQuery(api.dashboard.overview, {}) as
+    | DashboardData
+    | undefined;
 
-  const stats = useQuery(api.elevators.analytics.stats, orgFilter);
-  const chartData = useQuery(api.elevators.analytics.chartData, orgFilter);
-
-  if (stats === undefined || chartData === undefined) {
+  if (data === undefined) {
     return <DashboardSkeleton />;
   }
 
-  const kpiItems: KpiItem[] = [
-    {
-      title: "Totalt antal hissar",
-      value: stats.totalCount,
-      icon: <Building2 className="h-4 w-4" />,
-    },
-    {
-      title: "Medelålder",
-      value: `${stats.averageAge} år`,
-      icon: <Clock className="h-4 w-4" />,
-    },
-    {
-      title: "Modernisering inom 3 år",
-      value: stats.modernizationWithin3Years,
-      description: "Rekommenderad modernisering",
-      icon: <Hammer className="h-4 w-4" />,
-    },
-    {
-      title: "Budget innevarande år",
-      value: `${(stats.totalBudgetCurrentYear / 1000).toFixed(0)} tkr`,
-      icon: <TrendingUp className="h-4 w-4" />,
-    },
-    {
-      title: "Utan modernisering",
-      value: stats.withoutModernization,
-      description: "Ej ombyggda",
-      icon: <AlertTriangle className="h-4 w-4" />,
-    },
-    {
-      title: "Senaste inventering",
-      value: stats.lastInventory
-        ? new Date(stats.lastInventory).toLocaleDateString("sv-SE")
-        : "–",
-      icon: <Calendar className="h-4 w-4" />,
-    },
-  ];
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
 
-      <KpiCards items={kpiItems} />
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          label="Hissar totalt"
+          value={data.totalElevators}
+          icon={<Building2 className="h-4 w-4 text-muted-foreground" />}
+        />
+        <StatCard
+          label="Organisationer"
+          value={data.totalOrganizations}
+          icon={<Building2 className="h-4 w-4 text-muted-foreground" />}
+        />
+        <StatCard
+          label="Kommande besiktningar"
+          value={data.upcomingInspections}
+          icon={<CalendarCheck className="h-4 w-4 text-muted-foreground" />}
+        />
+        <StatCard
+          label="Modernisering inom 3 år"
+          value={data.modernizationSoon}
+          icon={<Hammer className="h-4 w-4 text-muted-foreground" />}
+        />
+      </div>
 
-      {stats.totalCount === 0 ? (
-        <div className="py-12 text-center text-muted-foreground">
-          Inga hissar registrerade ännu. Skapa en hiss via &quot;Ny hiss&quot;
-          för att se statistik.
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Left column: Top orgs + shortcuts */}
+        <div className="space-y-6 lg:col-span-1">
+          {/* Top organizations */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base font-semibold">
+                Organisationer
+              </CardTitle>
+              <Link
+                to="/admin/organisationer"
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                Visa alla
+              </Link>
+            </CardHeader>
+            <CardContent className="space-y-1 pt-0">
+              {data.topOrganizations.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  Inga organisationer ännu
+                </p>
+              ) : (
+                data.topOrganizations.map((org) => (
+                  <Link
+                    key={org._id}
+                    to={
+                      `/admin/organisationer/${org._id}` as string
+                    }
+                    className="flex items-center justify-between rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent"
+                  >
+                    <span className="font-medium truncate">{org.name}</span>
+                    <span className="ml-2 shrink-0 text-muted-foreground">
+                      {org.elevatorCount} hissar
+                    </span>
+                  </Link>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Shortcuts */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold">
+                Genvägar
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 pt-0">
+              <Link to="/ny" className="block">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Ny hiss
+                </Button>
+              </Link>
+              <Link to="/admin/import" className="block">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  Importera
+                </Button>
+              </Link>
+              <Link to="/admin/referensdata" className="block">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2"
+                >
+                  <Database className="h-4 w-4" />
+                  Referensdata
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <DashboardBarChart
-            title="Hissar per distrikt"
-            data={chartData.byDistrict}
-            color="var(--color-chart-1, #2563eb)"
-          />
 
-          <DashboardBarChart
-            title="Åldersfördelning"
-            data={chartData.ageDistribution}
-            color="var(--color-chart-2, #16a34a)"
-          />
-
-          <DashboardPieChart
-            title="Hisstyper"
-            data={chartData.byElevatorType}
-          />
-
-          <DashboardBarChart
-            title="Topp 10 fabrikat"
-            data={chartData.topManufacturers}
-            color="var(--color-chart-3, #d97706)"
-          />
-
-          <DashboardBarChart
-            title="Moderniseringstidslinje"
-            data={chartData.modernizationTimeline}
-            color="var(--color-chart-4, #dc2626)"
-          />
-
-          <DashboardPieChart
-            title="Skötselföretag"
-            data={chartData.byMaintenanceCompany}
-            innerRadius={60}
-          />
-        </div>
-      )}
+        {/* Right column: Recent activity */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base font-semibold">
+              Senaste aktivitet
+            </CardTitle>
+            <Link
+              to="/register"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Visa register
+            </Link>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {data.recentActivity.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                Ingen aktivitet ännu. Skapa eller redigera en hiss för att se
+                senaste ändringar.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                {data.recentActivity.map((item) => (
+                  <Link
+                    key={item._id}
+                    to="/hiss/$id"
+                    params={{ id: item._id }}
+                    className="flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-accent group"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">
+                          {item.elevator_number}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {item.organizationName}
+                        </span>
+                      </div>
+                      {item.address && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{item.address}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {formatRelativeTime(item.last_updated_at)}
+                      </span>
+                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
+function StatCard({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+          {icon}
+          {label}
+        </div>
+        <div className="text-2xl font-bold">{value}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatRelativeTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return "just nu";
+  if (minutes < 60) return `${minutes} min sedan`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} tim sedan`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "igår";
+  if (days < 7) return `${days} dagar sedan`;
+  return new Date(timestamp).toLocaleDateString("sv-SE");
+}
+
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <Skeleton className="h-8 w-48" />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-28 rounded-xl" />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-20 rounded-xl" />
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-[380px] rounded-xl" />
-        ))}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6">
+          <Skeleton className="h-64 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
+        </div>
+        <Skeleton className="h-96 rounded-xl lg:col-span-2" />
       </div>
     </div>
   );

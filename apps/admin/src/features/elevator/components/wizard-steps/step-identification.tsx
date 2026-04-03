@@ -44,7 +44,7 @@ export function StepIdentification({ form }: StepIdentificationProps) {
         name="elevator_designation"
         label="Hissbeteckning"
         category="elevator_designation"
-        placeholder="V\u00e4lj eller ange beteckning..."
+        placeholder="Välj eller ange beteckning..."
         changed={false}
       />
 
@@ -54,7 +54,7 @@ export function StepIdentification({ form }: StepIdentificationProps) {
         name="district"
         label="Distrikt"
         category="district"
-        placeholder="V\u00e4lj eller ange distrikt..."
+        placeholder="Välj eller ange distrikt..."
         changed={false}
       />
     </div>

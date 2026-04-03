@@ -5,133 +5,57 @@ import {
   Database,
   Globe,
   HardHat,
+  Plus,
   Upload,
   Users,
   Wrench,
 } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarRail,
-} from "@elevatorbud/ui/components/ui/sidebar";
-import { UserButton } from "@elevatorbud/auth";
+  AppSidebar as AppSidebarBase,
+  type NavGroup,
+} from "@elevatorbud/ui/components/ui/app-sidebar";
+import { UserMenu } from "./user-menu";
 
-const mainNav = [
-  { title: "Dashboard", href: "/dashboard", icon: BarChart3 },
-  { title: "Register", href: "/register", icon: ClipboardList },
-  { title: "Modernisering", href: "/modernisering", icon: HardHat },
-  { title: "Underhåll", href: "/underhall", icon: Wrench },
-] as const;
-
-const webbplatsNav = [
-  { title: "Webbplats", href: "/webbplats", icon: Globe },
-] as const;
-
-const adminNav = [
-  { title: "Organisationer", href: "/admin/organisationer", icon: Building2 },
-  { title: "Användare", href: "/admin/anvandare", icon: Users },
-  { title: "Import", href: "/admin/import", icon: Upload },
-  { title: "Referensdata", href: "/admin/referensdata", icon: Database },
-] as const;
+const navigation: NavGroup[] = [
+  {
+    items: [
+      { title: "Dashboard", href: "/dashboard", icon: BarChart3 },
+      { title: "Ny hiss", href: "/ny", icon: Plus },
+      { title: "Register", href: "/register", icon: ClipboardList },
+      { title: "Modernisering", href: "/modernisering", icon: HardHat },
+      { title: "Underhåll", href: "/underhall", icon: Wrench },
+    ],
+  },
+  {
+    label: "Webbplats",
+    items: [{ title: "Webbplats", href: "/webbplats", icon: Globe }],
+  },
+  {
+    label: "Admin",
+    items: [
+      { title: "Organisationer", href: "/admin/organisationer", icon: Building2 },
+      { title: "Användare", href: "/admin/anvandare", icon: Users },
+      { title: "Import", href: "/admin/import", icon: Upload },
+      { title: "Referensdata", href: "/admin/referensdata", icon: Database },
+    ],
+  },
+];
 
 export function AppSidebar() {
   const routerState = useRouterState();
   const pathname = routerState.location.pathname;
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-sm">
-            H
-          </div>
-          <span className="truncate font-semibold text-sm group-data-[collapsible=icon]:hidden">
-            Hisskompetens
-          </span>
-        </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mainNav.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={
-                      pathname === item.href ||
-                      (item.href === "/dashboard" && pathname === "/")
-                    }
-                    tooltip={item.title}
-                  >
-                    <Link to={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Webbplats</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {webbplatsNav.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname.startsWith(item.href)}
-                    tooltip={item.title}
-                  >
-                    <Link to={item.href} search={{ sida: "startsida" }}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Admin</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminNav.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname.startsWith(item.href)}
-                    tooltip={item.title}
-                  >
-                    <Link to={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter>
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <UserButton />
-        </div>
-      </SidebarFooter>
-      <SidebarRail />
-    </Sidebar>
+    <AppSidebarBase
+      logo="H"
+      name="Hisskompetens"
+      navigation={navigation}
+      pathname={pathname}
+      renderLink={({ href, children }) => (
+        <Link to={href}>{children}</Link>
+      )}
+      footer={<UserMenu />}
+    />
   );
 }

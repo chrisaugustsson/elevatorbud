@@ -46,7 +46,7 @@ const tooltipStyle = {
 function EmptyBudget() {
   return (
     <p className="py-8 text-center text-muted-foreground">
-      Ingen budgetdata tillg\u00e4nglig.
+      Ingen budgetdata tillgänglig.
     </p>
   );
 }
@@ -61,7 +61,7 @@ export function BudgetOverview({
     <div className="space-y-4">
       <h2 className="flex items-center gap-2 text-lg font-semibold">
         <TrendingUp className="h-5 w-5" />
-        Budget\u00f6versikt
+        Budgetöversikt
         <span className="text-sm font-normal text-muted-foreground">
           (Totalt: {(totalBudget / 1000).toFixed(0)} tkr)
         </span>
@@ -72,7 +72,7 @@ export function BudgetOverview({
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              Budget per \u00e5r (tkr)
+              Budget per år (tkr)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -102,14 +102,14 @@ export function BudgetOverview({
                       contentStyle={tooltipStyle}
                       formatter={(value, name) => [
                         `${String(value)} tkr`,
-                        name === "amount" ? "Per \u00e5r" : "Kumulativt",
+                        name === "amount" ? "Per år" : "Kumulativt",
                       ]}
                     />
                     <Legend
                       wrapperStyle={{ fontSize: "12px" }}
                       formatter={(value: string) => (
                         <span className="text-foreground">
-                          {value === "amount" ? "Per \u00e5r" : "Kumulativt"}
+                          {value === "amount" ? "Per år" : "Kumulativt"}
                         </span>
                       )}
                     />

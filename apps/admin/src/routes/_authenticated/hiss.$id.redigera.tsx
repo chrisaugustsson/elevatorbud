@@ -1,9 +1,15 @@
 import { useState, useEffect, useMemo } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useForm } from "@tanstack/react-form";
 import { Button } from "@elevatorbud/ui/components/ui/button";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@elevatorbud/ui/components/ui/tabs";
 import {
   ArrowLeft,
   Check,
@@ -35,12 +41,23 @@ import { ModernizationSection } from "../../features/elevator/components/moderni
 import { EmergencyPhoneSection } from "../../features/elevator/components/emergency-phone-section";
 import { CommentsSection } from "../../features/elevator/components/comments-section";
 
+const tabSlugs = ["grundinfo", "teknik", "underhall", "ovrigt"] as const;
+type TabSlug = (typeof tabSlugs)[number];
+
+function getInitialTab(): TabSlug {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get("tab");
+  return tabSlugs.includes(tab as TabSlug) ? (tab as TabSlug) : "grundinfo";
+}
+
 export const Route = createFileRoute("/_authenticated/hiss/$id/redigera")({
   component: RedigeraHiss,
 });
 
 function RedigeraHiss() {
   const { id } = Route.useParams();
+  const [activeTab, setActiveTab] = useState<TabSlug>(getInitialTab);
+  const router = useRouter();
   const hiss = useQuery(api.elevators.crud.get, { id: id as never });
   const orgs = useQuery(api.organizations.list);
   const updateHiss = useMutation(api.elevators.crud.update);
@@ -79,11 +96,11 @@ function RedigeraHiss() {
           (err.message === "OFFLINE" || err.message.includes("fetch"))
         ) {
           setSubmitError(
-            "Ingen uppkoppling \u2014 f\u00f6rs\u00f6k igen n\u00e4r du har n\u00e4t",
+            "Ingen uppkoppling — försök igen när du har nät",
           );
         } else {
           setSubmitError(
-            err instanceof Error ? err.message : "Ett ov\u00e4ntat fel uppstod",
+            err instanceof Error ? err.message : "Ett oväntat fel uppstod",
           );
         }
       } finally {
@@ -142,22 +159,22 @@ function RedigeraHiss() {
           <div className="flex size-20 items-center justify-center rounded-full bg-green-100 text-green-600">
             <CheckCircle2 className="size-10" />
           </div>
-          <h2 className="text-xl font-semibold">\u00c4ndringar sparade!</h2>
+          <h2 className="text-xl font-semibold">Ändringar sparade!</h2>
           <p className="text-muted-foreground">
             Hiss {(hiss as { elevator_number: string }).elevator_number} har uppdaterats.
           </p>
           <div className="mt-4 flex gap-3">
-            <Link to="/sok">
+            <Link to="/hiss/$id" params={{ id }}>
               <Button variant="outline" className="h-12 text-base">
                 <ArrowLeft className="mr-1 size-5" />
-                Tillbaka till s\u00f6k
+                Tillbaka till hiss
               </Button>
             </Link>
             <Button
               className="h-12 text-base"
               onClick={() => setSubmitSuccess(false)}
             >
-              Forts\u00e4tt redigera
+              Fortsätt redigera
             </Button>
           </div>
         </div>
@@ -171,11 +188,11 @@ function RedigeraHiss() {
       {draftPromptVisible && (
         <div className="border-b border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-800 dark:bg-blue-950">
           <p className="mb-2 text-sm font-medium text-blue-900 dark:text-blue-100">
-            Du har ett sparat utkast. Vill du forts\u00e4tta d\u00e4r du slutade?
+            Du har ett sparat utkast. Vill du fortsätta där du slutade?
           </p>
           <div className="flex gap-2">
             <Button size="sm" className="h-9" onClick={restoreDraft}>
-              \u00c5terst\u00e4ll utkast
+              Återställ utkast
             </Button>
             <Button
               size="sm"
@@ -183,7 +200,7 @@ function RedigeraHiss() {
               className="h-9"
               onClick={dismissDraft}
             >
-              Anv\u00e4nd serverdata
+              Använd serverdata
             </Button>
           </div>
         </div>
@@ -193,11 +210,14 @@ function RedigeraHiss() {
       <div className="border-b bg-background px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/sok">
-              <Button variant="ghost" size="sm" className="h-9 px-2">
-                <ArrowLeft className="size-5" />
-              </Button>
-            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 px-2"
+              onClick={() => router.history.back()}
+            >
+              <ArrowLeft className="size-5" />
+            </Button>
             <div>
               <h1 className="text-lg font-semibold">Redigera hiss</h1>
               <p className="text-sm text-muted-foreground">
@@ -214,59 +234,97 @@ function RedigeraHiss() {
             )}
             {changedCount > 0 && (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                {changedCount} \u00e4ndr{changedCount === 1 ? "ing" : "ingar"}
+                {changedCount} ändr{changedCount === 1 ? "ing" : "ingar"}
               </span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Scrollable form content */}
-      <div className="flex-1 overflow-auto px-4 py-4">
-        <div className="space-y-6">
-          <BasicInfoSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-            orgs={orgs}
-            currentHissId={id}
-          />
-          <TechnicalSpecsSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-          <DoorsAndCabSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-          <MachinerySection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-          <InspectionSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-          <ModernizationSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-          <EmergencyPhoneSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-          <CommentsSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-        </div>
+      {/* Tabbed form content */}
+      <div className="flex-1 overflow-auto">
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => {
+            setActiveTab(value as TabSlug);
+            const url = new URL(window.location.href);
+            url.searchParams.set("tab", value);
+            window.history.replaceState({}, "", url.toString());
+          }}
+        >
+          <div className="sticky top-0 z-10 border-b bg-background px-4">
+            <TabsList variant="line" className="w-full">
+              <TabsTrigger value="grundinfo">Grundinfo</TabsTrigger>
+              <TabsTrigger value="teknik">Teknik</TabsTrigger>
+              <TabsTrigger value="underhall">Underhåll & Modernisering</TabsTrigger>
+              <TabsTrigger value="ovrigt">Övrigt</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <div className="px-4 py-4">
+            <TabsContent value="grundinfo">
+              <div className="space-y-6">
+                <BasicInfoSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                  orgs={orgs}
+                  currentHissId={id}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="teknik">
+              <div className="space-y-6">
+                <TechnicalSpecsSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+                <DoorsAndCabSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+                <MachinerySection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="underhall">
+              <div className="space-y-6">
+                <InspectionSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+                <ModernizationSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="ovrigt">
+              <div className="space-y-6">
+                <EmergencyPhoneSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+                <CommentsSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+              </div>
+            </TabsContent>
+          </div>
+        </Tabs>
       </div>
 
       {/* Error message */}
@@ -286,17 +344,16 @@ function RedigeraHiss() {
       {/* Save bar */}
       <div className="sticky bottom-0 border-t bg-background px-4 py-3">
         <div className="flex gap-3">
-          <Link to="/sok" className="flex-1">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-12 w-full text-base"
-              disabled={isSubmitting}
-            >
-              <ArrowLeft className="mr-1 size-5" />
-              Avbryt
-            </Button>
-          </Link>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 flex-1 text-base"
+            disabled={isSubmitting}
+            onClick={() => router.history.back()}
+          >
+            <ArrowLeft className="mr-1 size-5" />
+            Avbryt
+          </Button>
           <Button
             type="button"
             className="h-12 flex-1 text-base"
@@ -311,8 +368,8 @@ function RedigeraHiss() {
             {isSubmitting
               ? "Sparar..."
               : changedCount > 0
-                ? `Spara ${changedCount} \u00e4ndring${changedCount === 1 ? "" : "ar"}`
-                : "Inga \u00e4ndringar"}
+                ? `Spara ${changedCount} ändring${changedCount === 1 ? "" : "ar"}`
+                : "Inga ändringar"}
           </Button>
         </div>
       </div>

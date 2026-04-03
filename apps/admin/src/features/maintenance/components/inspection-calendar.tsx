@@ -24,6 +24,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { Link } from "@tanstack/react-router";
 import { CalendarDays, ChevronRight } from "lucide-react";
 import type { KalenderEntry, BesiktningsListaItem } from "../types";
 
@@ -228,7 +229,13 @@ export function InspectionCalendar({
                           {h.inspection_authority || "–"}
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
-                          {h.organizationName}
+                          <Link
+                            to="/admin/organisationer/$id"
+                            params={{ id: h.organization_id }}
+                            className="text-primary hover:underline"
+                          >
+                            {h.organizationName}
+                          </Link>
                         </TableCell>
                         <TableCell>
                           <a

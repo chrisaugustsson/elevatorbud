@@ -32,7 +32,7 @@ export function RegisterPagination({
   return (
     <div className="flex items-center justify-between">
       <p className="text-sm text-muted-foreground">
-        Visar {offset + 1}{"\u2013"}{Math.min(offset + limit, totalCount)} av{" "}
+        Visar {offset + 1}{"–"}{Math.min(offset + limit, totalCount)} av{" "}
         {totalCount}
       </p>
       <div className="flex items-center gap-2">

@@ -1,5 +1,11 @@
-import { createFileRoute, Navigate, Outlet } from "@tanstack/react-router";
-import { useAuth } from "@elevatorbud/auth";
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+} from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { auth } from "@elevatorbud/auth/server";
+import { ConvexHttpClient } from "convex/browser";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import {
@@ -9,28 +15,44 @@ import {
 } from "@elevatorbud/ui/components/ui/sidebar";
 import { Separator } from "@elevatorbud/ui/components/ui/separator";
 import { AppSidebar } from "../shared/components/app-sidebar";
-import { OrgSelector } from "../shared/components/org-selector";
-import { OrgProvider } from "../shared/lib/org-context";
+import { GlobalSearch } from "../shared/components/global-search";
+
+const authGuard = createServerFn().handler(async () => {
+  const { isAuthenticated, userId, getToken } = await auth();
+
+  if (!isAuthenticated) {
+    throw redirect({ to: "/login" });
+  }
+
+  // Prefetch user from Convex server-side to avoid client loading flash
+  try {
+    const token = await getToken({ template: "convex" });
+    if (token) {
+      const httpClient = new ConvexHttpClient(
+        import.meta.env.VITE_CONVEX_URL as string,
+      );
+      httpClient.setAuth(token);
+      const user = await httpClient.query(api.users.me);
+      return { userId, user };
+    }
+  } catch {
+    // Fall back to client-side fetch
+  }
+
+  return { userId, user: undefined as undefined };
+});
 
 export const Route = createFileRoute("/_authenticated")({
+  beforeLoad: () => authGuard(),
   component: AuthenticatedLayout,
 });
 
 function AuthenticatedLayout() {
-  const { isSignedIn, isLoaded } = useAuth();
-  const user = useQuery(api.users.me);
+  const { user: prefetchedUser } = Route.useRouteContext();
+  const liveUser = useQuery(api.users.me);
 
-  if (!isLoaded) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground">Laddar...</div>
-      </div>
-    );
-  }
-
-  if (!isSignedIn) {
-    return <Navigate to="/login" />;
-  }
+  // Use live subscription once available, fall back to server-prefetched data
+  const user = liveUser !== undefined ? liveUser : prefetchedUser;
 
   if (user === undefined) {
     return (
@@ -68,20 +90,21 @@ function AuthenticatedLayout() {
   }
 
   return (
-    <OrgProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <OrgSelector />
-          </header>
-          <div className="flex-1 overflow-auto p-6">
-            <Outlet />
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
-    </OrgProvider>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
+          <Separator
+            orientation="vertical"
+            className="mr-2 data-[orientation=vertical]:h-4"
+          />
+          <GlobalSearch />
+        </header>
+        <div className="min-w-0 flex-1 overflow-auto p-6">
+          <Outlet />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

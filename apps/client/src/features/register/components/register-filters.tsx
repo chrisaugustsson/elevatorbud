@@ -103,7 +103,7 @@ export function RegisterFilters({
           onChange={(e) => onBuildYearMinChange(e.target.value)}
           className="h-9 w-20"
         />
-        <span className="text-muted-foreground">{"\u2013"}</span>
+        <span className="text-muted-foreground">{"–"}</span>
         <Input
           type="number"
           placeholder="Till"

@@ -17,6 +17,7 @@ declare module "@convex/_generated/api" {
       create: FunctionReference<"action", "public">;
       update: FunctionReference<"action", "public">;
       deactivate: FunctionReference<"action", "public">;
+      activate: FunctionReference<"action", "public">;
       remove: FunctionReference<"action", "public">;
       list: FunctionReference<"query", "public">;
       get: FunctionReference<"query", "public">;
@@ -63,6 +64,13 @@ declare module "@convex/_generated/api" {
       update: FunctionReference<"mutation", "public">;
       merge: FunctionReference<"mutation", "public">;
       deactivate: FunctionReference<"mutation", "public">;
+      activate: FunctionReference<"mutation", "public">;
+    };
+    search: {
+      global: FunctionReference<"query", "public">;
+    };
+    dashboard: {
+      overview: FunctionReference<"query", "public">;
     };
     cms: {
       getPage: FunctionReference<"query", "public">;
@@ -87,6 +95,7 @@ declare module "@convex/_generated/api" {
       insertUser: FunctionReference<"mutation", "internal">;
       updateUser: FunctionReference<"mutation", "internal">;
       deactivateUser: FunctionReference<"mutation", "internal">;
+      activateUser: FunctionReference<"mutation", "internal">;
       removeUser: FunctionReference<"mutation", "internal">;
       getInternal: FunctionReference<"query", "internal">;
     };

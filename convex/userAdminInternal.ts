@@ -54,8 +54,12 @@ export const updateUser = internalMutation({
     if (fields.name !== undefined) updates.name = fields.name;
     if (fields.email !== undefined) updates.email = fields.email;
     if (fields.role !== undefined) updates.role = fields.role;
-    if (fields.organization_id !== undefined)
+    // Clear org when role is admin; otherwise update if provided
+    if (fields.role === "admin") {
+      updates.organization_id = undefined;
+    } else if (fields.organization_id !== undefined) {
       updates.organization_id = fields.organization_id;
+    }
     await ctx.db.patch(id, updates);
   },
 });
@@ -68,6 +72,18 @@ export const deactivateUser = internalMutation({
       throw new Error("Användaren hittades inte");
     }
     await ctx.db.patch(id, { active: false });
+    return existing.clerk_user_id;
+  },
+});
+
+export const activateUser = internalMutation({
+  args: { id: v.id("users") },
+  handler: async (ctx, { id }) => {
+    const existing = await ctx.db.get(id);
+    if (!existing) {
+      throw new Error("Användaren hittades inte");
+    }
+    await ctx.db.patch(id, { active: true });
     return existing.clerk_user_id;
   },
 });

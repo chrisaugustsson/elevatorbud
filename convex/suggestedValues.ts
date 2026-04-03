@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { getCurrentUser, requireAdmin } from "./auth";
+import { requireAuth, requireAdmin } from "./auth";
+import { MutationCtx } from "./_generated/server";
 
 const CATEGORIES = [
   "elevator_type",
@@ -34,7 +35,7 @@ const CATEGORY_TO_FIELD: Record<Category, string> = {
 };
 
 async function updateElevatorsField(
-  ctx: { db: any },
+  ctx: MutationCtx,
   category: string,
   oldValue: string,
   newValue: string,
@@ -44,7 +45,7 @@ async function updateElevatorsField(
 
   const allElevators = await ctx.db.query("elevators").collect();
   for (const elevator of allElevators) {
-    if ((elevator as any)[fieldName] === oldValue) {
+    if ((elevator as Record<string, unknown>)[fieldName] === oldValue) {
       await ctx.db.patch(elevator._id, { [fieldName]: newValue });
     }
   }
@@ -53,15 +54,12 @@ async function updateElevatorsField(
 export const list = query({
   args: { category: v.optional(v.string()) },
   handler: async (ctx, { category }) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) {
-      throw new Error("Ej autentiserad");
-    }
+    await requireAuth(ctx);
 
     if (category) {
       return await ctx.db
         .query("suggested_values")
-        .withIndex("by_category", (q: any) => q.eq("category", category))
+        .withIndex("by_category", (q) => q.eq("category", category))
         .collect();
     }
 
@@ -147,6 +145,21 @@ export const deactivate = mutation({
       throw new Error("Förslagsvärdet hittades inte");
     }
     await ctx.db.patch(id, { active: false });
+    return id;
+  },
+});
+
+export const activate = mutation({
+  args: {
+    id: v.id("suggested_values"),
+  },
+  handler: async (ctx, { id }) => {
+    await requireAdmin(ctx);
+    const existing = await ctx.db.get(id);
+    if (!existing) {
+      throw new Error("Förslagsvärdet hittades inte");
+    }
+    await ctx.db.patch(id, { active: true });
     return id;
   },
 });

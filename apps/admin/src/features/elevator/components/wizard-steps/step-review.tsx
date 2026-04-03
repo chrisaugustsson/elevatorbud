@@ -40,25 +40,25 @@ export function StepReview({ form, goToStep, orgs }: StepReviewProps) {
       fields: [
         { label: "Hisstyp", value: values.elevator_type },
         { label: "Fabrikat", value: values.manufacturer },
-        { label: "Bygg\u00e5r", value: values.build_year },
+        { label: "Byggår", value: values.build_year },
         { label: "Hastighet", value: values.speed },
-        { label: "Lyfth\u00f6jd", value: values.lift_height },
+        { label: "Lyfthöjd", value: values.lift_height },
         { label: "Marklast", value: values.load_capacity },
         { label: "Antal plan", value: values.floor_count },
-        { label: "Antal d\u00f6rrar", value: values.door_count },
+        { label: "Antal dörrar", value: values.door_count },
       ],
     },
     {
-      title: "D\u00f6rrar och korg",
+      title: "Dörrar och korg",
       step: 3,
       fields: [
-        { label: "Typ d\u00f6rrar", value: values.door_type },
-        { label: "Genomg\u00e5ng", value: values.passthrough, type: "boolean" },
+        { label: "Typ dörrar", value: values.door_type },
+        { label: "Genomgång", value: values.passthrough, type: "boolean" },
         { label: "Kollektiv", value: values.collective },
         { label: "Korgstorlek", value: values.cab_size },
-        { label: "Dag\u00f6ppning", value: values.daylight_opening },
-        { label: "B\u00e4rbeslag", value: values.grab_rail },
-        { label: "D\u00f6rrmaskin", value: values.door_machine },
+        { label: "Dagöppning", value: values.daylight_opening },
+        { label: "Bärbeslag", value: values.grab_rail },
+        { label: "Dörrmaskin", value: values.door_machine },
       ],
     },
     {
@@ -66,19 +66,19 @@ export function StepReview({ form, goToStep, orgs }: StepReviewProps) {
       step: 4,
       fields: [
         { label: "Drivsystem", value: values.drive_system },
-        { label: "Upph\u00e4ngning", value: values.suspension },
+        { label: "Upphängning", value: values.suspension },
         { label: "Maskinplacering", value: values.machine_placement },
         { label: "Typ maskin", value: values.machine_type },
         { label: "Typ styrsystem", value: values.control_system_type },
       ],
     },
     {
-      title: "Besiktning och underh\u00e5ll",
+      title: "Besiktning och underhåll",
       step: 5,
       fields: [
         { label: "Besiktningsorgan", value: values.inspection_authority },
-        { label: "Besiktningsm\u00e5nad", value: values.inspection_month },
-        { label: "Sk\u00f6tself\u00f6retag", value: values.maintenance_company },
+        { label: "Besiktningsmånad", value: values.inspection_month },
+        { label: "Skötselföretag", value: values.maintenance_company },
         { label: "Schaktbelysning", value: values.shaft_lighting },
       ],
     },
@@ -86,32 +86,32 @@ export function StepReview({ form, goToStep, orgs }: StepReviewProps) {
       title: "Modernisering",
       step: 6,
       fields: [
-        { label: "Moderniserings\u00e5r", value: values.modernization_year },
+        { label: "Moderniseringsår", value: values.modernization_year },
         { label: "Garanti", value: values.warranty, type: "boolean" },
         {
-          label: "Rekommenderat moderniserings\u00e5r",
+          label: "Rekommenderat moderniseringsår",
           value: values.recommended_modernization_year,
         },
         { label: "Budget belopp", value: values.budget_amount },
         {
-          label: "\u00c5tg\u00e4rder vid modernisering",
+          label: "Åtgärder vid modernisering",
           value: values.modernization_measures,
         },
       ],
     },
     {
-      title: "N\u00f6dtelefon",
+      title: "Nödtelefon",
       step: 7,
       fields: [
         {
-          label: "Har n\u00f6dtelefon",
+          label: "Har nödtelefon",
           value: values.has_emergency_phone,
           type: "boolean",
         },
         { label: "Modell", value: values.emergency_phone_model },
         { label: "Typ", value: values.emergency_phone_type },
         {
-          label: "Beh\u00f6ver uppgradering",
+          label: "Behöver uppgradering",
           value: values.needs_upgrade,
           type: "boolean",
         },
@@ -139,7 +139,7 @@ export function StepReview({ form, goToStep, orgs }: StepReviewProps) {
         <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           <AlertCircle className="size-4 shrink-0" />
           <span>
-            Hissnummer och organisation m\u00e5ste anges innan du kan spara.
+            Hissnummer och organisation måste anges innan du kan spara.
           </span>
         </div>
       )}

@@ -14,4 +14,9 @@ export {
   RedirectToSignIn,
   RedirectToSignUp,
 } from "@clerk/tanstack-react-start";
-export { useAuth, useUser, useSession } from "@clerk/tanstack-react-start";
+export {
+  useAuth,
+  useUser,
+  useSession,
+  useClerk,
+} from "@clerk/tanstack-react-start";

@@ -3,6 +3,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useForm } from "@tanstack/react-form";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+  createColumnHelper,
+  type SortingState,
+} from "@tanstack/react-table";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Input } from "@elevatorbud/ui/components/ui/input";
 import { Label } from "@elevatorbud/ui/components/ui/label";
@@ -10,10 +18,15 @@ import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
 } from "@elevatorbud/ui/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@elevatorbud/ui/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -30,13 +43,23 @@ import {
   DialogFooter,
 } from "@elevatorbud/ui/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@elevatorbud/ui/components/ui/dropdown-menu";
+import {
   Plus,
+  ArrowUpDown,
   Pencil,
   Merge,
   Ban,
-  Database,
   CheckCircle,
+  Database,
+  MoreHorizontal,
 } from "lucide-react";
+import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated/admin/referensdata")({
   component: Referensdata,
@@ -94,6 +117,7 @@ function Referensdata() {
   const updateValue = useMutation(api.suggestedValues.update);
   const mergeValue = useMutation(api.suggestedValues.merge);
   const deactivateValue = useMutation(api.suggestedValues.deactivate);
+  const activateValue = useMutation(api.suggestedValues.activate);
 
   const filteredValues = (values as SuggestedValue[] | undefined)?.filter(
     (item) => item.value.toLowerCase().includes(search.toLowerCase()),
@@ -101,6 +125,95 @@ function Referensdata() {
 
   const activeCount = filteredValues?.filter((v) => v.active).length ?? 0;
   const inactiveCount = filteredValues?.filter((v) => !v.active).length ?? 0;
+
+  const columnHelper = createColumnHelper<SuggestedValue>();
+
+  const columns = [
+    columnHelper.accessor("value", {
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-3"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          Värde
+          <ArrowUpDown className="ml-1 size-3" />
+        </Button>
+      ),
+      cell: (info) => <span className="font-medium">{info.getValue()}</span>,
+    }),
+    columnHelper.accessor("active", {
+      header: "Status",
+      cell: (info) => (
+        <Badge variant={info.getValue() ? "outline" : "secondary"}>
+          {info.getValue() ? "Aktiv" : "Inaktiv"}
+        </Badge>
+      ),
+    }),
+    columnHelper.display({
+      id: "actions",
+      header: "",
+      cell: (info) => {
+        const row = info.row.original;
+        return (
+          <div className="flex items-center justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-8">
+                  <MoreHorizontal className="size-4" />
+                  <span className="sr-only">Åtgärder</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setRenameItem(row)}>
+                  <Pencil className="mr-2 size-4" />
+                  Byt namn
+                </DropdownMenuItem>
+                {row.active && (
+                  <DropdownMenuItem onClick={() => setMergeItem(row)}>
+                    <Merge className="mr-2 size-4" />
+                    Slå ihop
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                {row.active ? (
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      await deactivateValue({ id: row._id as never });
+                    }}
+                  >
+                    <Ban className="mr-2 size-4" />
+                    Inaktivera
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      await activateValue({ id: row._id as never });
+                    }}
+                  >
+                    <CheckCircle className="mr-2 size-4" />
+                    Aktivera
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
+    }),
+  ];
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+
+  const table = useReactTable({
+    data: filteredValues ?? [],
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
 
   return (
     <div className="space-y-6">
@@ -113,7 +226,7 @@ function Referensdata() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
         <div className="space-y-2 sm:w-64">
-          <Label>Category</Label>
+          <Label>Kategori</Label>
           <Select
             value={selectedCategory}
             onValueChange={(val) => {
@@ -148,9 +261,29 @@ function Referensdata() {
       </div>
 
       {values === undefined ? (
-        <div className="flex items-center justify-center py-12">
-          <p className="text-muted-foreground">Laddar värden...</p>
-        </div>
+        <>
+          <Skeleton className="h-4 w-24" />
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead><Skeleton className="h-4 w-20" /></TableHead>
+                  <TableHead><Skeleton className="h-4 w-16" /></TableHead>
+                  <TableHead><Skeleton className="h-4 w-8" /></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="ml-auto h-8 w-8" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       ) : (
         <>
           <div className="flex gap-3 text-sm text-muted-foreground">
@@ -158,68 +291,59 @@ function Referensdata() {
             {inactiveCount > 0 && <span>{inactiveCount} inaktiva</span>}
           </div>
 
-          {filteredValues && filteredValues.length > 0 ? (
-            <div className="grid gap-2">
-              {filteredValues.map((item) => (
-                <Card
-                  key={item._id}
-                  className={
-                    !item.active ? "border-dashed opacity-60" : undefined
-                  }
-                >
-                  <CardContent className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="font-medium">{item.value}</span>
-                      {!item.active && (
-                        <Badge variant="secondary">Inaktiv</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setRenameItem(item)}
-                        title="Byt namn"
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      {item.active && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setMergeItem(item)}
-                          title="Slå ihop med annat värde"
-                        >
-                          <Merge className="size-4" />
-                        </Button>
-                      )}
-                      {item.active && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={async () => {
-                            await deactivateValue({
-                              id: item._id as never,
-                            });
-                          }}
-                          title="Inaktivera"
-                        >
-                          <Ban className="size-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
-                <Database className="size-8" />
-                <p>Inga värden hittades.</p>
-              </CardContent>
-            </Card>
-          )}
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows.length ? (
+                  table.getRowModel().rows.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      className={
+                        !row.original.active ? "opacity-50" : undefined
+                      }
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columns.length}
+                      className="h-24 text-center"
+                    >
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <Database className="size-8" />
+                        <p>Inga värden hittades.</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </>
       )}
 

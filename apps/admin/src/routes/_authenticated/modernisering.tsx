@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { useSelectedOrg } from "../../shared/lib/org-context";
 import {
   PERIODS,
   getUrgencyColor,
@@ -20,32 +19,23 @@ export const Route = createFileRoute("/_authenticated/modernisering")({
 });
 
 function Modernisering() {
-  const { selectedOrgId } = useSelectedOrg();
-  const orgFilter = selectedOrgId
-    ? ({ organization_id: selectedOrgId } as never)
-    : {};
-
   const [selectedPeriod, setSelectedPeriod] = useState<TimelinePeriod | null>(
     null,
   );
 
-  const tidslinje = useQuery(api.elevators.modernization.timeline, orgFilter);
-  const budget = useQuery(api.elevators.modernization.budget, orgFilter);
-  const atgarder = useQuery(api.elevators.modernization.measures, orgFilter);
+  const tidslinje = useQuery(api.elevators.modernization.timeline, {});
+  const budget = useQuery(api.elevators.modernization.budget, {});
+  const atgarder = useQuery(api.elevators.modernization.measures, {});
 
   const prioritetslistaArgs = useMemo(() => {
-    const base = selectedOrgId
-      ? { organization_id: selectedOrgId as never }
-      : {};
     if (selectedPeriod) {
       return {
-        ...base,
         yearFrom: selectedPeriod.yearFrom,
         yearTo: selectedPeriod.yearTo,
       };
     }
-    return base;
-  }, [selectedOrgId, selectedPeriod]);
+    return {};
+  }, [selectedPeriod]);
 
   const prioritetslista = useQuery(
     api.elevators.modernization.priorityList,
@@ -117,7 +107,7 @@ function Modernisering() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       <h1 className="text-2xl font-bold text-foreground">
         Moderniseringsplanering
       </h1>
@@ -152,6 +142,7 @@ function Modernisering() {
             recommended_modernization_year?: string;
             budget_amount?: number;
             modernization_measures?: string;
+            organization_id: string;
             organizationName: string;
           }[]
         }

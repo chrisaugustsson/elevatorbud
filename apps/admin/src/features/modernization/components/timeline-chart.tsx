@@ -40,7 +40,7 @@ export function TimelineChart({ data }: TimelineChartProps) {
             Inga hissar med rekommenderat moderniseringsår.
           </p>
         ) : (
-          <div className="h-[300px] w-full">
+          <div className="h-[300px] w-full overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={data}
@@ -55,7 +55,7 @@ export function TimelineChart({ data }: TimelineChartProps) {
                   tick={{ fontSize: 12 }}
                   angle={-45}
                   textAnchor="end"
-                  interval={0}
+                  interval="preserveStartEnd"
                   height={60}
                 />
                 <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />

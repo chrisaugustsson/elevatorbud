@@ -21,10 +21,10 @@ export const createOrg = internalMutation({
 
 export const importBatch = internalMutation({
   args: {
-    elevators: v.array(v.any()),
+    elevators: v.array(v.record(v.string(), v.any())),
     orgMappingNames: v.array(v.string()),
     orgMappingIds: v.array(v.string()),
-    adminId: v.any(),
+    adminId: v.id("users"),
   },
   handler: async (ctx, args) => {
     // Reconstruct org mapping from parallel arrays
@@ -70,8 +70,8 @@ export const importBatch = internalMutation({
         // Check if elevator_number exists
         const existing = await ctx.db
           .query("elevators")
-          .withIndex("by_elevator_number", (q: any) =>
-            q.eq("elevator_number", fields.elevator_number),
+          .withIndex("by_elevator_number", (q) =>
+            q.eq("elevator_number", fields.elevator_number as string),
           )
           .unique();
 
@@ -84,7 +84,7 @@ export const importBatch = internalMutation({
             ...(importStatus
               ? { status: importStatus as "active" | "demolished" | "archived" }
               : {}),
-            last_updated_by: args.adminId as Id<"users">,
+            last_updated_by: args.adminId,
             last_updated_at: Date.now(),
           });
           updated++;
@@ -93,17 +93,17 @@ export const importBatch = internalMutation({
           await autoAddSuggestedValues(ctx, fields);
 
           // Create new elevator
-          const insertData = {
+          await ctx.db.insert("elevators", {
+            elevator_number: fields.elevator_number as string,
             ...fields,
             organization_id: orgId as Id<"organizations">,
             status: ((importStatus as string) || "active") as
               | "active"
               | "demolished"
               | "archived",
-            created_by: args.adminId as Id<"users">,
+            created_by: args.adminId,
             created_at: Date.now(),
-          } as any;
-          await ctx.db.insert("elevators", insertData);
+          });
           created++;
         }
       } catch (e) {

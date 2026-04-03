@@ -24,7 +24,7 @@ export function TechnicalSpecsSection({
         name="elevator_type"
         label="Hisstyp"
         category="elevator_type"
-        placeholder="V\u00e4lj eller ange hisstyp..."
+        placeholder="Välj eller ange hisstyp..."
         changed={
           !!originalValues &&
           isChanged("elevator_type", formValues, originalValues)
@@ -36,7 +36,7 @@ export function TechnicalSpecsSection({
         name="manufacturer"
         label="Fabrikat"
         category="manufacturer"
-        placeholder="V\u00e4lj eller ange fabrikat..."
+        placeholder="Välj eller ange fabrikat..."
         changed={
           !!originalValues &&
           isChanged("manufacturer", formValues, originalValues)
@@ -52,7 +52,7 @@ export function TechnicalSpecsSection({
         <form.Field name="build_year">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="build_year">Bygg\u00e5r</Label>
+              <Label htmlFor="build_year">Byggår</Label>
               <Input
                 id="build_year"
                 className="h-11"
@@ -99,7 +99,7 @@ export function TechnicalSpecsSection({
           <form.Field name="lift_height">
             {(field) => (
               <div className="space-y-1.5">
-                <Label htmlFor="lift_height">Lyfth\u00f6jd</Label>
+                <Label htmlFor="lift_height">Lyfthöjd</Label>
                 <Input
                   id="lift_height"
                   className="h-11"
@@ -169,7 +169,7 @@ export function TechnicalSpecsSection({
           <form.Field name="door_count">
             {(field) => (
               <div className="space-y-1.5">
-                <Label htmlFor="door_count">Antal d\u00f6rrar</Label>
+                <Label htmlFor="door_count">Antal dörrar</Label>
                 <Input
                   id="door_count"
                   className="h-11"

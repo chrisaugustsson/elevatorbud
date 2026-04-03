@@ -30,6 +30,7 @@ type HissRow = {
   modernization_year?: string;
   recommended_modernization_year?: string;
   budget_amount?: number;
+  organization_id: string;
   organizationName: string;
 };
 
@@ -92,7 +93,7 @@ export function RegisterTable({
             onSort={() => handleSort("address")}
           />
         ),
-        cell: (info) => info.getValue() || "\u2014",
+        cell: (info) => info.getValue() || "—",
       }),
       columnHelper.accessor("district", {
         header: () => (
@@ -102,7 +103,20 @@ export function RegisterTable({
             onSort={() => handleSort("district")}
           />
         ),
-        cell: (info) => info.getValue() || "\u2014",
+        cell: (info) => info.getValue() || "—",
+      }),
+      columnHelper.accessor("organizationName", {
+        header: () => "Organisation",
+        cell: (info) => (
+          <Link
+            to="/admin/organisationer/$id"
+            params={{ id: info.row.original.organization_id }}
+            onClick={(e) => e.stopPropagation()}
+            className="text-primary hover:underline"
+          >
+            {info.getValue()}
+          </Link>
+        ),
       }),
       columnHelper.accessor("elevator_type", {
         header: () => (
@@ -112,7 +126,7 @@ export function RegisterTable({
             onSort={() => handleSort("elevator_type")}
           />
         ),
-        cell: (info) => info.getValue() || "\u2014",
+        cell: (info) => info.getValue() || "—",
       }),
       columnHelper.accessor("manufacturer", {
         header: () => (
@@ -122,7 +136,7 @@ export function RegisterTable({
             onSort={() => handleSort("manufacturer")}
           />
         ),
-        cell: (info) => info.getValue() || "\u2014",
+        cell: (info) => info.getValue() || "—",
       }),
       columnHelper.accessor("build_year", {
         header: () => (
@@ -132,7 +146,7 @@ export function RegisterTable({
             onSort={() => handleSort("build_year")}
           />
         ),
-        cell: (info) => info.getValue() ?? "\u2014",
+        cell: (info) => info.getValue() ?? "—",
       }),
       columnHelper.accessor("modernization_year", {
         header: () => (
@@ -142,7 +156,7 @@ export function RegisterTable({
             onSort={() => handleSort("modernization_year")}
           />
         ),
-        cell: (info) => info.getValue() || "\u2014",
+        cell: (info) => info.getValue() || "—",
       }),
       columnHelper.accessor("recommended_modernization_year", {
         header: () => (
@@ -155,7 +169,7 @@ export function RegisterTable({
             onSort={() => handleSort("recommended_modernization_year")}
           />
         ),
-        cell: (info) => info.getValue() || "\u2014",
+        cell: (info) => info.getValue() || "—",
       }),
       columnHelper.accessor("budget_amount", {
         header: () => (
@@ -169,7 +183,7 @@ export function RegisterTable({
           const v = info.getValue();
           return v !== undefined && v !== null
             ? `${(v / 1000).toFixed(0)} tkr`
-            : "\u2014";
+            : "—";
         },
       }),
       columnHelper.display({

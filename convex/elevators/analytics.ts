@@ -1,25 +1,13 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
-import { getCurrentUser } from "../auth";
+import { queryElevators, parseModernizationYear } from "./helpers";
+
+const NOT_MODERNIZED = "Ej ombyggd";
 
 export const stats = query({
   args: { organization_id: v.optional(v.id("organizations")) },
   handler: async (ctx, { organization_id }) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
-
-    let elevators;
-    if (organization_id) {
-      elevators = await ctx.db
-        .query("elevators")
-        .withIndex("by_organization_id", (q) =>
-          q.eq("organization_id", organization_id),
-        )
-        .collect();
-    } else {
-      elevators = await ctx.db.query("elevators").collect();
-    }
-
+    const elevators = await queryElevators(ctx, organization_id);
     const active = elevators.filter((h) => h.status === "active");
 
     const currentYear = new Date().getFullYear();
@@ -32,22 +20,20 @@ export const stats = query({
         : 0;
 
     const modernizationWithin3Years = active.filter((h) => {
-      if (!h.recommended_modernization_year) return false;
-      const year = parseInt(h.recommended_modernization_year, 10);
-      if (isNaN(year)) return false;
-      return year >= currentYear && year <= currentYear + 3;
+      const year = parseModernizationYear(h.recommended_modernization_year);
+      return year !== null && year >= currentYear && year <= currentYear + 3;
     }).length;
 
     const totalBudgetCurrentYear = active
       .filter((h) => {
-        if (!h.recommended_modernization_year || !h.budget_amount) return false;
-        const year = parseInt(h.recommended_modernization_year, 10);
+        if (!h.budget_amount) return false;
+        const year = parseModernizationYear(h.recommended_modernization_year);
         return year === currentYear;
       })
       .reduce((sum, h) => sum + (h.budget_amount ?? 0), 0);
 
     const withoutModernization = active.filter((h) => {
-      return !h.modernization_year || h.modernization_year === "Ej ombyggd";
+      return !h.modernization_year || h.modernization_year === NOT_MODERNIZED;
     }).length;
 
     const lastInventory =
@@ -69,21 +55,7 @@ export const stats = query({
 export const chartData = query({
   args: { organization_id: v.optional(v.id("organizations")) },
   handler: async (ctx, { organization_id }) => {
-    const user = await getCurrentUser(ctx);
-    if (!user) throw new Error("Ej autentiserad");
-
-    let elevators;
-    if (organization_id) {
-      elevators = await ctx.db
-        .query("elevators")
-        .withIndex("by_organization_id", (q) =>
-          q.eq("organization_id", organization_id),
-        )
-        .collect();
-    } else {
-      elevators = await ctx.db.query("elevators").collect();
-    }
-
+    const elevators = await queryElevators(ctx, organization_id);
     const active = elevators.filter((h) => h.status === "active");
     const currentYear = new Date().getFullYear();
 
@@ -132,9 +104,8 @@ export const chartData = query({
     // Modernization timeline (2026-2045+)
     const modernizationTimeline: Record<string, number> = {};
     for (const h of active) {
-      if (!h.recommended_modernization_year) continue;
-      const year = parseInt(h.recommended_modernization_year, 10);
-      if (isNaN(year)) continue;
+      const year = parseModernizationYear(h.recommended_modernization_year);
+      if (year === null) continue;
       const key = year >= 2045 ? "2045+" : String(year);
       modernizationTimeline[key] = (modernizationTimeline[key] || 0) + 1;
     }

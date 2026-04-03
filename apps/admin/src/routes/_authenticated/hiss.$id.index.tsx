@@ -102,7 +102,7 @@ function DetailField({
 }) {
   let display: string;
   if (value === undefined || value === null || value === "") {
-    display = "\u2014";
+    display = "—";
   } else if (typeof value === "boolean") {
     display = value ? "Ja" : "Nej";
   } else {

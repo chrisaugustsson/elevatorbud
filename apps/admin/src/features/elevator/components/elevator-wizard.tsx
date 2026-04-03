@@ -39,11 +39,11 @@ import { StepReview } from "./wizard-steps/step-review";
 const STEPS = [
   { number: 1, title: "Identifiering", shortTitle: "ID" },
   { number: 2, title: "Teknisk specifikation", shortTitle: "Teknik" },
-  { number: 3, title: "D\u00f6rrar och korg", shortTitle: "D\u00f6rrar" },
+  { number: 3, title: "Dörrar och korg", shortTitle: "Dörrar" },
   { number: 4, title: "Maskineri", shortTitle: "Maskin" },
-  { number: 5, title: "Besiktning och underh\u00e5ll", shortTitle: "Besiktn." },
+  { number: 5, title: "Besiktning och underhåll", shortTitle: "Besiktn." },
   { number: 6, title: "Modernisering", shortTitle: "Modern." },
-  { number: 7, title: "N\u00f6dtelefon", shortTitle: "N\u00f6dtel." },
+  { number: 7, title: "Nödtelefon", shortTitle: "Nödtel." },
   { number: 8, title: "Kommentarer", shortTitle: "Komm." },
   { number: 9, title: "Granska och spara", shortTitle: "Granska" },
 ] as const;
@@ -224,11 +224,11 @@ export function ElevatorWizard({
       {draftPromptVisible && (
         <div className="border-b border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-800 dark:bg-blue-950">
           <p className="mb-2 text-sm font-medium text-blue-900 dark:text-blue-100">
-            Du har ett sparat utkast. Vill du forts\u00e4tta d\u00e4r du slutade?
+            Du har ett sparat utkast. Vill du fortsätta där du slutade?
           </p>
           <div className="flex gap-2">
             <Button size="sm" className="h-9" onClick={restoreDraft}>
-              \u00c5terst\u00e4ll utkast
+              Återställ utkast
             </Button>
             <Button
               size="sm"
@@ -236,7 +236,7 @@ export function ElevatorWizard({
               className="h-9"
               onClick={dismissDraft}
             >
-              B\u00f6rja om
+              Börja om
             </Button>
           </div>
         </div>
@@ -266,7 +266,7 @@ export function ElevatorWizard({
                   onValueChange={(val) => field.handleChange(val)}
                 >
                   <SelectTrigger className="h-11 w-full">
-                    <SelectValue placeholder="V\u00e4lj organisation..." />
+                    <SelectValue placeholder="Välj organisation..." />
                   </SelectTrigger>
                   <SelectContent>
                     {orgs?.map((org: { _id: string; name: string }) => (
@@ -342,7 +342,7 @@ export function ElevatorWizard({
             disabled={currentStep === 1 || isSubmitting}
           >
             <ChevronLeft className="mr-1 size-5" />
-            F\u00f6reg\u00e5ende
+            Föregående
           </Button>
           {currentStep < STEPS.length ? (
             <Button
@@ -350,7 +350,7 @@ export function ElevatorWizard({
               className="h-12 min-w-[44px] flex-1 text-base"
               onClick={goNext}
             >
-              N\u00e4sta
+              Nästa
               <ChevronRight className="ml-1 size-5" />
             </Button>
           ) : (
