@@ -66,6 +66,9 @@ declare module "@convex/_generated/api" {
       deactivate: FunctionReference<"mutation", "public">;
       activate: FunctionReference<"mutation", "public">;
     };
+    search: {
+      global: FunctionReference<"query", "public">;
+    };
     cms: {
       getPage: FunctionReference<"query", "public">;
       listPages: FunctionReference<"query", "public">;
