@@ -9,10 +9,10 @@ export type TimelinePeriod = {
 };
 
 export const PERIODS: TimelinePeriod[] = [
-  { label: "Akut (\u22641 \u00e5r)", yearFrom: 0, yearTo: currentYear + 1 },
-  { label: "2-4 \u00e5r", yearFrom: currentYear + 2, yearTo: currentYear + 4 },
-  { label: "5-9 \u00e5r", yearFrom: currentYear + 5, yearTo: currentYear + 9 },
-  { label: "10+ \u00e5r", yearFrom: currentYear + 10, yearTo: 2099 },
+  { label: "Akut (≤1 år)", yearFrom: 0, yearTo: currentYear + 1 },
+  { label: "2-4 år", yearFrom: currentYear + 2, yearTo: currentYear + 4 },
+  { label: "5-9 år", yearFrom: currentYear + 5, yearTo: currentYear + 9 },
+  { label: "10+ år", yearFrom: currentYear + 10, yearTo: 2099 },
 ];
 
 export function getUrgencyColor(year: number): string {
@@ -34,18 +34,18 @@ export function getUrgencyBadge(year: number) {
   if (diff <= 4)
     return (
       <Badge className="bg-orange-500 text-xs text-white hover:bg-orange-600">
-        2-4 \u00e5r
+        2-4 år
       </Badge>
     );
   if (diff <= 9)
     return (
       <Badge className="bg-yellow-500 text-xs text-white hover:bg-yellow-600">
-        5-9 \u00e5r
+        5-9 år
       </Badge>
     );
   return (
     <Badge className="bg-green-600 text-xs text-white hover:bg-green-700">
-      10+ \u00e5r
+      10+ år
     </Badge>
   );
 }

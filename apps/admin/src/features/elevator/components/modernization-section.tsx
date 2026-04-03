@@ -29,7 +29,7 @@ export function ModernizationSection({
         <form.Field name="modernization_year">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="modernization_year">Moderniserings\u00e5r</Label>
+              <Label htmlFor="modernization_year">Moderniseringsår</Label>
               <Input
                 id="modernization_year"
                 className="h-11"
@@ -78,7 +78,7 @@ export function ModernizationSection({
           {(field) => (
             <div className="space-y-1.5">
               <Label htmlFor="recommended_modernization_year">
-                Rekommenderat moderniserings\u00e5r
+                Rekommenderat moderniseringsår
               </Label>
               <Input
                 id="recommended_modernization_year"
@@ -119,9 +119,9 @@ export function ModernizationSection({
       <ComboboxField
         form={form}
         name="modernization_measures"
-        label="\u00c5tg\u00e4rder vid modernisering"
+        label="Åtgärder vid modernisering"
         category="modernization_measures"
-        placeholder="V\u00e4lj eller ange \u00e5tg\u00e4rder..."
+        placeholder="Välj eller ange åtgärder..."
         changed={
           !!originalValues &&
           isChanged(

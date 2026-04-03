@@ -26,13 +26,13 @@ export function InspectionSection({
   originalValues,
 }: InspectionSectionProps) {
   return (
-    <EditSection title="5. Besiktning och underh\u00e5ll">
+    <EditSection title="5. Besiktning och underhåll">
       <ComboboxField
         form={form}
         name="inspection_authority"
         label="Besiktningsorgan"
         category="inspection_authority"
-        placeholder="V\u00e4lj eller ange besiktningsorgan..."
+        placeholder="Välj eller ange besiktningsorgan..."
         changed={
           !!originalValues &&
           isChanged("inspection_authority", formValues, originalValues)
@@ -48,13 +48,13 @@ export function InspectionSection({
         <form.Field name="inspection_month">
           {(field) => (
             <div className="space-y-1.5">
-              <Label>Besiktningsm\u00e5nad</Label>
+              <Label>Besiktningsmånad</Label>
               <Select
                 value={field.state.value}
                 onValueChange={(val) => field.handleChange(val)}
               >
                 <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="V\u00e4lj m\u00e5nad..." />
+                  <SelectValue placeholder="Välj månad..." />
                 </SelectTrigger>
                 <SelectContent>
                   {BESIKTNINGSMANADER.map((manad) => (
@@ -72,9 +72,9 @@ export function InspectionSection({
       <ComboboxField
         form={form}
         name="maintenance_company"
-        label="Sk\u00f6tself\u00f6retag"
+        label="Skötselföretag"
         category="maintenance_company"
-        placeholder="V\u00e4lj eller ange sk\u00f6tself\u00f6retag..."
+        placeholder="Välj eller ange skötselföretag..."
         changed={
           !!originalValues &&
           isChanged("maintenance_company", formValues, originalValues)

@@ -17,13 +17,13 @@ export function MeasuresCard({ measures }: MeasuresCardProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Wrench className="h-4 w-4" />
-          Vanligaste \u00e5tg\u00e4rder
+          Vanligaste åtgärder
         </CardTitle>
       </CardHeader>
       <CardContent>
         {measures.length === 0 ? (
           <p className="py-8 text-center text-muted-foreground">
-            Inga \u00e5tg\u00e4rder registrerade.
+            Inga åtgärder registrerade.
           </p>
         ) : (
           <div className="space-y-3">

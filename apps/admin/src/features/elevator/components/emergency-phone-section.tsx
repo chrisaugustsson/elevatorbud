@@ -19,7 +19,7 @@ export function EmergencyPhoneSection({
   originalValues,
 }: EmergencyPhoneSectionProps) {
   return (
-    <EditSection title="7. N\u00f6dtelefon">
+    <EditSection title="7. Nödtelefon">
       <FieldWrapper
         changed={
           !!originalValues &&
@@ -31,7 +31,7 @@ export function EmergencyPhoneSection({
             <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
               <Label htmlFor="has_emergency_phone" className="cursor-pointer">
                 <Phone className="mr-1.5 inline size-4" />
-                Har n\u00f6dtelefon
+                Har nödtelefon
               </Label>
               <Switch
                 id="has_emergency_phone"
@@ -100,7 +100,7 @@ export function EmergencyPhoneSection({
                 htmlFor="needs_upgrade"
                 className="cursor-pointer"
               >
-                Beh\u00f6ver uppgradering
+                Behöver uppgradering
               </Label>
               <Switch
                 id="needs_upgrade"

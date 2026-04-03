@@ -54,7 +54,7 @@ export function PriorityList({
                   onClearPeriod();
                 }}
               >
-                \u00d7
+                ×
               </button>
             </Badge>
           )}
@@ -63,7 +63,7 @@ export function PriorityList({
       <CardContent>
         {elevators.length === 0 ? (
           <p className="py-8 text-center text-muted-foreground">
-            Inga hissar med rekommenderat moderniserings\u00e5r
+            Inga hissar med rekommenderat moderniseringsår
             {selectedPeriod ? " i vald period" : ""}.
           </p>
         ) : (
@@ -78,13 +78,13 @@ export function PriorityList({
                   <TableHead className="hidden md:table-cell">
                     Distrikt
                   </TableHead>
-                  <TableHead>Rek. \u00e5r</TableHead>
-                  <TableHead>Br\u00e5dskande</TableHead>
+                  <TableHead>Rek. år</TableHead>
+                  <TableHead>Brådskande</TableHead>
                   <TableHead className="hidden sm:table-cell">
                     Budget
                   </TableHead>
                   <TableHead className="hidden lg:table-cell">
-                    \u00c5tg\u00e4rd
+                    Åtgärd
                   </TableHead>
                   <TableHead className="w-8" />
                 </TableRow>
@@ -101,20 +101,20 @@ export function PriorityList({
                         {h.elevator_number}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
-                        {h.address || "\u2013"}
+                        {h.address || "–"}
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
-                        {h.district || "\u2013"}
+                        {h.district || "–"}
                       </TableCell>
                       <TableCell>{h.recommended_modernization_year}</TableCell>
                       <TableCell>{getUrgencyBadge(year)}</TableCell>
                       <TableCell className="hidden sm:table-cell">
                         {h.budget_amount
                           ? `${h.budget_amount.toLocaleString("sv-SE")} kr`
-                          : "\u2013"}
+                          : "–"}
                       </TableCell>
                       <TableCell className="hidden lg:table-cell">
-                        {h.modernization_measures || "\u2013"}
+                        {h.modernization_measures || "–"}
                       </TableCell>
                       <TableCell>
                         <a

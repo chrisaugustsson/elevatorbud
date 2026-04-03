@@ -37,7 +37,7 @@ export function TimelineChart({ data }: TimelineChartProps) {
       <CardContent>
         {data.length === 0 ? (
           <p className="py-8 text-center text-muted-foreground">
-            Inga hissar med rekommenderat moderniserings\u00e5r.
+            Inga hissar med rekommenderat moderniseringsår.
           </p>
         ) : (
           <div className="h-[300px] w-full">

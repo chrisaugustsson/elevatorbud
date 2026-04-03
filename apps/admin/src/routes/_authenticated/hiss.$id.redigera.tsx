@@ -79,11 +79,11 @@ function RedigeraHiss() {
           (err.message === "OFFLINE" || err.message.includes("fetch"))
         ) {
           setSubmitError(
-            "Ingen uppkoppling \u2014 f\u00f6rs\u00f6k igen n\u00e4r du har n\u00e4t",
+            "Ingen uppkoppling — försök igen när du har nät",
           );
         } else {
           setSubmitError(
-            err instanceof Error ? err.message : "Ett ov\u00e4ntat fel uppstod",
+            err instanceof Error ? err.message : "Ett oväntat fel uppstod",
           );
         }
       } finally {
@@ -142,7 +142,7 @@ function RedigeraHiss() {
           <div className="flex size-20 items-center justify-center rounded-full bg-green-100 text-green-600">
             <CheckCircle2 className="size-10" />
           </div>
-          <h2 className="text-xl font-semibold">\u00c4ndringar sparade!</h2>
+          <h2 className="text-xl font-semibold">Ändringar sparade!</h2>
           <p className="text-muted-foreground">
             Hiss {(hiss as { elevator_number: string }).elevator_number} har uppdaterats.
           </p>
@@ -150,14 +150,14 @@ function RedigeraHiss() {
             <Link to="/sok">
               <Button variant="outline" className="h-12 text-base">
                 <ArrowLeft className="mr-1 size-5" />
-                Tillbaka till s\u00f6k
+                Tillbaka till sök
               </Button>
             </Link>
             <Button
               className="h-12 text-base"
               onClick={() => setSubmitSuccess(false)}
             >
-              Forts\u00e4tt redigera
+              Fortsätt redigera
             </Button>
           </div>
         </div>
@@ -171,11 +171,11 @@ function RedigeraHiss() {
       {draftPromptVisible && (
         <div className="border-b border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-800 dark:bg-blue-950">
           <p className="mb-2 text-sm font-medium text-blue-900 dark:text-blue-100">
-            Du har ett sparat utkast. Vill du forts\u00e4tta d\u00e4r du slutade?
+            Du har ett sparat utkast. Vill du fortsätta där du slutade?
           </p>
           <div className="flex gap-2">
             <Button size="sm" className="h-9" onClick={restoreDraft}>
-              \u00c5terst\u00e4ll utkast
+              Återställ utkast
             </Button>
             <Button
               size="sm"
@@ -183,7 +183,7 @@ function RedigeraHiss() {
               className="h-9"
               onClick={dismissDraft}
             >
-              Anv\u00e4nd serverdata
+              Använd serverdata
             </Button>
           </div>
         </div>
@@ -214,7 +214,7 @@ function RedigeraHiss() {
             )}
             {changedCount > 0 && (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                {changedCount} \u00e4ndr{changedCount === 1 ? "ing" : "ingar"}
+                {changedCount} ändr{changedCount === 1 ? "ing" : "ingar"}
               </span>
             )}
           </div>
@@ -311,8 +311,8 @@ function RedigeraHiss() {
             {isSubmitting
               ? "Sparar..."
               : changedCount > 0
-                ? `Spara ${changedCount} \u00e4ndring${changedCount === 1 ? "" : "ar"}`
-                : "Inga \u00e4ndringar"}
+                ? `Spara ${changedCount} ändring${changedCount === 1 ? "" : "ar"}`
+                : "Inga ändringar"}
           </Button>
         </div>
       </div>

@@ -24,7 +24,7 @@ export function MachinerySection({
         name="drive_system"
         label="Drivsystem"
         category="drive_system"
-        placeholder="V\u00e4lj eller ange drivsystem..."
+        placeholder="Välj eller ange drivsystem..."
         changed={
           !!originalValues &&
           isChanged("drive_system", formValues, originalValues)
@@ -40,11 +40,11 @@ export function MachinerySection({
         <form.Field name="suspension">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="suspension">Upph\u00e4ngning</Label>
+              <Label htmlFor="suspension">Upphängning</Label>
               <Input
                 id="suspension"
                 className="h-11"
-                placeholder="Ange upph\u00e4ngning..."
+                placeholder="Ange upphängning..."
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}
               />
@@ -58,7 +58,7 @@ export function MachinerySection({
         name="machine_placement"
         label="Maskinplacering"
         category="machine_placement"
-        placeholder="V\u00e4lj eller ange maskinplacering..."
+        placeholder="Välj eller ange maskinplacering..."
         changed={
           !!originalValues &&
           isChanged("machine_placement", formValues, originalValues)

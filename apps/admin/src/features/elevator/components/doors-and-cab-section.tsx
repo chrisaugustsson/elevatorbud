@@ -19,13 +19,13 @@ export function DoorsAndCabSection({
   originalValues,
 }: DoorsAndCabSectionProps) {
   return (
-    <EditSection title="3. D\u00f6rrar och korg">
+    <EditSection title="3. Dörrar och korg">
       <ComboboxField
         form={form}
         name="door_type"
-        label="Typ d\u00f6rrar"
+        label="Typ dörrar"
         category="door_type"
-        placeholder="V\u00e4lj eller ange d\u00f6rrtyp..."
+        placeholder="Välj eller ange dörrtyp..."
         changed={
           !!originalValues &&
           isChanged("door_type", formValues, originalValues)
@@ -42,7 +42,7 @@ export function DoorsAndCabSection({
           {(field) => (
             <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
               <Label htmlFor="passthrough" className="cursor-pointer">
-                Genomg\u00e5ng
+                Genomgång
               </Label>
               <Switch
                 id="passthrough"
@@ -59,7 +59,7 @@ export function DoorsAndCabSection({
         name="collective"
         label="Kollektiv"
         category="collective"
-        placeholder="V\u00e4lj eller ange kollektiv..."
+        placeholder="Välj eller ange kollektiv..."
         changed={
           !!originalValues &&
           isChanged("collective", formValues, originalValues)
@@ -97,7 +97,7 @@ export function DoorsAndCabSection({
         <form.Field name="daylight_opening">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="daylight_opening">Dag\u00f6ppning</Label>
+              <Label htmlFor="daylight_opening">Dagöppning</Label>
               <Input
                 id="daylight_opening"
                 className="h-11"
@@ -120,7 +120,7 @@ export function DoorsAndCabSection({
           <form.Field name="grab_rail">
             {(field) => (
               <div className="space-y-1.5">
-                <Label htmlFor="grab_rail">B\u00e4rbeslag</Label>
+                <Label htmlFor="grab_rail">Bärbeslag</Label>
                 <Input
                   id="grab_rail"
                   className="h-11"
@@ -142,7 +142,7 @@ export function DoorsAndCabSection({
           <form.Field name="door_machine">
             {(field) => (
               <div className="space-y-1.5">
-                <Label htmlFor="door_machine">D\u00f6rrmaskin</Label>
+                <Label htmlFor="door_machine">Dörrmaskin</Label>
                 <Input
                   id="door_machine"
                   className="h-11"

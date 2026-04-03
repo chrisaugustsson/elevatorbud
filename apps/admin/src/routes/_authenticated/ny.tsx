@@ -45,11 +45,11 @@ function NyHiss() {
           (err.message === "OFFLINE" || err.message.includes("fetch"))
         ) {
           setSubmitError(
-            "Ingen uppkoppling \u2014 f\u00f6rs\u00f6k igen n\u00e4r du har n\u00e4t",
+            "Ingen uppkoppling — försök igen när du har nät",
           );
         } else {
           setSubmitError(
-            err instanceof Error ? err.message : "Ett ov\u00e4ntat fel uppstod",
+            err instanceof Error ? err.message : "Ett oväntat fel uppstod",
           );
         }
       } finally {
