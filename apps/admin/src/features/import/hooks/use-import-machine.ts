@@ -1,15 +1,21 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useQuery, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import {
   readWorkbook,
-  parseExcelImport,
+  autoMapSheet,
+  autoMapColumns,
+  getSheetData,
+  parseExcelImportWithMapping,
   type FullImportResult,
+  type AutoMapResult,
+  type ColumnMapping,
 } from "@elevatorbud/utils";
 
 export type AnalysisResult = {
-  existingHissnummer: Record<string, string>;
-  orgMatches: Record<string, string>;
+  existingElevatorNumbers: Record<string, string>;
+  orgMatchNames: string[];
+  orgMatchIds: string[];
   newOrgNames: string[];
   summary: {
     newElevators: number;
@@ -27,7 +33,13 @@ export type ImportResult = {
   emailSent?: boolean;
 };
 
-export type ImportStatus = "idle" | "parsing" | "preview" | "importing" | "complete";
+export type ImportStatus =
+  | "idle"
+  | "parsing"
+  | "mapping"
+  | "preview"
+  | "importing"
+  | "complete";
 
 export function useImportMachine() {
   const [status, setStatus] = useState<ImportStatus>("idle");
@@ -40,10 +52,16 @@ export function useImportMachine() {
     orgNames: string[];
   } | null>(null);
 
+  // Mapping step state
+  const workbookRef = useRef<ReturnType<typeof readWorkbook> | null>(null);
+  const [autoMapResult, setAutoMapResult] = useState<AutoMapResult | null>(
+    null,
+  );
+  const [sheetData, setSheetData] = useState<unknown[][]>([]);
+
   const confirmImport = useAction(api.imports.confirm);
   const currentUser = useQuery(api.users.me) as { email?: string } | undefined;
 
-  // Server-side analysis (reactive query, skipped until parse is done)
   const analysis = useQuery(
     api.imports.analyze,
     analysisArgs ?? ("skip" as const),
@@ -62,24 +80,21 @@ export function useImportMachine() {
 
     try {
       const buffer = await file.arrayBuffer();
-      const workbook = readWorkbook(buffer);
-      const result = parseExcelImport(workbook);
-      setParseResult(result);
+      const wb = readWorkbook(buffer);
+      workbookRef.current = wb;
 
-      // Prepare analysis args — deduplicated
-      const elevatorNumberList = [
-        ...new Set(result.combined.map((e) => e.elevator_number)),
-      ];
-      const orgNames = [
-        ...new Set(
-          result.combined
-            .map((e) => e._organisation_namn)
-            .filter((n): n is string => !!n),
-        ),
-      ];
+      // Auto-map the Hissar sheet
+      const mapResult = autoMapSheet(wb, "Hissar");
+      if (!mapResult) {
+        setParseError("Kunde inte hitta eller läsa 'Hissar'-arket");
+        setStatus("idle");
+        return;
+      }
 
-      setAnalysisArgs({ elevatorNumberList, orgNames });
-      setStatus("preview");
+      const data = getSheetData(wb, "Hissar");
+      setSheetData(data);
+      setAutoMapResult(mapResult);
+      setStatus("mapping");
     } catch (e) {
       setParseError(
         e instanceof Error ? e.message : "Kunde inte läsa filen",
@@ -88,6 +103,58 @@ export function useImportMachine() {
     }
   }, []);
 
+  const handleHeaderRowChange = useCallback(
+    (rowIndex: number) => {
+      const wb = workbookRef.current;
+      if (!wb) return;
+      const data = getSheetData(wb, "Hissar");
+      if (rowIndex < 0 || rowIndex >= data.length) return;
+
+      const headerRow = data[rowIndex] || [];
+      const headers = headerRow.map((cell) => String(cell || ""));
+      const result = autoMapColumns(headers, rowIndex);
+      setAutoMapResult(result);
+      setSheetData(data);
+    },
+    [],
+  );
+
+  const handleMappingConfirm = useCallback(
+    (mappings: ColumnMapping[]) => {
+      const wb = workbookRef.current;
+      if (!wb || !autoMapResult) return;
+
+      try {
+        const result = parseExcelImportWithMapping(
+          wb,
+          mappings,
+          autoMapResult.headerRowIndex,
+        );
+        setParseResult(result);
+
+        const elevatorNumberList = [
+          ...new Set(result.combined.map((e) => e.elevator_number)),
+        ];
+        const orgNames = [
+          ...new Set(
+            result.combined
+              .map((e) => e._organisation_namn)
+              .filter((n): n is string => !!n),
+          ),
+        ];
+
+        setAnalysisArgs({ elevatorNumberList, orgNames });
+        setStatus("preview");
+      } catch (e) {
+        setParseError(
+          e instanceof Error ? e.message : "Kunde inte tolka filen",
+        );
+        setStatus("idle");
+      }
+    },
+    [autoMapResult],
+  );
+
   const handleConfirm = useCallback(async () => {
     if (!parseResult || !analysis) return;
 
@@ -95,7 +162,8 @@ export function useImportMachine() {
     try {
       const result = await confirmImport({
         elevators: parseResult.combined as any,
-        existingOrgMapping: analysis.orgMatches as any,
+        existingOrgMatchNames: analysis.orgMatchNames,
+        existingOrgMatchIds: analysis.orgMatchIds,
         newOrgNames: analysis.newOrgNames,
         adminEmail: currentUser?.email,
       });
@@ -124,6 +192,9 @@ export function useImportMachine() {
     setParseError(null);
     setImportResult(null);
     setAnalysisArgs(null);
+    setAutoMapResult(null);
+    setSheetData([]);
+    workbookRef.current = null;
   }, []);
 
   return {
@@ -133,7 +204,11 @@ export function useImportMachine() {
     parseError,
     importResult,
     analysis,
+    autoMapResult,
+    sheetData,
     handleFileSelect,
+    handleHeaderRowChange,
+    handleMappingConfirm,
     handleConfirm,
     handleReset,
   };

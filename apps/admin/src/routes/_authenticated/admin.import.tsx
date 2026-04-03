@@ -6,6 +6,7 @@ import {
 import { UploadZone } from "@elevatorbud/ui/components/ui/upload-zone";
 import { FileSpreadsheet, Loader2 } from "lucide-react";
 import { useImportMachine } from "../../features/import/hooks/use-import-machine";
+import { ColumnMappingSection } from "../../features/import/components/column-mapping-section";
 import { PreviewSection } from "../../features/import/components/preview-section";
 import { ResultSection } from "../../features/import/components/result-section";
 
@@ -21,7 +22,11 @@ function ImportPage() {
     parseError,
     importResult,
     analysis,
+    autoMapResult,
+    sheetData,
     handleFileSelect,
+    handleHeaderRowChange,
+    handleMappingConfirm,
     handleConfirm,
     handleReset,
   } = useImportMachine();
@@ -71,6 +76,17 @@ function ImportPage() {
             <span>Läser Excel-fil...</span>
           </CardContent>
         </Card>
+      )}
+
+      {status === "mapping" && autoMapResult && (
+        <ColumnMappingSection
+          key={autoMapResult.headerRowIndex}
+          autoMapResult={autoMapResult}
+          sheetData={sheetData}
+          onConfirm={handleMappingConfirm}
+          onHeaderRowChange={handleHeaderRowChange}
+          onCancel={handleReset}
+        />
       )}
 
       {status === "preview" && parseResult && (
