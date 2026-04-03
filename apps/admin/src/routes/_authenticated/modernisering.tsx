@@ -104,9 +104,9 @@ function Modernisering() {
     null,
   );
 
-  const tidslinje = useQuery(api.elevators.modernizationTimeline, orgFilter);
-  const budget = useQuery(api.elevators.modernizationBudget, orgFilter);
-  const atgarder = useQuery(api.elevators.modernizationMeasures, orgFilter);
+  const tidslinje = useQuery(api.elevators.modernization.timeline, orgFilter);
+  const budget = useQuery(api.elevators.modernization.budget, orgFilter);
+  const atgarder = useQuery(api.elevators.modernization.measures, orgFilter);
 
   const prioritetslistaArgs = useMemo(() => {
     const base = selectedOrgId
@@ -123,7 +123,7 @@ function Modernisering() {
   }, [selectedOrgId, selectedPeriod]);
 
   const prioritetslista = useQuery(
-    api.elevators.modernizationPriorityList,
+    api.elevators.modernization.priorityList,
     prioritetslistaArgs as never,
   );
 

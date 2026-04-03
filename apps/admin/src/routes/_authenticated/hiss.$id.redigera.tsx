@@ -232,9 +232,9 @@ const BESIKTNINGSMANADER = [
 
 function RedigeraHiss() {
   const { id } = Route.useParams();
-  const hiss = useQuery(api.elevators.get, { id: id as never });
+  const hiss = useQuery(api.elevators.crud.get, { id: id as never });
   const orgs = useQuery(api.organizations.list);
-  const updateHiss = useMutation(api.elevators.update);
+  const updateHiss = useMutation(api.elevators.crud.update);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -1489,7 +1489,7 @@ function HissnummerField({
 }) {
   const elevatorNumber = field.state.value;
   const checkResult = useQuery(
-    api.elevators.checkElevatorNumber,
+    api.elevators.crud.checkElevatorNumber,
     elevatorNumber
       ? { elevator_number: elevatorNumber, excludeId: currentHissId as never }
       : "skip",

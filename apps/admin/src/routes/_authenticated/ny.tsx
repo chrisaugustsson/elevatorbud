@@ -186,7 +186,7 @@ function NyHiss() {
   const draftSavedTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const draftKey = getDraftKey();
   const orgs = useQuery(api.organizations.list);
-  const createHiss = useMutation(api.elevators.create);
+  const createHiss = useMutation(api.elevators.crud.create);
 
   // Check for existing draft on mount
   useEffect(() => {
@@ -643,7 +643,7 @@ function HissnummerField({
 }) {
   const elevatorNumber = field.state.value;
   const checkResult = useQuery(
-    api.elevators.checkElevatorNumber,
+    api.elevators.crud.checkElevatorNumber,
     elevatorNumber ? { elevator_number: elevatorNumber } : "skip",
   );
   const isDuplicate = checkResult?.exists === true;

@@ -103,12 +103,12 @@ function ModerniseringPage() {
   );
 
   const tidslinje = useQuery(
-    api.elevators.modernizationTimeline,
+    api.elevators.modernization.timeline,
     orgFilter as never,
   );
-  const budget = useQuery(api.elevators.modernizationBudget, orgFilter as never);
+  const budget = useQuery(api.elevators.modernization.budget, orgFilter as never);
   const atgarder = useQuery(
-    api.elevators.modernizationMeasures,
+    api.elevators.modernization.measures,
     orgFilter as never,
   );
 
@@ -126,7 +126,7 @@ function ModerniseringPage() {
   }, [user?.organization_id, selectedPeriod]);
 
   const prioritetslista = useQuery(
-    api.elevators.modernizationPriorityList,
+    api.elevators.modernization.priorityList,
     prioritetslistaArgs as never,
   );
 

@@ -275,7 +275,7 @@ function Register() {
     limit,
   } as never;
 
-  const result = useQuery(api.elevators.list, queryArgs) as
+  const result = useQuery(api.elevators.listing.list, queryArgs) as
     | ListResult
     | undefined;
 
@@ -285,7 +285,7 @@ function Register() {
   >(null);
   const exportArgs = exportRequested ? (filterBaseArgs as never) : "skip";
   const exportData = useQuery(
-    api.elevators.exportData,
+    api.elevators.listing.exportData,
     exportArgs as never,
   ) as Record<string, unknown>[] | undefined;
 

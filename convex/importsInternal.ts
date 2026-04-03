@@ -2,7 +2,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { requireAdmin } from "./auth";
-import { autoAddSuggestedValues } from "./elevators";
+import { autoAddSuggestedValues } from "./elevators/helpers";
 
 export const checkAdmin = internalQuery({
   args: {},

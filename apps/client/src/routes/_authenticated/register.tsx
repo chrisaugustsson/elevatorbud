@@ -277,7 +277,7 @@ function RegisterPage() {
     : "skip";
 
   const result = useQuery(
-    api.elevators.list,
+    api.elevators.listing.list,
     queryArgs as never,
   ) as ListResult | undefined;
 
@@ -288,7 +288,7 @@ function RegisterPage() {
   const exportArgs =
     exportRequested && filterBaseArgs ? (filterBaseArgs as never) : "skip";
   const exportData = useQuery(
-    api.elevators.exportData,
+    api.elevators.listing.exportData,
     exportArgs as never,
   ) as Record<string, unknown>[] | undefined;
 

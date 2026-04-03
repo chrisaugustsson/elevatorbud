@@ -23,25 +23,35 @@ declare module "@convex/_generated/api" {
       listByOrganization: FunctionReference<"query", "public">;
     };
     elevators: {
-      list: FunctionReference<"query", "public">;
-      exportData: FunctionReference<"query", "public">;
-      stats: FunctionReference<"query", "public">;
-      chartData: FunctionReference<"query", "public">;
-      modernizationTimeline: FunctionReference<"query", "public">;
-      modernizationBudget: FunctionReference<"query", "public">;
-      modernizationPriorityList: FunctionReference<"query", "public">;
-      modernizationMeasures: FunctionReference<"query", "public">;
-      inspectionCalendar: FunctionReference<"query", "public">;
-      inspectionList: FunctionReference<"query", "public">;
-      maintenanceCompanies: FunctionReference<"query", "public">;
-      emergencyPhoneStatus: FunctionReference<"query", "public">;
-      todaysElevators: FunctionReference<"query", "public">;
-      get: FunctionReference<"query", "public">;
-      checkElevatorNumber: FunctionReference<"query", "public">;
-      search: FunctionReference<"query", "public">;
-      create: FunctionReference<"mutation", "public">;
-      update: FunctionReference<"mutation", "public">;
-      archive: FunctionReference<"mutation", "public">;
+      crud: {
+        get: FunctionReference<"query", "public">;
+        search: FunctionReference<"query", "public">;
+        checkElevatorNumber: FunctionReference<"query", "public">;
+        create: FunctionReference<"mutation", "public">;
+        update: FunctionReference<"mutation", "public">;
+        archive: FunctionReference<"mutation", "public">;
+      };
+      listing: {
+        list: FunctionReference<"query", "public">;
+        exportData: FunctionReference<"query", "public">;
+      };
+      analytics: {
+        stats: FunctionReference<"query", "public">;
+        chartData: FunctionReference<"query", "public">;
+      };
+      modernization: {
+        timeline: FunctionReference<"query", "public">;
+        budget: FunctionReference<"query", "public">;
+        priorityList: FunctionReference<"query", "public">;
+        measures: FunctionReference<"query", "public">;
+      };
+      maintenance: {
+        inspectionCalendar: FunctionReference<"query", "public">;
+        companies: FunctionReference<"query", "public">;
+        emergencyPhoneStatus: FunctionReference<"query", "public">;
+        inspectionList: FunctionReference<"query", "public">;
+        todaysElevators: FunctionReference<"query", "public">;
+      };
     };
     imports: {
       analyze: FunctionReference<"query", "public">;

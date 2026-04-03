@@ -75,12 +75,12 @@ function UnderhallPage() {
   const [selectedManad, setSelectedManad] = useState<string | null>(null);
 
   const kalender = useQuery(
-    api.elevators.inspectionCalendar,
+    api.elevators.maintenance.inspectionCalendar,
     orgFilter as never,
   );
-  const foretag = useQuery(api.elevators.maintenanceCompanies, orgFilter as never);
+  const foretag = useQuery(api.elevators.maintenance.companies, orgFilter as never);
   const nodtelefon = useQuery(
-    api.elevators.emergencyPhoneStatus,
+    api.elevators.maintenance.emergencyPhoneStatus,
     orgFilter as never,
   );
 
@@ -89,7 +89,7 @@ function UnderhallPage() {
       ? ({ organization_id: user.organization_id as never, month: selectedManad })
       : "skip";
   const besiktningslista = useQuery(
-    api.elevators.inspectionList,
+    api.elevators.maintenance.inspectionList,
     besiktningslistaArgs as never,
   );
 

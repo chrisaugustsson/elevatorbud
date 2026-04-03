@@ -28,8 +28,8 @@ function Dashboard() {
     ? ({ organization_id: selectedOrgId } as never)
     : {};
 
-  const stats = useQuery(api.elevators.stats, orgFilter);
-  const chartData = useQuery(api.elevators.chartData, orgFilter);
+  const stats = useQuery(api.elevators.analytics.stats, orgFilter);
+  const chartData = useQuery(api.elevators.analytics.chartData, orgFilter);
 
   if (stats === undefined || chartData === undefined) {
     return <DashboardSkeleton />;
