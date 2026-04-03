@@ -54,8 +54,12 @@ export const updateUser = internalMutation({
     if (fields.name !== undefined) updates.name = fields.name;
     if (fields.email !== undefined) updates.email = fields.email;
     if (fields.role !== undefined) updates.role = fields.role;
-    if (fields.organization_id !== undefined)
+    // Clear org when role is admin; otherwise update if provided
+    if (fields.role === "admin") {
+      updates.organization_id = undefined;
+    } else if (fields.organization_id !== undefined) {
       updates.organization_id = fields.organization_id;
+    }
     await ctx.db.patch(id, updates);
   },
 });

@@ -103,9 +103,13 @@ export const update = action({
       clerkUpdate.lastName = nameParts.slice(1).join(" ") || undefined;
     }
 
+    const effectiveRole = args.role ?? currentData.role;
     clerkUpdate.publicMetadata = {
-      role: args.role ?? currentData.role,
-      organization_id: args.organization_id ?? currentData.organization_id,
+      role: effectiveRole,
+      organization_id:
+        effectiveRole === "admin"
+          ? undefined
+          : (args.organization_id ?? currentData.organization_id),
     };
 
     await clerk.users.updateUser(currentData.clerk_user_id, clerkUpdate);
