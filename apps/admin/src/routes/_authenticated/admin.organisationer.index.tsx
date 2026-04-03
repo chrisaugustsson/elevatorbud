@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useForm } from "@tanstack/react-form";
 import {
@@ -39,6 +41,7 @@ export const Route = createFileRoute(
   "/_authenticated/admin/organisationer/",
 )({
   component: Organisationer,
+  pendingComponent: OrganisationerSkeleton,
 });
 
 type Organisation = {
@@ -107,7 +110,11 @@ function validateOrganisationsnummer(value: string): string | undefined {
 }
 
 function Organisationer() {
-  const orgs = useQuery(api.organizations.list);
+  const opts = convexQuery(api.organizations.list, {});
+  const { data: orgs } = useSuspenseQuery({
+    queryKey: opts.queryKey,
+    staleTime: opts.staleTime,
+  }) as { data: Organisation[] };
   const createOrg = useMutation(api.organizations.create);
   const updateOrg = useMutation(api.organizations.update);
   const navigate = useNavigate();
@@ -118,7 +125,7 @@ function Organisationer() {
   const [editOrg, setEditOrg] = useState<Organisation | null>(null);
 
   const table = useReactTable({
-    data: (orgs as Organisation[] | undefined) ?? [],
+    data: orgs,
     columns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
@@ -127,47 +134,6 @@ function Organisationer() {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
-
-  if (orgs === undefined) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="mt-2 h-4 w-80" />
-          </div>
-          <Skeleton className="h-9 w-40" />
-        </div>
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-9 w-full max-w-sm" />
-        </div>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {["w-24", "w-28", "w-32", "w-44", "w-20"].map((w, i) => (
-                  <TableHead key={i}>
-                    <Skeleton className={`h-4 ${w}`} />
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-8" /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -678,5 +644,46 @@ function EditOrgDialogInner({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function OrganisationerSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="mt-2 h-4 w-80" />
+        </div>
+        <Skeleton className="h-9 w-40" />
+      </div>
+      <div className="flex items-center gap-4">
+        <Skeleton className="h-9 w-full max-w-sm" />
+      </div>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {["w-24", "w-28", "w-32", "w-44", "w-20"].map((w, i) => (
+                <TableHead key={i}>
+                  <Skeleton className={`h-4 ${w}`} />
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <TableRow key={i}>
+                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-8" /></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 }
