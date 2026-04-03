@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@elevatorbud/ui/components/ui/table";
 import { Badge } from "@elevatorbud/ui/components/ui/badge";
+import { Link } from "@tanstack/react-router";
 import { Building2, ChevronRight } from "lucide-react";
 import type { TimelinePeriod } from "./urgency-helpers";
 import { getUrgencyBadge } from "./urgency-helpers";
@@ -26,6 +27,7 @@ type PriorityElevator = {
   recommended_modernization_year?: string;
   budget_amount?: number;
   modernization_measures?: string;
+  organization_id: string;
   organizationName: string;
 };
 
@@ -80,6 +82,9 @@ export function PriorityList({
                   <TableHead className="hidden md:table-cell">
                     Distrikt
                   </TableHead>
+                  <TableHead className="hidden sm:table-cell">
+                    Organisation
+                  </TableHead>
                   <TableHead>Rek. år</TableHead>
                   <TableHead>Brådskande</TableHead>
                   <TableHead className="hidden sm:table-cell">
@@ -107,6 +112,16 @@ export function PriorityList({
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {h.district || "–"}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <Link
+                          to="/admin/organisationer/$id"
+                          params={{ id: h.organization_id }}
+                          className="text-primary hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {h.organizationName}
+                        </Link>
                       </TableCell>
                       <TableCell>{h.recommended_modernization_year}</TableCell>
                       <TableCell>{getUrgencyBadge(year)}</TableCell>

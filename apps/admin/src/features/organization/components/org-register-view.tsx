@@ -21,6 +21,7 @@ type ListResult = {
     modernization_year?: string;
     recommended_modernization_year?: string;
     budget_amount?: number;
+    organization_id: string;
     organizationName: string;
   }>;
   totalCount: number;

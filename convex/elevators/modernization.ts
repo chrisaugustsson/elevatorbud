@@ -147,6 +147,7 @@ export const priorityList = query({
           recommended_modernization_year: h.recommended_modernization_year,
           budget_amount: h.budget_amount,
           modernization_measures: h.modernization_measures,
+          organization_id: h.organization_id,
           organizationName: orgName,
         };
       }),

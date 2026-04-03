@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { useSelectedOrg } from "../../shared/lib/org-context";
 import { downloadCSV, downloadExcel } from "@elevatorbud/utils/export";
 import type { SortingState } from "@tanstack/react-table";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
@@ -27,6 +26,7 @@ type ListResult = {
     modernization_year?: string;
     recommended_modernization_year?: string;
     budget_amount?: number;
+    organization_id: string;
     organizationName: string;
   }>;
   totalCount: number;
@@ -43,8 +43,6 @@ type SuggestedValueItem = {
 };
 
 function Register() {
-  const { selectedOrgId } = useSelectedOrg();
-
   // Search state
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -84,7 +82,6 @@ function Register() {
     filterManufacturer,
     buildYearMin,
     buildYearMax,
-    selectedOrgId,
     statusFilter,
   ]);
 
@@ -127,7 +124,6 @@ function Register() {
     ...(buildYearMax && !isNaN(parseInt(buildYearMax))
       ? { buildYearMax: parseInt(buildYearMax) }
       : {}),
-    ...(selectedOrgId ? { organization_id: selectedOrgId } : {}),
     ...(statusFilter !== "all" ? { status: statusFilter } : {}),
   };
 

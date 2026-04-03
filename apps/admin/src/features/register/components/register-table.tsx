@@ -30,6 +30,7 @@ type HissRow = {
   modernization_year?: string;
   recommended_modernization_year?: string;
   budget_amount?: number;
+  organization_id: string;
   organizationName: string;
 };
 
@@ -103,6 +104,19 @@ export function RegisterTable({
           />
         ),
         cell: (info) => info.getValue() || "—",
+      }),
+      columnHelper.accessor("organizationName", {
+        header: () => "Organisation",
+        cell: (info) => (
+          <Link
+            to="/admin/organisationer/$id"
+            params={{ id: info.row.original.organization_id }}
+            onClick={(e) => e.stopPropagation()}
+            className="text-primary hover:underline"
+          >
+            {info.getValue()}
+          </Link>
+        ),
       }),
       columnHelper.accessor("elevator_type", {
         header: () => (

@@ -35,5 +35,6 @@ export type BesiktningsListaItem = {
   address?: string;
   district?: string;
   inspection_authority?: string;
+  organization_id: string;
   organizationName: string;
 };

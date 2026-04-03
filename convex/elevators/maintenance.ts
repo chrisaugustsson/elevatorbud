@@ -206,6 +206,7 @@ export const inspectionList = query({
           address: h.address,
           district: h.district,
           inspection_authority: h.inspection_authority,
+          organization_id: h.organization_id,
           organizationName: orgName,
         };
       }),

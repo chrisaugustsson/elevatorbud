@@ -2,7 +2,6 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { useSelectedOrg } from "../../shared/lib/org-context";
 import { InspectionCalendar } from "../../features/maintenance/components/inspection-calendar";
 import { MaintenanceCompanies } from "../../features/maintenance/components/maintenance-companies";
 import { EmergencyPhoneStatus } from "../../features/maintenance/components/emergency-phone-status";
@@ -36,19 +35,14 @@ const currentMonthIndex = new Date().getMonth();
 const currentMonthName = MANADER[currentMonthIndex];
 
 function Underhall() {
-  const { selectedOrgId } = useSelectedOrg();
-  const orgFilter = selectedOrgId
-    ? ({ organization_id: selectedOrgId } as never)
-    : {};
-
   const [selectedManad, setSelectedManad] = useState<string | null>(null);
 
-  const kalender = useQuery(api.elevators.maintenance.inspectionCalendar, orgFilter);
-  const foretag = useQuery(api.elevators.maintenance.companies, orgFilter);
-  const nodtelefon = useQuery(api.elevators.maintenance.emergencyPhoneStatus, orgFilter);
+  const kalender = useQuery(api.elevators.maintenance.inspectionCalendar, {});
+  const foretag = useQuery(api.elevators.maintenance.companies, {});
+  const nodtelefon = useQuery(api.elevators.maintenance.emergencyPhoneStatus, {});
 
   const besiktningslistaArgs = selectedManad
-    ? { ...(selectedOrgId ? { organization_id: selectedOrgId as never } : {}), month: selectedManad }
+    ? { month: selectedManad }
     : "skip";
   const besiktningslista = useQuery(
     api.elevators.maintenance.inspectionList,

@@ -8,7 +8,6 @@ import {
 } from "@elevatorbud/ui/components/ui/sidebar";
 import { AppSidebar } from "../shared/components/app-sidebar";
 import { GlobalSearch } from "../shared/components/global-search";
-import { OrgProvider } from "../shared/lib/org-context";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -66,18 +65,16 @@ function AuthenticatedLayout() {
   }
 
   return (
-    <OrgProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-            <GlobalSearch />
-          </header>
-          <div className="flex-1 overflow-auto p-6">
-            <Outlet />
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
-    </OrgProvider>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+          <GlobalSearch />
+        </header>
+        <div className="flex-1 overflow-auto p-6">
+          <Outlet />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

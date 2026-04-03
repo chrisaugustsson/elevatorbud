@@ -136,6 +136,7 @@ export function OrgModernizationView({
             recommended_modernization_year?: string;
             budget_amount?: number;
             modernization_measures?: string;
+            organization_id: string;
             organizationName: string;
           }[]
         }

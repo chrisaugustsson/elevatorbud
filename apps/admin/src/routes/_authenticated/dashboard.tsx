@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { useSelectedOrg } from "../../shared/lib/org-context";
 import { KpiCards } from "@elevatorbud/ui/components/dashboard/kpi-cards";
 import type { KpiItem } from "@elevatorbud/ui/components/dashboard/kpi-cards";
 import {
@@ -23,13 +22,8 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
-  const { selectedOrgId } = useSelectedOrg();
-  const orgFilter = selectedOrgId
-    ? ({ organization_id: selectedOrgId } as never)
-    : {};
-
-  const stats = useQuery(api.elevators.analytics.stats, orgFilter);
-  const chartData = useQuery(api.elevators.analytics.chartData, orgFilter);
+  const stats = useQuery(api.elevators.analytics.stats, {});
+  const chartData = useQuery(api.elevators.analytics.chartData, {});
 
   if (stats === undefined || chartData === undefined) {
     return <DashboardSkeleton />;
