@@ -246,7 +246,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 14,
-      "passes": false,
+      "passes": true,
       "notes": "Route file: apps/admin/src/routes/_authenticated/admin.organisationer.$id.tsx. For the overview stats, check if existing analytics queries (api.elevators.analytics.stats, api.elevators.analytics.chartData) accept an org filter parameter — if so, reuse them. Hissar and Användare tab content will be added in US-015 and US-016."
     },
     {
