@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useForm } from "@tanstack/react-form";
 import { Button } from "@elevatorbud/ui/components/ui/button";
@@ -40,6 +42,7 @@ import { InspectionSection } from "../../features/elevator/components/inspection
 import { ModernizationSection } from "../../features/elevator/components/modernization-section";
 import { EmergencyPhoneSection } from "../../features/elevator/components/emergency-phone-section";
 import { CommentsSection } from "../../features/elevator/components/comments-section";
+import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 
 const tabSlugs = ["grundinfo", "teknik", "underhall", "ovrigt"] as const;
 type TabSlug = (typeof tabSlugs)[number];
@@ -52,14 +55,79 @@ function getInitialTab(): TabSlug {
 
 export const Route = createFileRoute("/_authenticated/hiss/$id/redigera")({
   component: RedigeraHiss,
+  pendingComponent: RedigeraSkeleton,
 });
+
+function RedigeraSkeleton() {
+  return (
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+      {/* Header */}
+      <div className="border-b bg-background px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-9 w-9" />
+            <div>
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="mt-1 h-4 w-20" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tab bar */}
+      <div className="sticky top-0 z-10 border-b bg-background px-4">
+        <div className="flex gap-4 py-2">
+          <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-8 w-20" />
+          <Skeleton className="h-8 w-40" />
+          <Skeleton className="h-8 w-20" />
+        </div>
+      </div>
+
+      {/* Form content */}
+      <div className="flex-1 overflow-auto px-4 py-4">
+        <div className="space-y-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-lg border p-4">
+              <Skeleton className="mb-4 h-5 w-40" />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <div key={j}>
+                    <Skeleton className="mb-1.5 h-4 w-24" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Save bar */}
+      <div className="sticky bottom-0 border-t bg-background px-4 py-3">
+        <div className="flex gap-3">
+          <Skeleton className="h-12 flex-1" />
+          <Skeleton className="h-12 flex-1" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function RedigeraHiss() {
   const { id } = Route.useParams();
   const [activeTab, setActiveTab] = useState<TabSlug>(getInitialTab);
   const router = useRouter();
-  const hiss = useQuery(api.elevators.crud.get, { id: id as never });
-  const orgs = useQuery(api.organizations.list);
+  const hissOpts = convexQuery(api.elevators.crud.get, { id: id as never });
+  const { data: hiss } = useSuspenseQuery({
+    queryKey: hissOpts.queryKey,
+    staleTime: hissOpts.staleTime,
+  });
+  const orgsOpts = convexQuery(api.organizations.list, {});
+  const { data: orgs } = useSuspenseQuery({
+    queryKey: orgsOpts.queryKey,
+    staleTime: orgsOpts.staleTime,
+  });
   const updateHiss = useMutation(api.elevators.crud.update);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -122,6 +190,21 @@ function RedigeraHiss() {
     setInitialized(true);
   }, [hiss, initialized, form]);
 
+  // Not found
+  if (hiss === null) {
+    return (
+      <div className="flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center px-4">
+        <p className="text-muted-foreground">Hissen kunde inte hittas.</p>
+        <Link to="/" className="mt-4">
+          <Button variant="outline">
+            <ArrowLeft className="mr-1 size-4" />
+            Tillbaka
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
   const formValues = form.state.values;
 
   const { draftPromptVisible, draftSavedVisible, restoreDraft, dismissDraft } =
@@ -141,15 +224,6 @@ function RedigeraHiss() {
       Object.keys(originalValues) as Array<keyof HissFormValues>
     ).filter((key) => isChanged(key, formValues, originalValues)).length;
   }, [formValues, originalValues]);
-
-  // Loading state
-  if (!hiss || !initialized) {
-    return (
-      <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   // Success confirmation
   if (submitSuccess) {
