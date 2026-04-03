@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery, useMutation } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
+import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
+import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import {
   Tabs,
   TabsList,
@@ -34,6 +37,7 @@ export const Route = createFileRoute("/_authenticated/webbplats")({
       : "startsida") as PageSlug,
   }),
   component: Webbplats,
+  pendingComponent: WebbplatsSkeleton,
 });
 
 function Webbplats() {
@@ -61,7 +65,9 @@ function Webbplats() {
         </TabsList>
         {pages.map((page) => (
           <TabsContent key={page.slug} value={page.slug}>
-            <PageTab slug={page.slug} label={page.label} />
+            <Suspense fallback={<PageTabSkeleton />}>
+              <PageTab slug={page.slug} label={page.label} />
+            </Suspense>
           </TabsContent>
         ))}
       </Tabs>
@@ -70,7 +76,11 @@ function Webbplats() {
 }
 
 function PageTab({ slug, label }: { slug: string; label: string }) {
-  const page = useQuery(api.cms.getPage, { slug });
+  const opts = convexQuery(api.cms.getPage, { slug });
+  const { data: page } = useSuspenseQuery({
+    queryKey: opts.queryKey,
+    staleTime: opts.staleTime,
+  });
   const createPage = useMutation(api.cms.createPage);
   const updatePage = useMutation(api.cms.updatePage);
   const [isSaving, setIsSaving] = useState(false);
@@ -108,12 +118,6 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
     } finally {
       setIsSaving(false);
     }
-  }
-
-  if (page === undefined) {
-    return (
-      <div className="py-8 text-center text-muted-foreground">Laddar…</div>
-    );
   }
 
   const formContent = (() => {
@@ -158,6 +162,42 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
         </div>
       </div>
       {formContent}
+    </div>
+  );
+}
+
+function PageTabSkeleton() {
+  return (
+    <div className="py-4">
+      <div className="mb-4 flex items-center justify-between">
+        <Skeleton className="h-7 w-32" />
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-5 w-20 rounded-full" />
+          <Skeleton className="h-5 w-28" />
+        </div>
+      </div>
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+    </div>
+  );
+}
+
+function WebbplatsSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-8 w-40" />
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          {pages.map((page) => (
+            <Skeleton key={page.slug} className="h-9 w-24 rounded-md" />
+          ))}
+        </div>
+        <PageTabSkeleton />
+      </div>
     </div>
   );
 }
