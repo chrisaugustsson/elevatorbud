@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { useSelectedOrg } from "../../lib/org-context";
+import { useSelectedOrg } from "../../shared/lib/org-context";
 import {
   Card,
   CardContent,

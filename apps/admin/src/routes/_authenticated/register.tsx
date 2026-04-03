@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { useSelectedOrg } from "../../lib/org-context";
+import { useSelectedOrg } from "../../shared/lib/org-context";
 import { downloadCSV, downloadExcel } from "@elevatorbud/utils/export";
 import {
   useReactTable,

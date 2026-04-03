@@ -8,9 +8,9 @@ import {
   SidebarTrigger,
 } from "@elevatorbud/ui/components/ui/sidebar";
 import { Separator } from "@elevatorbud/ui/components/ui/separator";
-import { AppSidebar } from "../components/app-sidebar";
-import { OrgSelector } from "../components/org-selector";
-import { OrgProvider } from "../lib/org-context";
+import { AppSidebar } from "../shared/components/app-sidebar";
+import { OrgSelector } from "../shared/components/org-selector";
+import { OrgProvider } from "../shared/lib/org-context";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,

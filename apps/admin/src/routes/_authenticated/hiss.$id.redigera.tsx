@@ -35,7 +35,7 @@ import {
   loadDraft,
   clearDraft,
   hasDraft,
-} from "../../lib/form-persistence";
+} from "../../shared/lib/form-persistence";
 
 export const Route = createFileRoute("/_authenticated/hiss/$id/redigera")({
   component: RedigeraHiss,
