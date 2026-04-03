@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
@@ -37,6 +38,7 @@ export const Route = createFileRoute(
   "/_authenticated/admin/organisationer/$id",
 )({
   component: OrganisationDetail,
+  pendingComponent: DetailSkeleton,
 });
 
 const tabSlugs = [
@@ -61,45 +63,54 @@ function OrganisationDetail() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabSlug>(getInitialTab);
 
-  const org = useQuery(api.organizations.get, { id } as never) as
-    | {
-        _id: string;
-        name: string;
-        organization_number?: string;
-        contact_person?: string;
-        phone_number?: string;
-        email?: string;
-      }
-    | null
-    | undefined;
+  const orgOpts = convexQuery(api.organizations.get, { id } as never);
+  const { data: org } = useSuspenseQuery({
+    queryKey: orgOpts.queryKey,
+    staleTime: orgOpts.staleTime,
+  }) as {
+    data: {
+      _id: string;
+      name: string;
+      organization_number?: string;
+      contact_person?: string;
+      phone_number?: string;
+      email?: string;
+    } | null;
+  };
 
-  const stats = useQuery(
-    api.elevators.analytics.stats,
-    { organization_id: id } as never,
-  ) as
-    | {
-        totalCount: number;
-        averageAge: number;
-        modernizationWithin3Years: number;
-        totalBudgetCurrentYear: number;
-        withoutModernization: number;
-        lastInventory: number | null;
-      }
-    | undefined;
+  const statsOpts = convexQuery(api.elevators.analytics.stats, {
+    organization_id: id,
+  } as never);
+  const { data: stats } = useSuspenseQuery({
+    queryKey: statsOpts.queryKey,
+    staleTime: statsOpts.staleTime,
+  }) as {
+    data: {
+      totalCount: number;
+      averageAge: number;
+      modernizationWithin3Years: number;
+      totalBudgetCurrentYear: number;
+      withoutModernization: number;
+      lastInventory: number | null;
+    };
+  };
 
-  const chartData = useQuery(
-    api.elevators.analytics.chartData,
-    { organization_id: id } as never,
-  ) as
-    | {
-        byDistrict: { name: string; count: number }[];
-        ageDistribution: { name: string; count: number }[];
-        byElevatorType: { name: string; count: number }[];
-        topManufacturers: { name: string; count: number }[];
-        modernizationTimeline: { name: string; count: number }[];
-        byMaintenanceCompany: { name: string; count: number }[];
-      }
-    | undefined;
+  const chartOpts = convexQuery(api.elevators.analytics.chartData, {
+    organization_id: id,
+  } as never);
+  const { data: chartData } = useSuspenseQuery({
+    queryKey: chartOpts.queryKey,
+    staleTime: chartOpts.staleTime,
+  }) as {
+    data: {
+      byDistrict: { name: string; count: number }[];
+      ageDistribution: { name: string; count: number }[];
+      byElevatorType: { name: string; count: number }[];
+      topManufacturers: { name: string; count: number }[];
+      modernizationTimeline: { name: string; count: number }[];
+      byMaintenanceCompany: { name: string; count: number }[];
+    };
+  };
 
   function handleTabChange(value: string) {
     const tab = value as TabSlug;
@@ -107,10 +118,6 @@ function OrganisationDetail() {
     const url = new URL(window.location.href);
     url.searchParams.set("tab", tab);
     window.history.replaceState({}, "", url.toString());
-  }
-
-  if (org === undefined) {
-    return <DetailSkeleton />;
   }
 
   if (org === null) {
@@ -132,44 +139,42 @@ function OrganisationDetail() {
     );
   }
 
-  const kpiItems: KpiItem[] = stats
-    ? [
-        {
-          title: "Totalt antal hissar",
-          value: stats.totalCount,
-          icon: <Building2 className="h-4 w-4" />,
-        },
-        {
-          title: "Medelålder",
-          value: `${stats.averageAge} år`,
-          icon: <Clock className="h-4 w-4" />,
-        },
-        {
-          title: "Modernisering inom 3 år",
-          value: stats.modernizationWithin3Years,
-          description: "Rekommenderad modernisering",
-          icon: <Hammer className="h-4 w-4" />,
-        },
-        {
-          title: "Budget innevarande år",
-          value: `${(stats.totalBudgetCurrentYear / 1000).toFixed(0)} tkr`,
-          icon: <TrendingUp className="h-4 w-4" />,
-        },
-        {
-          title: "Utan modernisering",
-          value: stats.withoutModernization,
-          description: "Ej ombyggda",
-          icon: <AlertTriangle className="h-4 w-4" />,
-        },
-        {
-          title: "Senaste inventering",
-          value: stats.lastInventory
-            ? new Date(stats.lastInventory).toLocaleDateString("sv-SE")
-            : "–",
-          icon: <Calendar className="h-4 w-4" />,
-        },
-      ]
-    : [];
+  const kpiItems: KpiItem[] = [
+    {
+      title: "Totalt antal hissar",
+      value: stats.totalCount,
+      icon: <Building2 className="h-4 w-4" />,
+    },
+    {
+      title: "Medelålder",
+      value: `${stats.averageAge} år`,
+      icon: <Clock className="h-4 w-4" />,
+    },
+    {
+      title: "Modernisering inom 3 år",
+      value: stats.modernizationWithin3Years,
+      description: "Rekommenderad modernisering",
+      icon: <Hammer className="h-4 w-4" />,
+    },
+    {
+      title: "Budget innevarande år",
+      value: `${(stats.totalBudgetCurrentYear / 1000).toFixed(0)} tkr`,
+      icon: <TrendingUp className="h-4 w-4" />,
+    },
+    {
+      title: "Utan modernisering",
+      value: stats.withoutModernization,
+      description: "Ej ombyggda",
+      icon: <AlertTriangle className="h-4 w-4" />,
+    },
+    {
+      title: "Senaste inventering",
+      value: stats.lastInventory
+        ? new Date(stats.lastInventory).toLocaleDateString("sv-SE")
+        : "–",
+      icon: <Calendar className="h-4 w-4" />,
+    },
+  ];
 
   return (
     <div className="min-w-0 space-y-6">
@@ -223,9 +228,7 @@ function OrganisationDetail() {
 
         {/* Översikt tab */}
         <TabsContent value="oversikt" className="space-y-6">
-          {stats === undefined || chartData === undefined ? (
-            <OverviewSkeleton />
-          ) : stats.totalCount === 0 ? (
+          {stats.totalCount === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
               Inga hissar registrerade för denna organisation.
             </div>
@@ -281,32 +284,35 @@ function OrganisationDetail() {
   );
 }
 
-function OverviewSkeleton() {
+function DetailSkeleton() {
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Skeleton className="size-8" />
+          <Skeleton className="h-8 w-64" />
+        </div>
+        <div className="ml-10 flex items-center gap-4">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-4 w-40" />
+        </div>
+      </div>
+      {/* Tabs */}
+      <Skeleton className="h-10 w-full max-w-xl" />
+      {/* KPI cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={i} className="h-28 rounded-xl" />
         ))}
       </div>
+      {/* Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-[380px] rounded-xl" />
         ))}
       </div>
-    </div>
-  );
-}
-
-function DetailSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Skeleton className="size-8" />
-        <Skeleton className="h-8 w-64" />
-      </div>
-      <Skeleton className="h-10 w-96" />
-      <OverviewSkeleton />
     </div>
   );
 }
