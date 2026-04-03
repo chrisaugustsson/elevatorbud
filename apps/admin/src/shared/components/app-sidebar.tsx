@@ -27,7 +27,7 @@ import {
   useSidebar,
 } from "@elevatorbud/ui/components/ui/sidebar";
 import { Button } from "@elevatorbud/ui/components/ui/button";
-import { UserButton } from "@elevatorbud/auth";
+import { UserButton, useUser } from "@elevatorbud/auth";
 
 const mainNav = [
   { title: "Dashboard", href: "/dashboard", icon: BarChart3 },
@@ -51,6 +51,7 @@ export function AppSidebar() {
   const routerState = useRouterState();
   const pathname = routerState.location.pathname;
   const { toggleSidebar, state } = useSidebar();
+  const { user } = useUser();
 
   return (
     <Sidebar collapsible="icon">
@@ -149,6 +150,14 @@ export function AppSidebar() {
       <SidebarFooter>
         <div className="flex items-center gap-2 px-2 py-1.5">
           <UserButton />
+          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+            <p className="truncate text-sm font-medium leading-tight">
+              {user?.fullName}
+            </p>
+            <p className="truncate text-xs text-muted-foreground leading-tight">
+              {user?.primaryEmailAddress?.emailAddress}
+            </p>
+          </div>
         </div>
       </SidebarFooter>
       <SidebarRail />
