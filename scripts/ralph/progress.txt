@@ -135,3 +135,22 @@ Started: fre  3 apr. 2026 12:21:09 CEST
   - When Convex mutation uses `if (field !== undefined)` pattern for optional patches, `undefined` means "don't change" not "clear" — need explicit clearing logic for dependent field clearing
   - Role/org business rule (admin = no org) should be enforced in backend, not just frontend
 ---
+
+## 2026-04-03 - US-009
+- Replaced card-based list with React Table (same pattern as users page)
+- Added columns: Value (sortable), Status (active/inactive badge), Actions (dropdown menu with Edit, Merge, Deactivate/Activate)
+- Inactive items shown with reduced opacity (opacity-50 on table row)
+- Category dropdown label changed from "Category" to "Kategori" (Swedish)
+- Added `activate` mutation to `convex/suggestedValues.ts` (only `deactivate` existed)
+- Actions moved from inline icon buttons to DropdownMenu with MoreHorizontal trigger (consistent with users page)
+- Search filter, 'Nytt värde' button, active/inactive counts all preserved
+- Files changed:
+  - `apps/admin/src/routes/_authenticated/admin.referensdata.tsx` — replaced cards with table, added activate mutation usage, dropdown menu actions
+  - `convex/suggestedValues.ts` — added `activate` mutation
+  - `apps/admin/src/convex-api.d.ts` — added `activate` type for suggestedValues
+  - `apps/client/src/convex-api.d.ts` — added `activate` type for suggestedValues
+- **Learnings for future iterations:**
+  - React Table pattern is consistent across pages (users, reference data) — use `createColumnHelper`, `useReactTable`, `getCoreRowModel`, `getSortedRowModel`
+  - DropdownMenu pattern is the standard for row actions across the admin app
+  - When adding toggle behavior (activate/deactivate), always check if both mutations exist in backend
+---

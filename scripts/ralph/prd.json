@@ -149,7 +149,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "File: apps/admin/src/routes/_authenticated/admin.referensdata.tsx. Reuse the same table pattern from the users page (React Table). Keep existing create/edit/merge dialogs — just change the list rendering from cards to table rows."
     },
     {
