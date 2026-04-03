@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useForm } from "@tanstack/react-form";
 import {
@@ -63,6 +65,7 @@ import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated/admin/referensdata")({
   component: Referensdata,
+  pendingComponent: ReferensdataSkeleton,
 });
 
 const CATEGORIES = [
@@ -103,6 +106,53 @@ type SuggestedValue = {
   created_at: number;
 };
 
+function ReferensdataSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Referensdata</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Hantera förslagsvärden som används i formulärfält.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <div className="space-y-2 sm:w-64">
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+        <div className="flex-1">
+          <Skeleton className="h-10 max-w-sm" />
+        </div>
+        <Skeleton className="h-10 w-28" />
+      </div>
+
+      <Skeleton className="h-4 w-24" />
+
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead><Skeleton className="h-4 w-20" /></TableHead>
+              <TableHead><Skeleton className="h-4 w-16" /></TableHead>
+              <TableHead><Skeleton className="h-4 w-8" /></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <TableRow key={i}>
+                <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                <TableCell className="text-right"><Skeleton className="ml-auto h-8 w-8" /></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
 function Referensdata() {
   const [selectedCategory, setSelectedCategory] = useState<Category>("elevator_type");
   const [search, setSearch] = useState("");
@@ -110,21 +160,25 @@ function Referensdata() {
   const [renameItem, setRenameItem] = useState<SuggestedValue | null>(null);
   const [mergeItem, setMergeItem] = useState<SuggestedValue | null>(null);
 
-  const values = useQuery(api.suggestedValues.list, {
+  const opts = convexQuery(api.suggestedValues.list, {
     category: selectedCategory,
   });
+  const { data: values } = useSuspenseQuery({
+    queryKey: opts.queryKey,
+    staleTime: opts.staleTime,
+  }) as { data: SuggestedValue[] };
   const createValue = useMutation(api.suggestedValues.create);
   const updateValue = useMutation(api.suggestedValues.update);
   const mergeValue = useMutation(api.suggestedValues.merge);
   const deactivateValue = useMutation(api.suggestedValues.deactivate);
   const activateValue = useMutation(api.suggestedValues.activate);
 
-  const filteredValues = (values as SuggestedValue[] | undefined)?.filter(
+  const filteredValues = values.filter(
     (item) => item.value.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const activeCount = filteredValues?.filter((v) => v.active).length ?? 0;
-  const inactiveCount = filteredValues?.filter((v) => !v.active).length ?? 0;
+  const activeCount = filteredValues.filter((v) => v.active).length;
+  const inactiveCount = filteredValues.filter((v) => !v.active).length;
 
   const columnHelper = createColumnHelper<SuggestedValue>();
 
@@ -207,7 +261,7 @@ function Referensdata() {
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const table = useReactTable({
-    data: filteredValues ?? [],
+    data: filteredValues,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
@@ -260,92 +314,64 @@ function Referensdata() {
         </Button>
       </div>
 
-      {values === undefined ? (
-        <>
-          <Skeleton className="h-4 w-24" />
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead><Skeleton className="h-4 w-20" /></TableHead>
-                  <TableHead><Skeleton className="h-4 w-16" /></TableHead>
-                  <TableHead><Skeleton className="h-4 w-8" /></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-36" /></TableCell>
-                    <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="ml-auto h-8 w-8" /></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="flex gap-3 text-sm text-muted-foreground">
-            <span>{activeCount} aktiva</span>
-            {inactiveCount > 0 && <span>{inactiveCount} inaktiva</span>}
-          </div>
+      <div className="flex gap-3 text-sm text-muted-foreground">
+        <span>{activeCount} aktiva</span>
+        {inactiveCount > 0 && <span>{inactiveCount} inaktiva</span>}
+      </div>
 
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext(),
-                            )}
-                      </TableHead>
-                    ))}
-                  </TableRow>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                  </TableHead>
                 ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      className={
-                        !row.original.active ? "opacity-50" : undefined
-                      }
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Database className="size-8" />
-                        <p>Inga värden hittades.</p>
-                      </div>
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className={
+                    !row.original.active ? "opacity-50" : undefined
+                  }
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
                     </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </>
-      )}
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Database className="size-8" />
+                    <p>Inga värden hittades.</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       <CreateValueDialog
         open={createOpen}
@@ -371,9 +397,7 @@ function Referensdata() {
 
       <MergeDialog
         item={mergeItem}
-        allValues={
-          (values as SuggestedValue[] | undefined)?.filter((v) => v.active) ?? []
-        }
+        allValues={values.filter((v) => v.active)}
         onOpenChange={(open) => {
           if (!open) setMergeItem(null);
         }}
