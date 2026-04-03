@@ -32,6 +32,7 @@ import {
 import { OrgRegisterView } from "~/features/organization/components/org-register-view";
 import { OrgModernizationView } from "~/features/organization/components/org-modernization-view";
 import { OrgMaintenanceView } from "~/features/organization/components/org-maintenance-view";
+import { OrgUsersView } from "~/features/organization/components/org-users-view";
 
 export const Route = createFileRoute(
   "/_authenticated/admin/organisationer/$id",
@@ -304,11 +305,9 @@ function OrganisationDetail() {
           </Tabs>
         </TabsContent>
 
-        {/* Användare tab — placeholder for US-016 */}
+        {/* Användare tab */}
         <TabsContent value="anvandare">
-          <div className="py-12 text-center text-muted-foreground">
-            Användare-vyn implementeras i nästa steg.
-          </div>
+          <OrgUsersView organizationId={id} />
         </TabsContent>
       </Tabs>
     </div>
