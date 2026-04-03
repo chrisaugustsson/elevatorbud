@@ -146,14 +146,14 @@ function DetailSection({
 function HissDetail() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
-  const hiss = useQuery(api.elevators.get, { id } as never) as
+  const hiss = useQuery(api.elevators.crud.get, { id } as never) as
     | HissDoc
     | undefined;
   const org = useQuery(
     api.organizations.get,
     hiss ? ({ id: hiss.organization_id } as never) : "skip",
   ) as OrgDoc | undefined;
-  const archiveMutation = useMutation(api.elevators.archive);
+  const archiveMutation = useMutation(api.elevators.crud.archive);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [archiveStatus, setArchiveStatus] = useState<"demolished" | "archived">("demolished");
   const [isArchiving, setIsArchiving] = useState(false);

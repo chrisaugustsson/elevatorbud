@@ -29,7 +29,7 @@ function SokHiss() {
   }, [input]);
 
   const results = useQuery(
-    api.elevators.search,
+    api.elevators.crud.search,
     debouncedSearch.trim() ? { search: debouncedSearch.trim() } : "skip",
   ) as SearchResult[] | undefined;
 

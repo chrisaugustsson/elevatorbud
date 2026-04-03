@@ -116,7 +116,7 @@ function DetailSection({
 
 function HissDetail() {
   const { id } = Route.useParams();
-  const hiss = useQuery(api.elevators.get, { id } as never) as
+  const hiss = useQuery(api.elevators.crud.get, { id } as never) as
     | HissDoc
     | undefined;
 

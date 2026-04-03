@@ -27,8 +27,8 @@ function DashboardPage() {
     ? ({ organization_id: user.organization_id } as never)
     : "skip";
 
-  const stats = useQuery(api.elevators.stats, orgFilter as never);
-  const chartData = useQuery(api.elevators.chartData, orgFilter as never);
+  const stats = useQuery(api.elevators.analytics.stats, orgFilter as never);
+  const chartData = useQuery(api.elevators.analytics.chartData, orgFilter as never);
 
   if (
     user === undefined ||

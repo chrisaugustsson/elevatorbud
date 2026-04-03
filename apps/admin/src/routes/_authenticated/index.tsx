@@ -64,7 +64,7 @@ function DailyOverview() {
   const [draftIds, setDraftIds] = useState<string[]>([]);
   const [newDraft, setNewDraft] = useState(false);
 
-  const dagensHissar = useQuery(api.elevators.todaysElevators, { todayStart }) as
+  const dagensHissar = useQuery(api.elevators.maintenance.todaysElevators, { todayStart }) as
     | DagensHiss[]
     | undefined;
 
