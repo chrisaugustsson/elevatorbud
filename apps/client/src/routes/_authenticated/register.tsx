@@ -25,8 +25,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@elevatorbud/ui/components/ui/popover";
-import { Checkbox } from "@elevatorbud/ui/components/ui/checkbox";
-import { Badge } from "@elevatorbud/ui/components/ui/badge";
+import { SortHeader } from "@elevatorbud/ui/components/ui/sort-header";
+import { MultiSelectFilter } from "@elevatorbud/ui/components/ui/multi-select-filter";
 import {
   Select,
   SelectContent,
@@ -36,9 +36,6 @@ import {
 } from "@elevatorbud/ui/components/ui/select";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import {
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
   Search,
   X,
   Building2,
@@ -82,104 +79,12 @@ type SuggestedValueItem = {
   active: boolean;
 };
 
-function SortHeader({
-  label,
-  field,
-  sorting,
-  onSort,
-}: {
-  label: string;
-  field: string;
-  sorting: SortingState;
-  onSort: (field: string) => void;
-}) {
-  const active = sorting.find((s) => s.id === field);
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="-ml-3"
-      onClick={() => onSort(field)}
-    >
-      {label}
-      {active ? (
-        active.desc ? (
-          <ArrowDown className="ml-1 size-3" />
-        ) : (
-          <ArrowUp className="ml-1 size-3" />
-        )
-      ) : (
-        <ArrowUpDown className="ml-1 size-3" />
-      )}
-    </Button>
-  );
-}
-
-function MultiSelectFilter({
-  title,
-  options,
-  selected,
-  onSelectedChange,
-}: {
-  title: string;
-  options: string[];
-  selected: string[];
-  onSelectedChange: (selected: string[]) => void;
-}) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-9">
-          {title}
-          {selected.length > 0 && (
-            <Badge
-              variant="secondary"
-              className="ml-1 rounded-sm px-1 text-xs"
-            >
-              {selected.length}
-            </Badge>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-56 p-2" align="start">
-        <div className="max-h-60 space-y-1 overflow-y-auto">
-          {options.map((opt) => (
-            <label
-              key={opt}
-              className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-            >
-              <Checkbox
-                checked={selected.includes(opt)}
-                onCheckedChange={(checked) => {
-                  if (checked) {
-                    onSelectedChange([...selected, opt]);
-                  } else {
-                    onSelectedChange(selected.filter((s) => s !== opt));
-                  }
-                }}
-              />
-              {opt}
-            </label>
-          ))}
-          {options.length === 0 && (
-            <p className="px-2 py-1 text-sm text-muted-foreground">
-              Inga alternativ
-            </p>
-          )}
-        </div>
-        {selected.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mt-1 w-full text-xs"
-            onClick={() => onSelectedChange([])}
-          >
-            Rensa
-          </Button>
-        )}
-      </PopoverContent>
-    </Popover>
-  );
+function getSortDirection(
+  sorting: SortingState,
+  field: string,
+): "asc" | "desc" | null {
+  const s = sorting.find((s) => s.id === field);
+  return s ? (s.desc ? "desc" : "asc") : null;
 }
 
 function RegisterPage() {
@@ -344,9 +249,8 @@ function RegisterPage() {
         header: () => (
           <SortHeader
             label="Hissnummer"
-            field="elevator_number"
-            sorting={sorting}
-            onSort={handleSort}
+            sortDirection={getSortDirection(sorting, "elevator_number")}
+            onSort={() => handleSort("elevator_number")}
           />
         ),
         cell: (info) => (
@@ -357,9 +261,8 @@ function RegisterPage() {
         header: () => (
           <SortHeader
             label="Adress"
-            field="address"
-            sorting={sorting}
-            onSort={handleSort}
+            sortDirection={getSortDirection(sorting, "address")}
+            onSort={() => handleSort("address")}
           />
         ),
         cell: (info) => info.getValue() || "\u2014",
@@ -368,9 +271,8 @@ function RegisterPage() {
         header: () => (
           <SortHeader
             label="Distrikt"
-            field="district"
-            sorting={sorting}
-            onSort={handleSort}
+            sortDirection={getSortDirection(sorting, "district")}
+            onSort={() => handleSort("district")}
           />
         ),
         cell: (info) => info.getValue() || "\u2014",
@@ -379,9 +281,8 @@ function RegisterPage() {
         header: () => (
           <SortHeader
             label="Hisstyp"
-            field="elevator_type"
-            sorting={sorting}
-            onSort={handleSort}
+            sortDirection={getSortDirection(sorting, "elevator_type")}
+            onSort={() => handleSort("elevator_type")}
           />
         ),
         cell: (info) => info.getValue() || "\u2014",
@@ -390,9 +291,8 @@ function RegisterPage() {
         header: () => (
           <SortHeader
             label="Fabrikat"
-            field="manufacturer"
-            sorting={sorting}
-            onSort={handleSort}
+            sortDirection={getSortDirection(sorting, "manufacturer")}
+            onSort={() => handleSort("manufacturer")}
           />
         ),
         cell: (info) => info.getValue() || "\u2014",
@@ -400,10 +300,9 @@ function RegisterPage() {
       columnHelper.accessor("build_year", {
         header: () => (
           <SortHeader
-            label="Bygg\u00e5r"
-            field="build_year"
-            sorting={sorting}
-            onSort={handleSort}
+            label="Byggår"
+            sortDirection={getSortDirection(sorting, "build_year")}
+            onSort={() => handleSort("build_year")}
           />
         ),
         cell: (info) => info.getValue() ?? "\u2014",
@@ -412,9 +311,8 @@ function RegisterPage() {
         header: () => (
           <SortHeader
             label="Moderniserad"
-            field="modernization_year"
-            sorting={sorting}
-            onSort={handleSort}
+            sortDirection={getSortDirection(sorting, "modernization_year")}
+            onSort={() => handleSort("modernization_year")}
           />
         ),
         cell: (info) => info.getValue() || "\u2014",
@@ -423,9 +321,8 @@ function RegisterPage() {
         header: () => (
           <SortHeader
             label="Rek. modern."
-            field="recommended_modernization_year"
-            sorting={sorting}
-            onSort={handleSort}
+            sortDirection={getSortDirection(sorting, "recommended_modernization_year")}
+            onSort={() => handleSort("recommended_modernization_year")}
           />
         ),
         cell: (info) => info.getValue() || "\u2014",
@@ -434,9 +331,8 @@ function RegisterPage() {
         header: () => (
           <SortHeader
             label="Budget"
-            field="budget_amount"
-            sorting={sorting}
-            onSort={handleSort}
+            sortDirection={getSortDirection(sorting, "budget_amount")}
+            onSort={() => handleSort("budget_amount")}
           />
         ),
         cell: (info) => {
@@ -542,18 +438,24 @@ function RegisterPage() {
               options={filterOptions.district}
               selected={filterDistrict}
               onSelectedChange={setFilterDistrict}
+              emptyText="Inga alternativ"
+              clearText="Rensa"
             />
             <MultiSelectFilter
               title="Hisstyp"
               options={filterOptions.elevator_type}
               selected={filterElevatorType}
               onSelectedChange={setFilterElevatorType}
+              emptyText="Inga alternativ"
+              clearText="Rensa"
             />
             <MultiSelectFilter
               title="Fabrikat"
               options={filterOptions.manufacturer}
               selected={filterManufacturer}
               onSelectedChange={setFilterManufacturer}
+              emptyText="Inga alternativ"
+              clearText="Rensa"
             />
           </>
         )}

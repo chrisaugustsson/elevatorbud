@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import {
@@ -16,6 +16,8 @@ import {
   CardDescription,
 } from "@elevatorbud/ui/components/ui/card";
 import { Badge } from "@elevatorbud/ui/components/ui/badge";
+import { StatCard } from "@elevatorbud/ui/components/ui/stat-card";
+import { UploadZone } from "@elevatorbud/ui/components/ui/upload-zone";
 import {
   Upload,
   FileSpreadsheet,
@@ -64,7 +66,6 @@ function ImportPage() {
     orgNames: string[];
   } | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const confirmImport = useAction(api.imports.confirm);
   const currentUser = useQuery(api.users.me) as { email?: string } | undefined;
 
@@ -113,15 +114,6 @@ function ImportPage() {
     }
   }, []);
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      const file = e.dataTransfer.files[0];
-      if (file) handleFileSelect(file);
-    },
-    [handleFileSelect],
-  );
-
   const handleConfirm = useCallback(async () => {
     if (!parseResult || !analysis) return;
 
@@ -158,7 +150,6 @@ function ImportPage() {
     setParseError(null);
     setImportResult(null);
     setAnalysisArgs(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
 
   return (
@@ -173,10 +164,30 @@ function ImportPage() {
       {status === "idle" && (
         <UploadZone
           onFileSelect={handleFileSelect}
-          onDrop={handleDrop}
-          fileInputRef={fileInputRef}
+          accept=".xlsx,.xls"
+          title="Dra och släpp en Excel-fil här"
+          subtitle="eller klicka för att välja fil (.xlsx)"
           error={parseError}
-        />
+        >
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Stödda format</p>
+            <ul className="space-y-1 text-xs text-muted-foreground">
+              <li className="flex items-center gap-2">
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                <strong>Hissar</strong> — huvudark (obligatoriskt)
+              </li>
+              <li className="flex items-center gap-2">
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                <strong>Nodtelefoner</strong> — nödtelefondata (valfritt)
+              </li>
+              <li className="flex items-center gap-2">
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                <strong>Rivna hissar</strong> — rivna/arkiverade hissar
+                (valfritt)
+              </li>
+            </ul>
+          </div>
+        </UploadZone>
       )}
 
       {status === "parsing" && (
@@ -211,74 +222,6 @@ function ImportPage() {
         <ResultSection result={importResult} onReset={handleReset} />
       )}
     </div>
-  );
-}
-
-// --- Upload Zone ---
-
-function UploadZone({
-  onFileSelect,
-  onDrop,
-  fileInputRef,
-  error,
-}: {
-  onFileSelect: (file: File) => void;
-  onDrop: (e: React.DragEvent) => void;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-  error: string | null;
-}) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <div
-          className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-12 text-center transition-colors hover:border-muted-foreground/50 cursor-pointer"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={onDrop}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload className="mx-auto h-10 w-10 text-muted-foreground/50" />
-          <p className="mt-4 text-sm font-medium">
-            Dra och släpp en Excel-fil här
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            eller klicka för att välja fil (.xlsx)
-          </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onFileSelect(file);
-            }}
-          />
-        </div>
-        {error && (
-          <div className="mt-4 flex items-center gap-2 text-sm text-destructive">
-            <XCircle className="h-4 w-4" />
-            {error}
-          </div>
-        )}
-        <div className="mt-6 space-y-2">
-          <p className="text-sm font-medium">Stödda format</p>
-          <ul className="space-y-1 text-xs text-muted-foreground">
-            <li className="flex items-center gap-2">
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              <strong>Hissar</strong> — huvudark (obligatoriskt)
-            </li>
-            <li className="flex items-center gap-2">
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              <strong>Nodtelefoner</strong> — nödtelefondata (valfritt)
-            </li>
-            <li className="flex items-center gap-2">
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              <strong>Rivna hissar</strong> — rivna/arkiverade hissar (valfritt)
-            </li>
-          </ul>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -536,32 +479,6 @@ function SheetCard({
         )}
       </CardContent>
     </Card>
-  );
-}
-
-// --- Stat Card ---
-
-function StatCard({
-  label,
-  value,
-  variant,
-}: {
-  label: string;
-  value: number;
-  variant: "success" | "warning" | "info" | "default";
-}) {
-  const colors = {
-    success: "text-green-700 dark:text-green-400",
-    warning: "text-amber-700 dark:text-amber-400",
-    info: "text-blue-700 dark:text-blue-400",
-    default: "text-foreground",
-  };
-
-  return (
-    <div className="rounded-md border p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`text-2xl font-bold ${colors[variant]}`}>{value}</p>
-    </div>
   );
 }
 
