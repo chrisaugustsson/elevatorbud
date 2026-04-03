@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useQuery, useAction } from "convex/react";
+import { useAction } from "convex/react";
+import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useForm } from "@tanstack/react-form";
 import {
@@ -14,6 +16,7 @@ import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Input } from "@elevatorbud/ui/components/ui/input";
 import { Label } from "@elevatorbud/ui/components/ui/label";
 import { Badge } from "@elevatorbud/ui/components/ui/badge";
+import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -67,6 +70,8 @@ type UserRecord = {
   last_login?: string;
 };
 
+type Organisation = { _id: string; name: string };
+
 export function OrgUsersView({
   organizationId,
 }: {
@@ -82,10 +87,15 @@ export function OrgUsersView({
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const { user: currentClerkUser } = useUser();
-  const users = useQuery(api.userAdmin.list, {
+
+  const usersOpts = convexQuery(api.userAdmin.list, {
     organization_id: organizationId as never,
     search: searchText || undefined,
   });
+  const { data: users } = useSuspenseQuery({
+    queryKey: usersOpts.queryKey,
+    staleTime: usersOpts.staleTime,
+  }) as { data: UserRecord[] };
 
   const updateUser = useAction(api.userAdmin.update);
   const deactivateUser = useAction(api.userAdmin.deactivate);
@@ -192,21 +202,13 @@ export function OrgUsersView({
   ];
 
   const table = useReactTable({
-    data: (users as UserRecord[] | undefined) ?? [],
+    data: users,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
-
-  if (users === undefined) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">Laddar användare...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -410,7 +412,9 @@ function EditUserDialogInner({
     organization_id?: string;
   }) => Promise<void>;
 }) {
-  const orgs = useQuery(api.organizations.list);
+  const { data: orgs } = useQuery({
+    ...convexQuery(api.organizations.list, {}),
+  }) as { data: Organisation[] | undefined };
 
   const form = useForm({
     defaultValues: {
@@ -432,8 +436,6 @@ function EditUserDialogInner({
       form.reset();
     },
   });
-
-  type Organisation = { _id: string; name: string };
 
   return (
     <Dialog
@@ -584,7 +586,7 @@ function EditUserDialogInner({
                           <SelectValue placeholder="Välj organisation" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(orgs as Organisation[] | undefined)?.map((org) => (
+                          {orgs?.map((org) => (
                             <SelectItem key={org._id} value={org._id}>
                               {org.name}
                             </SelectItem>
@@ -625,5 +627,24 @@ function EditUserDialogInner({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function OrgUsersSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-4">
+        <Skeleton className="h-9 w-[300px]" />
+        <Skeleton className="h-4 w-24" />
+      </div>
+      <div className="rounded-md border">
+        <div className="space-y-3 p-4">
+          <Skeleton className="h-8 w-full" />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

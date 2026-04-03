@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { InspectionCalendar } from "../../maintenance/components/inspection-calendar";
 import { MaintenanceCompanies } from "../../maintenance/components/maintenance-companies";
 import { EmergencyPhoneStatus } from "../../maintenance/components/emergency-phone-status";
-import { MaintenanceSkeleton } from "../../maintenance/components/maintenance-skeleton";
 import type {
   ForetagData,
   NodData,
@@ -38,48 +38,54 @@ export function OrgMaintenanceView({
 
   const [selectedManad, setSelectedManad] = useState<string | null>(null);
 
-  const kalender = useQuery(
+  const kalenderOpts = convexQuery(
     api.elevators.maintenance.inspectionCalendar,
     orgFilter,
   );
-  const foretag = useQuery(api.elevators.maintenance.companies, orgFilter);
-  const nodtelefon = useQuery(
+  const { data: kalender } = useSuspenseQuery({
+    queryKey: kalenderOpts.queryKey,
+    staleTime: kalenderOpts.staleTime,
+  }) as { data: { month: string; count: number }[] };
+
+  const foretagOpts = convexQuery(
+    api.elevators.maintenance.companies,
+    orgFilter,
+  );
+  const { data: foretagData } = useSuspenseQuery({
+    queryKey: foretagOpts.queryKey,
+    staleTime: foretagOpts.staleTime,
+  }) as { data: ForetagData };
+
+  const nodOpts = convexQuery(
     api.elevators.maintenance.emergencyPhoneStatus,
     orgFilter,
   );
+  const { data: nodData } = useSuspenseQuery({
+    queryKey: nodOpts.queryKey,
+    staleTime: nodOpts.staleTime,
+  }) as { data: NodData };
 
   const besiktningslistaArgs = selectedManad
     ? { organization_id: organizationId as never, month: selectedManad }
     : "skip";
-  const besiktningslista = useQuery(
-    api.elevators.maintenance.inspectionList,
-    besiktningslistaArgs as never,
-  );
+  const { data: besiktningslista } = useQuery({
+    ...convexQuery(
+      api.elevators.maintenance.inspectionList,
+      besiktningslistaArgs as never,
+    ),
+  }) as { data: BesiktningsListaItem[] | undefined };
 
-  if (
-    kalender === undefined ||
-    foretag === undefined ||
-    nodtelefon === undefined
-  ) {
-    return <MaintenanceSkeleton />;
-  }
-
-  const kalenderData = (kalender as { month: string; count: number }[]).map(
-    (k) => ({
-      name: k.month.substring(0, 3),
-      fullName: k.month,
-      antal: k.count,
-      isCurrent: k.month === currentMonthName,
-      isSelected: k.month === selectedManad,
-    }),
-  );
+  const kalenderData = kalender.map((k) => ({
+    name: k.month.substring(0, 3),
+    fullName: k.month,
+    antal: k.count,
+    isCurrent: k.month === currentMonthName,
+    isSelected: k.month === selectedManad,
+  }));
 
   const totalBesiktningar = kalenderData.reduce((s, k) => s + k.antal, 0);
   const currentMonthCount =
     kalenderData.find((k) => k.isCurrent)?.antal || 0;
-
-  const foretagData = foretag as ForetagData;
-  const nodData = nodtelefon as NodData;
 
   return (
     <div className="space-y-6">
@@ -90,7 +96,7 @@ export function OrgMaintenanceView({
         currentMonthName={currentMonthName}
         selectedManad={selectedManad}
         onSelectManad={setSelectedManad}
-        besiktningslista={besiktningslista as BesiktningsListaItem[] | undefined}
+        besiktningslista={besiktningslista}
       />
 
       <MaintenanceCompanies foretagData={foretagData} />

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
@@ -29,10 +29,18 @@ import {
   ClipboardList,
   Wrench,
 } from "lucide-react";
-import { OrgRegisterView } from "~/features/organization/components/org-register-view";
+import {
+  OrgRegisterView,
+  RegisterViewSkeleton,
+} from "~/features/organization/components/org-register-view";
 import { OrgModernizationView } from "~/features/organization/components/org-modernization-view";
 import { OrgMaintenanceView } from "~/features/organization/components/org-maintenance-view";
-import { OrgUsersView } from "~/features/organization/components/org-users-view";
+import {
+  OrgUsersView,
+  OrgUsersSkeleton,
+} from "~/features/organization/components/org-users-view";
+import { ModernizationSkeleton } from "~/features/modernization/components/modernization-skeleton";
+import { MaintenanceSkeleton } from "~/features/maintenance/components/maintenance-skeleton";
 
 export const Route = createFileRoute(
   "/_authenticated/admin/organisationer/$id",
@@ -262,22 +270,30 @@ function OrganisationDetail() {
 
         {/* Hissar tab */}
         <TabsContent value="hissar">
-          <OrgRegisterView organizationId={id} />
+          <Suspense fallback={<RegisterViewSkeleton />}>
+            <OrgRegisterView organizationId={id} />
+          </Suspense>
         </TabsContent>
 
         {/* Modernisering tab */}
         <TabsContent value="modernisering">
-          <OrgModernizationView organizationId={id} />
+          <Suspense fallback={<ModernizationSkeleton />}>
+            <OrgModernizationView organizationId={id} />
+          </Suspense>
         </TabsContent>
 
         {/* Underhåll tab */}
         <TabsContent value="underhall">
-          <OrgMaintenanceView organizationId={id} />
+          <Suspense fallback={<MaintenanceSkeleton />}>
+            <OrgMaintenanceView organizationId={id} />
+          </Suspense>
         </TabsContent>
 
         {/* Användare tab */}
         <TabsContent value="anvandare">
-          <OrgUsersView organizationId={id} />
+          <Suspense fallback={<OrgUsersSkeleton />}>
+            <OrgUsersView organizationId={id} />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>
