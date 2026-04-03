@@ -171,7 +171,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "The edit form sections are already extracted into feature components (BasicInfoSection, TechnicalSpecsSection, etc.) from the feature-slices refactor. This story wraps them in tabs. File: apps/admin/src/routes/_authenticated/hiss.$id.redigera.tsx. Use the Tabs component from @elevatorbud/ui (Radix-based, supports 'line' variant)."
     },
     {

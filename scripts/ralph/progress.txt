@@ -16,6 +16,7 @@ Started: fre  3 apr. 2026 12:21:09 CEST
 - Current user identity: `useUser()` from `@elevatorbud/auth` gives `user.id` (Clerk user ID) — compare with `clerk_user_id` field in user records
 - DropdownMenu: available at `@elevatorbud/ui/components/ui/dropdown-menu` — use DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator
 - Convex optional field clearing: `v.optional()` args with `if (field !== undefined)` pattern means `undefined` = "don't change". To clear a field, add explicit logic (e.g., clear org when role is admin) rather than relying on `undefined`
+- Optional URL search params: Avoid `validateSearch` on routes that are widely linked — it makes `search` required on ALL Link components. Instead use `useState(getInitialFromURL)` + `window.history.replaceState` for optional URL param persistence
 
 ---
 
@@ -153,4 +154,18 @@ Started: fre  3 apr. 2026 12:21:09 CEST
   - React Table pattern is consistent across pages (users, reference data) — use `createColumnHelper`, `useReactTable`, `getCoreRowModel`, `getSortedRowModel`
   - DropdownMenu pattern is the standard for row actions across the admin app
   - When adding toggle behavior (activate/deactivate), always check if both mutations exist in backend
+---
+
+## 2026-04-03 - US-010
+- Organized elevator edit form into 4 tabs: Grundinfo, Teknik, Underhåll & Modernisering, Övrigt
+- Used Tabs/TabsList/TabsTrigger/TabsContent from @elevatorbud/ui with "line" variant
+- Active tab persisted in URL search params (?tab=teknik) using useState + window.history.replaceState
+- Save button stays in sticky footer outside tabs — always visible
+- Form state preserved across tab switches (TanStack Form state is unaffected by Radix tab switching)
+- Files changed:
+  - `apps/admin/src/routes/_authenticated/hiss.$id.redigera.tsx` — added Tabs imports, tab state + URL sync, wrapped sections in TabsContent
+- **Learnings for future iterations:**
+  - Avoid `validateSearch` for optional URL params on routes that are widely linked — it makes `search` required on ALL `Link` components targeting that route
+  - Instead, use `useState` + `window.history.replaceState` for optional URL search param persistence — no type changes needed elsewhere
+  - Radix Tabs only renders the active TabsContent, but React form state persists since the form instance lives in the parent component
 ---
