@@ -74,7 +74,18 @@ function Anvandare() {
   const [rollFilter, setRollFilter] = useState<string>("alla");
   const [orgFilter, setOrgFilter] = useState<string>(orgFromSearch ?? "alla");
   const [searchText, setSearchText] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+
+  // Debounce search text — clear immediately, otherwise wait 300ms
+  useEffect(() => {
+    if (!searchText) {
+      setDebouncedSearch("");
+      return;
+    }
+    const timer = setTimeout(() => setDebouncedSearch(searchText), 300);
+    return () => clearTimeout(timer);
+  }, [searchText]);
 
   // Auto-open create dialog when coming from org page with ?create=true
   useEffect(() => {
@@ -96,7 +107,7 @@ function Anvandare() {
         : (rollFilter as "admin" | "customer"),
     organization_id:
       orgFilter === "alla" ? undefined : (orgFilter as never),
-    search: searchText || undefined,
+    search: debouncedSearch || undefined,
   });
 
   const createUser = useAction(api.userAdmin.create);
