@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useForm } from "@tanstack/react-form";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
+import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import { emptyValues } from "../../features/elevator/types";
 import { formValuesToUpdateArgs } from "../../features/elevator/utils/form-converters";
 import { ElevatorWizard } from "../../features/elevator/components/elevator-wizard";
@@ -12,10 +15,64 @@ import { getDraftKey, clearDraft } from "../../shared/lib/form-persistence";
 
 export const Route = createFileRoute("/_authenticated/ny")({
   component: NyHiss,
+  pendingComponent: NyHissSkeleton,
 });
 
+function NyHissSkeleton() {
+  return (
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
+      {/* Header */}
+      <div className="border-b bg-background px-4 py-3">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <div>
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="mt-1 h-4 w-24" />
+          </div>
+        </div>
+      </div>
+
+      {/* Step indicator */}
+      <div className="border-b bg-background px-4 py-3">
+        <div className="flex items-center gap-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <Skeleton className="h-4 w-16" />
+              {i < 3 && <Skeleton className="h-px w-8" />}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Form content */}
+      <div className="flex-1 p-4">
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-2/3" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-1/2" />
+        </div>
+      </div>
+
+      {/* Bottom navigation */}
+      <div className="border-t bg-background px-4 py-3">
+        <div className="flex justify-between">
+          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-24" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NyHiss() {
-  const orgs = useQuery(api.organizations.list);
+  const orgsOpts = convexQuery(api.organizations.list, {});
+  const { data: orgs } = useSuspenseQuery({
+    queryKey: orgsOpts.queryKey,
+    staleTime: orgsOpts.staleTime,
+  });
   const createHiss = useMutation(api.elevators.crud.create);
   const draftKey = getDraftKey();
 
