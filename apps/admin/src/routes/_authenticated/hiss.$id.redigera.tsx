@@ -5,6 +5,12 @@ import { api } from "@convex/_generated/api";
 import { useForm } from "@tanstack/react-form";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@elevatorbud/ui/components/ui/tabs";
+import {
   ArrowLeft,
   Check,
   AlertCircle,
@@ -35,12 +41,22 @@ import { ModernizationSection } from "../../features/elevator/components/moderni
 import { EmergencyPhoneSection } from "../../features/elevator/components/emergency-phone-section";
 import { CommentsSection } from "../../features/elevator/components/comments-section";
 
+const tabSlugs = ["grundinfo", "teknik", "underhall", "ovrigt"] as const;
+type TabSlug = (typeof tabSlugs)[number];
+
+function getInitialTab(): TabSlug {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get("tab");
+  return tabSlugs.includes(tab as TabSlug) ? (tab as TabSlug) : "grundinfo";
+}
+
 export const Route = createFileRoute("/_authenticated/hiss/$id/redigera")({
   component: RedigeraHiss,
 });
 
 function RedigeraHiss() {
   const { id } = Route.useParams();
+  const [activeTab, setActiveTab] = useState<TabSlug>(getInitialTab);
   const router = useRouter();
   const hiss = useQuery(api.elevators.crud.get, { id: id as never });
   const orgs = useQuery(api.organizations.list);
@@ -225,52 +241,90 @@ function RedigeraHiss() {
         </div>
       </div>
 
-      {/* Scrollable form content */}
-      <div className="flex-1 overflow-auto px-4 py-4">
-        <div className="space-y-6">
-          <BasicInfoSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-            orgs={orgs}
-            currentHissId={id}
-          />
-          <TechnicalSpecsSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-          <DoorsAndCabSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-          <MachinerySection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-          <InspectionSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-          <ModernizationSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-          <EmergencyPhoneSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-          <CommentsSection
-            form={form}
-            formValues={formValues}
-            originalValues={originalValues}
-          />
-        </div>
+      {/* Tabbed form content */}
+      <div className="flex-1 overflow-auto">
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => {
+            setActiveTab(value as TabSlug);
+            const url = new URL(window.location.href);
+            url.searchParams.set("tab", value);
+            window.history.replaceState({}, "", url.toString());
+          }}
+        >
+          <div className="sticky top-0 z-10 border-b bg-background px-4">
+            <TabsList variant="line" className="w-full">
+              <TabsTrigger value="grundinfo">Grundinfo</TabsTrigger>
+              <TabsTrigger value="teknik">Teknik</TabsTrigger>
+              <TabsTrigger value="underhall">Underhåll & Modernisering</TabsTrigger>
+              <TabsTrigger value="ovrigt">Övrigt</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <div className="px-4 py-4">
+            <TabsContent value="grundinfo">
+              <div className="space-y-6">
+                <BasicInfoSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                  orgs={orgs}
+                  currentHissId={id}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="teknik">
+              <div className="space-y-6">
+                <TechnicalSpecsSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+                <DoorsAndCabSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+                <MachinerySection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="underhall">
+              <div className="space-y-6">
+                <InspectionSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+                <ModernizationSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="ovrigt">
+              <div className="space-y-6">
+                <EmergencyPhoneSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+                <CommentsSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                />
+              </div>
+            </TabsContent>
+          </div>
+        </Tabs>
       </div>
 
       {/* Error message */}
