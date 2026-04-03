@@ -169,3 +169,15 @@ Started: fre  3 apr. 2026 12:21:09 CEST
   - Instead, use `useState` + `window.history.replaceState` for optional URL search param persistence — no type changes needed elsewhere
   - Radix Tabs only renders the active TabsContent, but React form state persists since the form instance lives in the parent component
 ---
+
+## 2026-04-03 - US-011
+- Fixed maintenance page layout: changed Skötselföretag section from 2-column grid to vertical stack
+- Bar chart ("Antal hissar per företag") now on top, matrix table ("Företag per distrikt") below — full width for both
+- Added z-10 to sticky first column cells in matrix table for proper layering during horizontal scroll
+- All responsive behavior preserved — both components stack naturally on all screen sizes
+- Files changed:
+  - `apps/admin/src/features/maintenance/components/maintenance-companies.tsx` — changed `grid lg:grid-cols-2` to `space-y-6`, added z-10 to sticky cells
+- **Learnings for future iterations:**
+  - When chart + table compete for horizontal space, vertical stacking is usually the better choice — tables with many columns need full width
+  - Sticky columns need `z-index` (z-10) to render above other cells during horizontal scroll
+---
