@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import {
@@ -43,16 +44,15 @@ type DashboardData = {
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
+  pendingComponent: DashboardSkeleton,
 });
 
 function Dashboard() {
-  const data = useQuery(api.dashboard.overview, {}) as
-    | DashboardData
-    | undefined;
-
-  if (data === undefined) {
-    return <DashboardSkeleton />;
-  }
+  const opts = convexQuery(api.dashboard.overview, {});
+  const { data } = useSuspenseQuery({
+    queryKey: opts.queryKey,
+    staleTime: opts.staleTime,
+  }) as { data: DashboardData };
 
   return (
     <div className="space-y-8">
