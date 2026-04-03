@@ -263,7 +263,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 15,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on US-014 (org details page shell). Reuse the already-extracted feature components from features/register/, features/maintenance/, features/modernization/. Pass the org ID as a filter prop. May need to update Convex queries to accept an optional orgId parameter."
     },
     {

@@ -243,3 +243,22 @@ Started: fre  3 apr. 2026 12:21:09 CEST
   - Existing analytics queries already accept optional `organization_id` param — no new backend queries needed for org-scoped stats
   - `api.organizations.get` uses `requireTenantAccess` (not `requireAdmin`) so it works for both admins and org members
 ---
+
+## 2026-04-03 - US-015
+- Added Hissar tab with Register, Modernisering, Underhåll sub-views on org details page
+- Created three org-scoped view components that reuse existing feature components with org filter:
+  - `OrgRegisterView` — full register table with search, filters, sorting, pagination, export
+  - `OrgModernizationView` — timeline, budget, measures, priority list
+  - `OrgMaintenanceView` — inspection calendar, maintenance companies, emergency phone status
+- Sub-tab state persisted in URL search params (?sub=register|modernisering|underhall)
+- All Convex queries already accepted optional `organization_id` — no backend changes needed
+- Files changed:
+  - `apps/admin/src/features/organization/components/org-register-view.tsx` — new file
+  - `apps/admin/src/features/organization/components/org-modernization-view.tsx` — new file
+  - `apps/admin/src/features/organization/components/org-maintenance-view.tsx` — new file
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.$id.tsx` — added sub-tabs, imported view components
+- **Learnings for future iterations:**
+  - Feature components that accept pre-fetched data (not org ID) are highly reusable — the data fetching wrapper pattern lets you scope any view to an org by changing just the query args
+  - Nested Tabs work well for sub-views within a tab — use separate URL params (tab + sub) to persist both levels
+  - All modernization, maintenance, and listing queries already supported optional `organization_id`, so no backend changes were needed
+---
