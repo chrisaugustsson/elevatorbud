@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery, useAction } from "convex/react";
+import { useAction } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useForm } from "@tanstack/react-form";
 import {
@@ -65,6 +67,7 @@ export const Route = createFileRoute("/_authenticated/admin/anvandare")({
     create: search.create === "true" || search.create === true,
   }),
   component: Anvandare,
+  pendingComponent: AnvandareSkeleton,
 });
 
 type Anvandare = {
@@ -87,7 +90,11 @@ type Organisation = {
 function Anvandare() {
   const { org: orgFromSearch, create: createFromSearch } = Route.useSearch();
   const navigate = useNavigate();
-  const orgs = useQuery(api.organizations.list);
+  const orgsOpts = convexQuery(api.organizations.list, {});
+  const { data: orgs } = useSuspenseQuery({
+    queryKey: orgsOpts.queryKey,
+    staleTime: orgsOpts.staleTime,
+  }) as { data: Organisation[] };
 
   const [rollFilter, setRollFilter] = useState<string>("alla");
   const [orgFilter, setOrgFilter] = useState<string>(orgFromSearch ?? "alla");
@@ -119,7 +126,7 @@ function Anvandare() {
     }
   }, [createFromSearch, navigate, orgFromSearch]);
 
-  const users = useQuery(api.userAdmin.list, {
+  const usersOpts = convexQuery(api.userAdmin.list, {
     role:
       rollFilter === "alla"
         ? undefined
@@ -128,6 +135,10 @@ function Anvandare() {
       orgFilter === "alla" ? undefined : (orgFilter as never),
     search: debouncedSearch || undefined,
   });
+  const { data: users } = useSuspenseQuery({
+    queryKey: usersOpts.queryKey,
+    staleTime: usersOpts.staleTime,
+  }) as { data: Anvandare[] };
 
   const { user: currentClerkUser } = useUser();
   const createUser = useAction(api.userAdmin.create);
@@ -142,10 +153,8 @@ function Anvandare() {
   const [actionLoading, setActionLoading] = useState(false);
 
   const orgMap = new Map<string, string>();
-  if (orgs) {
-    for (const org of orgs as Organisation[]) {
-      orgMap.set(org._id, org.name);
-    }
+  for (const org of orgs) {
+    orgMap.set(org._id, org.name);
   }
 
   const columnHelper = createColumnHelper<Anvandare>();
@@ -260,60 +269,13 @@ function Anvandare() {
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const table = useReactTable({
-    data: (users as Anvandare[] | undefined) ?? [],
+    data: users,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
-
-  if (users === undefined || orgs === undefined) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <Skeleton className="h-8 w-40" />
-            <Skeleton className="mt-2 h-4 w-72" />
-          </div>
-          <Skeleton className="h-9 w-36" />
-        </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <Skeleton className="h-9 w-full max-w-sm" />
-          <Skeleton className="h-9 w-[140px]" />
-          <Skeleton className="h-9 w-[200px]" />
-        </div>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {["w-32", "w-48", "w-16", "w-32", "w-16", "w-28", "w-16"].map(
-                  (w, i) => (
-                    <TableHead key={i}>
-                      <Skeleton className={`h-4 ${w}`} />
-                    </TableHead>
-                  ),
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-44" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-8 w-16" /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -353,7 +315,7 @@ function Anvandare() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="alla">Alla organisationer</SelectItem>
-            {(orgs as Organisation[]).map((org) => (
+            {orgs.map((org) => (
               <SelectItem key={org._id} value={org._id}>
                 {org.name}
               </SelectItem>
@@ -422,7 +384,7 @@ function Anvandare() {
       <CreateUserDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        orgs={orgs as Organisation[]}
+        orgs={orgs}
         defaultOrgId={orgFromSearch}
         onSubmit={async (values) => {
           await createUser(values);
@@ -435,7 +397,7 @@ function Anvandare() {
         onOpenChange={(open) => {
           if (!open) setEditingUser(null);
         }}
-        orgs={orgs as Organisation[]}
+        orgs={orgs}
         onSubmit={async (values) => {
           await updateUser(values);
           setEditingUser(null);
@@ -1066,5 +1028,52 @@ function EditUserDialogInner({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AnvandareSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <Skeleton className="h-8 w-40" />
+          <Skeleton className="mt-2 h-4 w-72" />
+        </div>
+        <Skeleton className="h-9 w-36" />
+      </div>
+      <div className="flex flex-wrap items-center gap-4">
+        <Skeleton className="h-9 w-full max-w-sm" />
+        <Skeleton className="h-9 w-[140px]" />
+        <Skeleton className="h-9 w-[200px]" />
+      </div>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {["w-32", "w-48", "w-16", "w-32", "w-16", "w-28", "w-16"].map(
+                (w, i) => (
+                  <TableHead key={i}>
+                    <Skeleton className={`h-4 ${w}`} />
+                  </TableHead>
+                ),
+              )}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <TableRow key={i}>
+                <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-44" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                <TableCell><Skeleton className="h-8 w-16" /></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 }
