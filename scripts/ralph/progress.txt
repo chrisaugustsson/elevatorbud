@@ -262,3 +262,21 @@ Started: fre  3 apr. 2026 12:21:09 CEST
   - Nested Tabs work well for sub-views within a tab — use separate URL params (tab + sub) to persist both levels
   - All modernization, maintenance, and listing queries already supported optional `organization_id`, so no backend changes were needed
 ---
+
+## 2026-04-03 - US-016
+- Added Användare tab to org details page with full user management
+- Created `OrgUsersView` component that queries users filtered by organization ID
+- Table columns: Name (sortable), Email, Role (badge), Status (active/inactive badge), Last login
+- Actions: edit (pencil icon opens edit dialog), dropdown menu with Deactivate/Activate and Delete
+- Edit dialog fetches org list for the org dropdown (self-contained, no prop drilling)
+- Deactivated users shown with opacity-50, confirmation dialogs for all destructive actions
+- Cannot delete yourself (same protection as users page)
+- Search input filters users by name/email
+- Files changed:
+  - `apps/admin/src/features/organization/components/org-users-view.tsx` — new file with OrgUsersView + inline EditUserDialogInner
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.$id.tsx` — imported OrgUsersView, replaced placeholder
+- **Learnings for future iterations:**
+  - Inlining the edit dialog within the view component (with its own org list query) avoids complex prop threading and keeps the component self-contained
+  - The `api.userAdmin.list` query already accepts `organization_id` filter — no backend changes needed
+  - Reusing patterns (table, dropdown menu, confirmation dialogs) from the users page ensures consistency across the admin app
+---

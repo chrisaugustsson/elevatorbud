@@ -279,7 +279,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 16,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on US-014 (org details page shell) and US-006/US-007 (user management components). Reuse the edit dialog and action menu from the users page. Filter users by organization_id matching the current org."
     },
     {
