@@ -1,6 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import {
+  useSuspenseQuery,
+  useQuery,
+} from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { downloadCSV, downloadExcel } from "@elevatorbud/utils/export";
 import type { SortingState } from "@tanstack/react-table";
@@ -12,6 +16,7 @@ import { RegisterPagination } from "~/features/register/components/register-pagi
 
 export const Route = createFileRoute("/_authenticated/register")({
   component: Register,
+  pendingComponent: RegisterSkeleton,
 });
 
 type ListResult = {
@@ -86,12 +91,13 @@ function Register() {
   ]);
 
   // Get filter options from suggestedValues
-  const allSuggestions = useQuery(api.suggestedValues.list, {});
+  const suggestionsOpts = convexQuery(api.suggestedValues.list, {});
+  const { data: allSuggestions } = useSuspenseQuery({
+    queryKey: suggestionsOpts.queryKey,
+    staleTime: suggestionsOpts.staleTime,
+  }) as { data: SuggestedValueItem[] };
   const filterOptions = useMemo(() => {
-    if (!allSuggestions) return null;
-    const active = (allSuggestions as SuggestedValueItem[]).filter(
-      (s) => s.active,
-    );
+    const active = allSuggestions.filter((s) => s.active);
     const byCategory = (cat: string) =>
       active
         .filter((s) => s.category === cat)
@@ -135,19 +141,22 @@ function Register() {
     limit,
   } as never;
 
-  const result = useQuery(api.elevators.listing.list, queryArgs) as
-    | ListResult
-    | undefined;
+  const listOpts = convexQuery(api.elevators.listing.list, queryArgs);
+  const { data: result } = useSuspenseQuery({
+    queryKey: listOpts.queryKey,
+    staleTime: listOpts.staleTime,
+  }) as { data: ListResult };
 
   // Export data query
   const [exportRequested, setExportRequested] = useState<
     "csv" | "xlsx" | null
   >(null);
-  const exportArgs = exportRequested ? (filterBaseArgs as never) : "skip";
-  const exportData = useQuery(
-    api.elevators.listing.exportData,
-    exportArgs as never,
-  ) as Record<string, unknown>[] | undefined;
+  const { data: exportData } = useQuery({
+    ...convexQuery(
+      api.elevators.listing.exportData,
+      exportRequested ? (filterBaseArgs as never) : "skip",
+    ),
+  }) as { data: Record<string, unknown>[] | undefined };
 
   const handleExport = useCallback((format: "csv" | "xlsx") => {
     setExportRequested(format);
@@ -180,10 +189,6 @@ function Register() {
     setBuildYearMin("");
     setBuildYearMax("");
     setStatusFilter("active");
-  }
-
-  if (result === undefined) {
-    return <RegisterSkeleton />;
   }
 
   const { totalCount, totalPages } = result;
