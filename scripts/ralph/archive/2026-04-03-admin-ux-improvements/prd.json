@@ -18,7 +18,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "This is the foundation. Read @convex-dev/react-query docs carefully. Verify no Node.js-specific APIs are pulled in — app runs on Cloudflare Workers. ConvexQueryClient's serverHttpClient uses fetch which is available in Workers."
     },
     {
@@ -37,7 +37,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "Provider nesting order matters: Router Wrap provides ConvexProvider (for SSR). Root route component provides ConvexProviderWithClerk (for client auth). Both share the same ConvexReactClient instance. The inner provider overrides the outer context. Moving ClerkProvider from shellComponent to component changes SSR rendering order — verify Clerk UI still works."
     },
     {
@@ -56,7 +56,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "This is the ONLY route that uses a blocking loader with ensureQueryData — needed for the admin role gate. All other routes will stream via Suspense. The loader receives context with queryClient and convexQueryClient."
     },
     {
@@ -73,7 +73,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "File: apps/admin/src/routes/_authenticated/dashboard.tsx. Dashboard was recently rewritten (US-018 of admin-ux-improvements) as a landing page with stat cards, org links, recent activity, and shortcuts."
     },
     {
@@ -90,7 +90,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "File: apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx. Mutations auto-propagate to TanStack Query cache via Convex subscriptions — no manual invalidation needed."
     },
     {
@@ -107,7 +107,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": "File: apps/admin/src/routes/_authenticated/admin.anvandare.tsx. Has debounced search — the debouncedSearch state drives the query args. useSuspenseQuery re-fetches when args change."
     },
     {
@@ -124,7 +124,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": "File: apps/admin/src/routes/_authenticated/admin.referensdata.tsx."
     },
     {
@@ -139,7 +139,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
       "notes": "File: apps/admin/src/routes/_authenticated/admin.organisationer.$id.tsx. Has three tabs (Översikt, Hissar, Användare) — skeleton should match the tab layout."
     },
     {
@@ -155,7 +155,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 9,
-      "passes": true,
+      "passes": false,
       "notes": "File: apps/admin/src/routes/_authenticated/hiss.$id.index.tsx."
     },
     {
@@ -171,7 +171,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 10,
-      "passes": true,
+      "passes": false,
       "notes": "File: apps/admin/src/routes/_authenticated/hiss.$id.redigera.tsx. Form is organized into 4 tabs (Grundinfo, Teknik, Underhåll & Modernisering, Övrigt) — skeleton should reflect the tabbed layout."
     },
     {
@@ -186,7 +186,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 11,
-      "passes": true,
+      "passes": false,
       "notes": "File: apps/admin/src/routes/_authenticated/register.tsx. Has multiple queries — all should use useSuspenseQuery."
     },
     {
@@ -201,7 +201,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 12,
-      "passes": true,
+      "passes": false,
       "notes": "File: apps/admin/src/routes/_authenticated/modernisering.tsx."
     },
     {
@@ -216,7 +216,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 13,
-      "passes": true,
+      "passes": false,
       "notes": "File: apps/admin/src/routes/_authenticated/underhall.tsx."
     },
     {
@@ -232,7 +232,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 14,
-      "passes": true,
+      "passes": false,
       "notes": "File: apps/admin/src/routes/_authenticated/ny.tsx."
     },
     {
@@ -248,8 +248,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 15,
-      "passes": true,
-      "notes": "File: apps/admin/src/routes/_authenticated/webbplats.tsx. Query is inside PageTab child component — wrapped with Suspense boundary."
+      "passes": false,
+      "notes": "File: apps/admin/src/routes/_authenticated/admin.webbplats.tsx (or similar — check routing)."
     },
     {
       "id": "US-016",
@@ -264,7 +264,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 16,
-      "passes": true,
+      "passes": false,
       "notes": "These use useQuery (not useSuspenseQuery) because they are conditionally enabled. enabled: false returns { data: undefined, isPending: true }. Use isPending/isFetching for loading states."
     },
     {
@@ -282,7 +282,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 17,
-      "passes": true,
+      "passes": false,
       "notes": "Files: apps/admin/src/features/organization/components/org-*.tsx. Parent is admin.organisationer.$id.tsx — wrap each tab view in <Suspense>. The skeletons should match each view's layout."
     },
     {
@@ -297,7 +297,7 @@
         "Typecheck passes"
       ],
       "priority": 18,
-      "passes": true,
+      "passes": false,
       "notes": "These are non-route hooks used inside feature components. Conditional queries use enabled flag (same pattern as US-016). use-import-machine.ts has complex state machine logic — be careful not to break the analyze-only-when-conditions-met behavior."
     },
     {
@@ -314,7 +314,7 @@
         "Typecheck passes"
       ],
       "priority": 19,
-      "passes": true,
+      "passes": false,
       "notes": "Final cleanup pass. Grep for 'from \"convex/react\"' to find remaining useQuery imports. Grep for 'ConvexHttpClient' and 'convex/browser' to find leftover workaround code. Only remove code that is truly unused after the migration."
     }
   ]

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { InspectionCalendarSection } from "../../features/maintenance/components/inspection-calendar-section";
 import {
@@ -16,6 +17,7 @@ import type { InspectionListItem } from "../../features/maintenance/components/i
 
 export const Route = createFileRoute("/_authenticated/underhall")({
   component: UnderhallPage,
+  pendingComponent: UnderhallSkeleton,
 });
 
 const MANADER = [
@@ -37,50 +39,49 @@ const currentMonthIndex = new Date().getMonth();
 const currentMonthName = MANADER[currentMonthIndex];
 
 function UnderhallPage() {
-  const user = useQuery(api.users.me);
-  const orgFilter = user?.organization_id
-    ? ({ organization_id: user.organization_id } as never)
-    : "skip";
+  const userOpts = convexQuery(api.users.me, {});
+  const { data: user } = useSuspenseQuery({
+    queryKey: userOpts.queryKey,
+    staleTime: userOpts.staleTime,
+  });
 
   const [selectedManad, setSelectedManad] = useState<string | null>(null);
 
-  const kalender = useQuery(
-    api.elevators.maintenance.inspectionCalendar,
-    orgFilter as never,
-  );
-  const foretag = useQuery(api.elevators.maintenance.companies, orgFilter as never);
-  const nodtelefon = useQuery(
-    api.elevators.maintenance.emergencyPhoneStatus,
-    orgFilter as never,
-  );
+  const orgArgs = { organization_id: user!.organization_id } as never;
 
-  const besiktningslistaArgs =
-    selectedManad && user?.organization_id
-      ? ({ organization_id: user.organization_id as never, month: selectedManad })
-      : "skip";
-  const besiktningslista = useQuery(
-    api.elevators.maintenance.inspectionList,
-    besiktningslistaArgs as never,
-  );
+  const kalenderOpts = convexQuery(api.elevators.maintenance.inspectionCalendar, orgArgs);
+  const { data: kalender } = useSuspenseQuery({
+    queryKey: kalenderOpts.queryKey,
+    staleTime: kalenderOpts.staleTime,
+  }) as { data: { month: string; count: number }[] };
 
-  if (
-    user === undefined ||
-    kalender === undefined ||
-    foretag === undefined ||
-    nodtelefon === undefined
-  ) {
-    return <UnderhallSkeleton />;
-  }
+  const foretagOpts = convexQuery(api.elevators.maintenance.companies, orgArgs);
+  const { data: foretag } = useSuspenseQuery({
+    queryKey: foretagOpts.queryKey,
+    staleTime: foretagOpts.staleTime,
+  }) as { data: ForetagData };
 
-  const kalenderData = (kalender as { month: string; count: number }[]).map(
-    (k) => ({
-      name: k.month.substring(0, 3),
-      fullName: k.month,
-      count: k.count,
-      isCurrent: k.month === currentMonthName,
-      isSelected: k.month === selectedManad,
-    }),
-  );
+  const nodOpts = convexQuery(api.elevators.maintenance.emergencyPhoneStatus, orgArgs);
+  const { data: nodtelefon } = useSuspenseQuery({
+    queryKey: nodOpts.queryKey,
+    staleTime: nodOpts.staleTime,
+  }) as { data: NodData };
+
+  const { data: besiktningslista } = useQuery({
+    ...convexQuery(api.elevators.maintenance.inspectionList, {
+      organization_id: user!.organization_id,
+      month: selectedManad!,
+    } as never),
+    enabled: !!selectedManad,
+  });
+
+  const kalenderData = kalender.map((k) => ({
+    name: k.month.substring(0, 3),
+    fullName: k.month,
+    count: k.count,
+    isCurrent: k.month === currentMonthName,
+    isSelected: k.month === selectedManad,
+  }));
 
   const totalBesiktningar = kalenderData.reduce((s, k) => s + k.count, 0);
   const currentMonthCount =

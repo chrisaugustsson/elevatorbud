@@ -10,7 +10,6 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
-  flexRender,
   createColumnHelper,
   type SortingState,
 } from "@tanstack/react-table";
@@ -26,6 +25,12 @@ import {
   TableRow,
 } from "@elevatorbud/ui/components/ui/table";
 import {
+  DataGrid,
+  DataGridContainer,
+  DataGridTable,
+  DataGridColumnHeader,
+} from "@elevatorbud/ui/components/ui/data-grid-table";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -34,7 +39,7 @@ import {
   DialogFooter,
 } from "@elevatorbud/ui/components/ui/dialog";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus, ArrowUpDown, Building2, UserPlus } from "lucide-react";
+import { Plus, Building2, UserPlus } from "lucide-react";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 
 export const Route = createFileRoute(
@@ -59,43 +64,36 @@ const columnHelper = createColumnHelper<Organisation>();
 const columns = [
   columnHelper.accessor("name", {
     header: ({ column }) => (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="-ml-3"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Namn
-        <ArrowUpDown className="ml-1 size-3" />
-      </Button>
+      <DataGridColumnHeader title="Namn" column={column} />
     ),
     cell: (info) => (
       <span className="font-medium">{info.getValue()}</span>
     ),
   }),
   columnHelper.accessor("organization_number", {
-    header: "Org.nummer",
+    header: ({ column }) => (
+      <DataGridColumnHeader title="Org.nummer" column={column} />
+    ),
+    enableSorting: false,
     cell: (info) => info.getValue() || "—",
   }),
   columnHelper.accessor("contact_person", {
-    header: "Kontaktperson",
+    header: ({ column }) => (
+      <DataGridColumnHeader title="Kontaktperson" column={column} />
+    ),
+    enableSorting: false,
     cell: (info) => info.getValue() || "—",
   }),
   columnHelper.accessor("email", {
-    header: "E-post",
+    header: ({ column }) => (
+      <DataGridColumnHeader title="E-post" column={column} />
+    ),
+    enableSorting: false,
     cell: (info) => info.getValue() || "—",
   }),
   columnHelper.accessor("elevatorCount", {
     header: ({ column }) => (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="-ml-3"
-        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      >
-        Antal hissar
-        <ArrowUpDown className="ml-1 size-3" />
-      </Button>
+      <DataGridColumnHeader title="Antal hissar" column={column} />
     ),
     cell: (info) => info.getValue(),
   }),
@@ -162,63 +160,28 @@ function Organisationer() {
         </p>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="cursor-pointer"
-                  onClick={() =>
-                    navigate({
-                      to: "/admin/organisationer/$id" as string,
-                      params: { id: row.original._id },
-                    })
-                  }
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Building2 className="size-8" />
-                    <p>Inga organisationer hittades.</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <DataGrid
+        table={table}
+        recordCount={orgs.length}
+        onRowClick={(row) =>
+          navigate({
+            to: "/admin/organisationer/$id" as string,
+            params: { id: row._id },
+          })
+        }
+        emptyMessage={
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <Building2 className="size-8" />
+            <p>Inga organisationer hittades.</p>
+          </div>
+        }
+      >
+        <DataGridContainer>
+          <div className="overflow-x-auto">
+            <DataGridTable />
+          </div>
+        </DataGridContainer>
+      </DataGrid>
 
       <CreateOrgDialog
         open={createOpen}

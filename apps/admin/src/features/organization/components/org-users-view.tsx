@@ -8,7 +8,6 @@ import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
-  flexRender,
   createColumnHelper,
   type SortingState,
 } from "@tanstack/react-table";
@@ -18,13 +17,11 @@ import { Label } from "@elevatorbud/ui/components/ui/label";
 import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@elevatorbud/ui/components/ui/table";
+  DataGrid,
+  DataGridContainer,
+  DataGridTable,
+  DataGridColumnHeader,
+} from "@elevatorbud/ui/components/ui/data-grid-table";
 import {
   Dialog,
   DialogContent,
@@ -48,7 +45,6 @@ import {
   DropdownMenuTrigger,
 } from "@elevatorbud/ui/components/ui/dropdown-menu";
 import {
-  ArrowUpDown,
   Users,
   Pencil,
   MoreHorizontal,
@@ -107,23 +103,21 @@ export function OrgUsersView({
   const columns = [
     columnHelper.accessor("name", {
       header: ({ column }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-ml-3"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Namn
-          <ArrowUpDown className="ml-1 size-3" />
-        </Button>
+        <DataGridColumnHeader title="Namn" column={column} />
       ),
       cell: (info) => <span className="font-medium">{info.getValue()}</span>,
     }),
     columnHelper.accessor("email", {
-      header: "E-post",
+      header: ({ column }) => (
+        <DataGridColumnHeader title="E-post" column={column} />
+      ),
+      enableSorting: false,
     }),
     columnHelper.accessor("role", {
-      header: "Roll",
+      header: ({ column }) => (
+        <DataGridColumnHeader title="Roll" column={column} />
+      ),
+      enableSorting: false,
       cell: (info) => (
         <Badge variant={info.getValue() === "admin" ? "default" : "secondary"}>
           {info.getValue() === "admin" ? "Admin" : "Kund"}
@@ -131,7 +125,10 @@ export function OrgUsersView({
       ),
     }),
     columnHelper.accessor("active", {
-      header: "Status",
+      header: ({ column }) => (
+        <DataGridColumnHeader title="Status" column={column} />
+      ),
+      enableSorting: false,
       cell: (info) => (
         <Badge variant={info.getValue() ? "outline" : "destructive"}>
           {info.getValue() ? "Aktiv" : "Inaktiv"}
@@ -139,7 +136,10 @@ export function OrgUsersView({
       ),
     }),
     columnHelper.accessor("last_login", {
-      header: "Senaste inloggning",
+      header: ({ column }) => (
+        <DataGridColumnHeader title="Senaste inloggning" column={column} />
+      ),
+      enableSorting: false,
       cell: (info) => {
         const val = info.getValue();
         if (!val) return "—";
@@ -224,57 +224,22 @@ export function OrgUsersView({
         </p>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className={!row.original.active ? "opacity-50" : undefined}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Users className="size-8" />
-                    <p>Inga användare hittades.</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <DataGrid
+        table={table}
+        recordCount={users.length}
+        emptyMessage={
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <Users className="size-8" />
+            <p>Inga användare hittades.</p>
+          </div>
+        }
+      >
+        <DataGridContainer>
+          <div className="overflow-x-auto">
+            <DataGridTable />
+          </div>
+        </DataGridContainer>
+      </DataGrid>
 
       {/* Edit dialog */}
       {editingUser && (

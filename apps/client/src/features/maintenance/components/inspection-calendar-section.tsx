@@ -15,16 +15,14 @@ import {
 import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
+  useChartColors,
+  sharedScaleOptions,
+  sharedTooltipOptions,
+  hoverColumnPlugin,
+} from "@elevatorbud/ui/lib/chart-helpers";
+import { Bar } from "react-chartjs-2";
 import { CalendarDays, ChevronRight } from "lucide-react";
+import { useMemo } from "react";
 
 const MANADER = [
   "Januari",
@@ -43,13 +41,6 @@ const MANADER = [
 
 const currentMonthIndex = new Date().getMonth();
 const currentMonthName = MANADER[currentMonthIndex];
-
-const tooltipStyle = {
-  backgroundColor: "hsl(var(--popover))",
-  border: "1px solid hsl(var(--border))",
-  borderRadius: "6px",
-  color: "hsl(var(--popover-foreground))",
-};
 
 export type KalenderEntry = {
   name: string;
@@ -166,6 +157,68 @@ function InspectionBarChart({
   selectedManad: string | null;
   onSelectManad: (month: string | null) => void;
 }) {
+  const colors = useChartColors();
+
+  const chartData = useMemo(
+    () => ({
+      labels: kalenderData.map((d) => d.name),
+      datasets: [
+        {
+          label: "Antal hissar",
+          data: kalenderData.map((d) => d.count),
+          backgroundColor: kalenderData.map((entry) => {
+            const base = entry.isSelected
+              ? colors.chart4
+              : entry.isCurrent
+                ? colors.chart1
+                : colors.chart2;
+            return selectedManad && !entry.isSelected ? base + "66" : base;
+          }),
+          borderRadius: 4,
+          barPercentage: 0.7,
+        },
+      ],
+    }),
+    [kalenderData, colors, selectedManad],
+  );
+
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index" as const, intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...sharedTooltipOptions,
+          callbacks: {
+            title: (items: { dataIndex: number }[]) => {
+              const idx = items[0]?.dataIndex;
+              return idx != null
+                ? kalenderData[idx]?.fullName ?? ""
+                : "";
+            },
+            label: (ctx: { parsed: { y: number | null } }) =>
+              `Antal hissar: ${ctx.parsed.y}`,
+          },
+        },
+      },
+      scales: sharedScaleOptions(colors),
+      onClick: (
+        _: unknown,
+        elements: { index: number }[],
+      ) => {
+        if (elements[0]) {
+          const fullName = kalenderData[elements[0].index]?.fullName;
+          if (fullName) {
+            onSelectManad(selectedManad === fullName ? null : fullName);
+          }
+        }
+      },
+    }),
+    [colors, kalenderData, selectedManad, onSelectManad],
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -193,54 +246,15 @@ function InspectionBarChart({
             Inga hissar med besiktningsmånad registrerad.
           </p>
         ) : (
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={kalenderData}
-                margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-                onClick={(data: any) => {
-                  if (data?.activePayload?.[0]) {
-                    const fullName = data.activePayload[0].payload
-                      .fullName as string;
-                    onSelectManad(
-                      selectedManad === fullName ? null : fullName,
-                    );
-                  }
-                }}
-                style={{ cursor: "pointer" }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  className="stroke-border"
-                />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  formatter={(value) => [String(value), "Antal hissar"]}
-                  labelFormatter={(label, payload) =>
-                    payload?.[0]?.payload?.fullName || label
-                  }
-                />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {kalenderData.map((entry, index) => (
-                    <Cell
-                      key={index}
-                      fill={
-                        entry.isSelected
-                          ? "var(--color-chart-4, #dc2626)"
-                          : entry.isCurrent
-                            ? "var(--color-chart-1, #2563eb)"
-                            : "var(--color-chart-2, #16a34a)"
-                      }
-                      opacity={
-                        selectedManad && !entry.isSelected ? 0.4 : 1
-                      }
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div
+            className="h-[300px] w-full"
+            style={{ cursor: "pointer" }}
+          >
+            <Bar
+              data={chartData}
+              options={options}
+              plugins={[hoverColumnPlugin]}
+            />
           </div>
         )}
       </CardContent>

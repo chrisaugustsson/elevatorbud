@@ -64,10 +64,10 @@ function Underhall() {
   }) as { data: NodData };
 
   const { data: besiktningslista } = useQuery({
-    ...convexQuery(
-      api.elevators.maintenance.inspectionList,
-      selectedManad ? { month: selectedManad } : "skip",
-    ),
+    ...convexQuery(api.elevators.maintenance.inspectionList, {
+      month: selectedManad!,
+    }),
+    enabled: !!selectedManad,
   });
 
   const kalenderData = kalender.map((k) => ({

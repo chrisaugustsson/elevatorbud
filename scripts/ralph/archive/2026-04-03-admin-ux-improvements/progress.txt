@@ -1,0 +1,7 @@
+# Ralph Progress Log
+Started: tor  3 apr. 2026
+---
+
+## Codebase Patterns
+
+---

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery, useQuery, keepPreviousData } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { downloadCSV, downloadExcel } from "@elevatorbud/utils/export";
@@ -8,7 +8,6 @@ import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import { RegisterToolbar } from "~/features/register/components/register-toolbar";
 import { RegisterFilters } from "~/features/register/components/register-filters";
 import { RegisterTable } from "~/features/register/components/register-table";
-import { RegisterPagination } from "~/features/register/components/register-pagination";
 
 type ListResult = {
   data: Array<{
@@ -128,20 +127,17 @@ export function OrgRegisterView({
   } as never;
 
   const listOpts = convexQuery(api.elevators.listing.list, queryArgs);
-  const { data: result } = useSuspenseQuery({
-    queryKey: listOpts.queryKey,
-    staleTime: listOpts.staleTime,
-  }) as { data: ListResult };
+  const { data: result, isLoading } = useQuery({
+    ...listOpts,
+    placeholderData: keepPreviousData,
+  }) as { data: ListResult | undefined; isLoading: boolean };
 
   const [exportRequested, setExportRequested] = useState<
     "csv" | "xlsx" | null
   >(null);
-  const exportArgs = exportRequested ? (filterBaseArgs as never) : "skip";
   const { data: exportData } = useQuery({
-    ...convexQuery(
-      api.elevators.listing.exportData,
-      exportArgs as never,
-    ),
+    ...convexQuery(api.elevators.listing.exportData, filterBaseArgs as never),
+    enabled: !!exportRequested,
   }) as { data: Record<string, unknown>[] | undefined };
 
   const handleExport = useCallback((format: "csv" | "xlsx") => {
@@ -176,7 +172,8 @@ export function OrgRegisterView({
     setStatusFilter("active");
   }
 
-  const { totalCount, totalPages } = result;
+  const totalCount = result?.totalCount ?? 0;
+  const totalPages = result?.totalPages ?? 0;
 
   return (
     <div className="space-y-4">
@@ -205,20 +202,16 @@ export function OrgRegisterView({
         onClearAllFilters={clearAllFilters}
       />
       <RegisterTable
-        data={result.data}
+        data={result?.data ?? []}
         sorting={sorting}
         onSortingChange={setSorting}
-        totalPages={totalPages}
-        page={page}
-        pageSize={limit}
-      />
-      <RegisterPagination
         totalCount={totalCount}
         totalPages={totalPages}
         page={page}
-        limit={limit}
+        pageSize={limit}
         onPageChange={setPage}
-        onLimitChange={setLimit}
+        onPageSizeChange={setLimit}
+        isLoading={isLoading}
       />
     </div>
   );

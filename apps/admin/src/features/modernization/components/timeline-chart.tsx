@@ -5,14 +5,12 @@ import {
   CardTitle,
 } from "@elevatorbud/ui/components/ui/card";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+  useChartColors,
+  sharedScaleOptions,
+  sharedTooltipOptions,
+  hoverColumnPlugin,
+} from "@elevatorbud/ui/lib/chart-helpers";
+import { Bar } from "react-chartjs-2";
 import { Calendar } from "lucide-react";
 
 type TimelineDataItem = {
@@ -26,6 +24,8 @@ type TimelineChartProps = {
 };
 
 export function TimelineChart({ data }: TimelineChartProps) {
+  const colors = useChartColors();
+
   return (
     <Card>
       <CardHeader>
@@ -41,42 +41,36 @@ export function TimelineChart({ data }: TimelineChartProps) {
           </p>
         ) : (
           <div className="h-[300px] w-full overflow-hidden">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={data}
-                margin={{ top: 5, right: 20, left: 0, bottom: 60 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  className="stroke-border"
-                />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 12 }}
-                  angle={-45}
-                  textAnchor="end"
-                  interval="preserveStartEnd"
-                  height={60}
-                />
-                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "6px",
-                    color: "hsl(var(--popover-foreground))",
-                  }}
-                  formatter={(value) => [String(value), "Antal hissar"]}
-                />
-                <Bar dataKey="antal" radius={[4, 4, 0, 0]}>
-                  {data.map(
-                    (entry: { fill: string }, index: number) => (
-                      <rect key={index} fill={entry.fill} />
-                    ),
-                  )}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <Bar
+              data={{
+                labels: data.map((d) => d.name),
+                datasets: [
+                  {
+                    label: "Antal hissar",
+                    data: data.map((d) => d.antal),
+                    backgroundColor: data.map((d) => d.fill),
+                    borderRadius: 4,
+                    barPercentage: 0.7,
+                  },
+                ],
+              }}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    ...sharedTooltipOptions,
+                    callbacks: {
+                      label: (ctx) => `Antal hissar: ${ctx.parsed.y}`,
+                    },
+                  },
+                },
+                scales: sharedScaleOptions(colors),
+              }}
+              plugins={[hoverColumnPlugin]}
+            />
           </div>
         )}
       </CardContent>

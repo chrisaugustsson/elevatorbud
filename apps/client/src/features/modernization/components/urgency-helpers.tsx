@@ -17,10 +17,10 @@ export const PERIODS: TimelinePeriod[] = [
 
 export function getUrgencyColor(year: number): string {
   const diff = year - currentYear;
-  if (diff <= 1) return "var(--color-chart-4, #dc2626)";
-  if (diff <= 4) return "var(--color-chart-3, #d97706)";
-  if (diff <= 9) return "#eab308";
-  return "var(--color-chart-2, #16a34a)";
+  if (diff <= 1) return "#dc2626"; // red
+  if (diff <= 4) return "#d97706"; // orange
+  if (diff <= 9) return "#eab308"; // yellow
+  return "#16a34a"; // green
 }
 
 export function getUrgencyBadge(year: number) {

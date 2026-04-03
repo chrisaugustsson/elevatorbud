@@ -13,29 +13,23 @@ import {
   TableRow,
 } from "@elevatorbud/ui/components/ui/table";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+  useChartColors,
+  sharedScaleOptions,
+  sharedTooltipOptions,
+  hoverColumnPlugin,
+} from "@elevatorbud/ui/lib/chart-helpers";
+import { Bar } from "react-chartjs-2";
 import { Wrench } from "lucide-react";
 import type { ForetagData } from "../types";
-
-const tooltipStyle = {
-  backgroundColor: "hsl(var(--popover))",
-  border: "1px solid hsl(var(--border))",
-  borderRadius: "6px",
-  color: "hsl(var(--popover-foreground))",
-};
 
 export function MaintenanceCompanies({
   foretagData,
 }: {
   foretagData: ForetagData;
 }) {
+  const colors = useChartColors();
+  const scales = sharedScaleOptions(colors);
+
   return (
     <div className="space-y-4">
       <h2 className="flex items-center gap-2 text-lg font-semibold">
@@ -56,37 +50,47 @@ export function MaintenanceCompanies({
               </p>
             ) : (
               <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={foretagData.companies.map((f) => ({
-                      name: f.name,
-                      antal: f.count,
-                    }))}
-                    layout="vertical"
-                    margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      className="stroke-border"
-                    />
-                    <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
-                    <YAxis
-                      dataKey="name"
-                      type="category"
-                      tick={{ fontSize: 11 }}
-                      width={120}
-                    />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      formatter={(value) => [String(value), "Antal hissar"]}
-                    />
-                    <Bar
-                      dataKey="antal"
-                      fill="var(--color-chart-1, #2563eb)"
-                      radius={[0, 4, 4, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <Bar
+                  data={{
+                    labels: foretagData.companies.map((f) => f.name),
+                    datasets: [
+                      {
+                        label: "Antal hissar",
+                        data: foretagData.companies.map((f) => f.count),
+                        backgroundColor: colors.chart1,
+                        borderRadius: 4,
+                        barPercentage: 0.7,
+                      },
+                    ],
+                  }}
+                  options={{
+                    indexAxis: "y",
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: "index" as const, intersect: false, axis: "y" as const },
+                    plugins: {
+                      legend: { display: false },
+                      tooltip: {
+                        ...sharedTooltipOptions,
+                        callbacks: {
+                          label: (ctx) => `Antal hissar: ${ctx.parsed.x}`,
+                        },
+                      },
+                    },
+                    scales: {
+                      y: {
+                        ticks: {
+                          color: colors.label,
+                          font: { size: 11, family: "Sora" },
+                        },
+                        grid: { display: false },
+                        border: { display: false },
+                      },
+                      x: scales.y,
+                    },
+                  }}
+                  plugins={[hoverColumnPlugin]}
+                />
               </div>
             )}
           </CardContent>

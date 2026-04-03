@@ -1,6 +1,12 @@
-import { createFileRoute, Navigate, Outlet } from "@tanstack/react-router";
-import { useAuth } from "@elevatorbud/auth";
-import { useQuery } from "convex/react";
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+} from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { auth } from "@elevatorbud/auth/server";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import {
   SidebarProvider,
@@ -11,33 +17,28 @@ import { Separator } from "@elevatorbud/ui/components/ui/separator";
 import { AppSidebar } from "../shared/components/app-sidebar";
 import { OrgDisplay } from "../shared/components/org-display";
 
+const authGuard = createServerFn().handler(async () => {
+  const { isAuthenticated } = await auth();
+
+  if (!isAuthenticated) {
+    throw redirect({ to: "/login" });
+  }
+});
+
 export const Route = createFileRoute("/_authenticated")({
+  beforeLoad: () => authGuard(),
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData(convexQuery(api.users.me, {}));
+  },
   component: AuthenticatedLayout,
 });
 
 function AuthenticatedLayout() {
-  const { isSignedIn, isLoaded } = useAuth();
-  const user = useQuery(api.users.me);
-
-  if (!isLoaded) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground">Laddar...</div>
-      </div>
-    );
-  }
-
-  if (!isSignedIn) {
-    return <Navigate to="/login" />;
-  }
-
-  if (user === undefined) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-muted-foreground">Laddar användare...</div>
-      </div>
-    );
-  }
+  const userQuery = convexQuery(api.users.me, {});
+  const { data: user } = useSuspenseQuery({
+    queryKey: userQuery.queryKey,
+    staleTime: userQuery.staleTime,
+  });
 
   if (user === null) {
     return (
@@ -72,12 +73,15 @@ function AuthenticatedLayout() {
       <SidebarInset>
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
+          <Separator
+            orientation="vertical"
+            className="mr-2 data-[orientation=vertical]:h-4"
+          />
           {user.organization_id && (
             <OrgDisplay organisationId={user.organization_id} />
           )}
         </header>
-        <div className="flex-1 overflow-auto p-6">
+        <div className="min-w-0 flex-1 overflow-auto p-6">
           <Outlet />
         </div>
       </SidebarInset>

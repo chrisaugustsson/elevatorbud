@@ -4,30 +4,19 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   getPaginationRowModel,
-  flexRender,
   createColumnHelper,
   type SortingState,
 } from "@tanstack/react-table";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@elevatorbud/ui/components/ui/table";
+  DataGrid,
+  DataGridContainer,
+  DataGridTable,
+  DataGridPagination,
+  DataGridColumnHeader,
+} from "@elevatorbud/ui/components/ui/data-grid-table";
 import { Badge } from "@elevatorbud/ui/components/ui/badge";
-import { Button } from "@elevatorbud/ui/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@elevatorbud/ui/components/ui/select";
-import { SortHeader } from "@elevatorbud/ui/components/ui/sort-header";
 import { Link } from "@tanstack/react-router";
-import { Building2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Building2, ChevronRight } from "lucide-react";
 import type { TimelinePeriod } from "./urgency-helpers";
 import { getUrgencyBadge } from "./urgency-helpers";
 
@@ -52,14 +41,6 @@ type PriorityListProps = {
 
 const columnHelper = createColumnHelper<PriorityElevator>();
 
-function getSortDirection(
-  sorting: SortingState,
-  field: string,
-): "asc" | "desc" | null {
-  const s = sorting.find((s) => s.id === field);
-  return s ? (s.desc ? "desc" : "asc") : null;
-}
-
 export function PriorityList({
   elevators,
   selectedPeriod,
@@ -72,41 +53,32 @@ export function PriorityList({
   const columns = useMemo(
     () => [
       columnHelper.accessor("elevator_number", {
-        header: () => (
-          <SortHeader
-            label="Hissnummer"
-            sortDirection={getSortDirection(sorting, "elevator_number")}
-            onSort={() => handleSort("elevator_number")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Hissnummer" column={column} />
         ),
         cell: (info) => (
           <span className="font-medium">{info.getValue()}</span>
         ),
       }),
       columnHelper.accessor("address", {
-        header: () => (
-          <SortHeader
-            label="Adress"
-            sortDirection={getSortDirection(sorting, "address")}
-            onSort={() => handleSort("address")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Adress" column={column} />
         ),
         cell: (info) => info.getValue() || "–",
         meta: { className: "hidden sm:table-cell" },
       }),
       columnHelper.accessor("district", {
-        header: () => (
-          <SortHeader
-            label="Distrikt"
-            sortDirection={getSortDirection(sorting, "district")}
-            onSort={() => handleSort("district")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Distrikt" column={column} />
         ),
         cell: (info) => info.getValue() || "–",
         meta: { className: "hidden md:table-cell" },
       }),
       columnHelper.accessor("organizationName", {
-        header: () => "Organisation",
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Organisation" column={column} />
+        ),
+        enableSorting: false,
         cell: (info) => (
           <Link
             to="/admin/organisationer/$id"
@@ -120,21 +92,17 @@ export function PriorityList({
         meta: { className: "hidden sm:table-cell" },
       }),
       columnHelper.accessor("recommended_modernization_year", {
-        header: () => (
-          <SortHeader
-            label="Rek. år"
-            sortDirection={getSortDirection(
-              sorting,
-              "recommended_modernization_year",
-            )}
-            onSort={() => handleSort("recommended_modernization_year")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Rek. år" column={column} />
         ),
         cell: (info) => info.getValue() || "–",
       }),
       columnHelper.display({
         id: "urgency",
-        header: "Brådskande",
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Brådskande" column={column} />
+        ),
+        enableSorting: false,
         cell: (info) => {
           const year = parseInt(
             info.row.original.recommended_modernization_year || "0",
@@ -144,12 +112,8 @@ export function PriorityList({
         },
       }),
       columnHelper.accessor("budget_amount", {
-        header: () => (
-          <SortHeader
-            label="Budget"
-            sortDirection={getSortDirection(sorting, "budget_amount")}
-            onSort={() => handleSort("budget_amount")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Budget" column={column} />
         ),
         cell: (info) => {
           const v = info.getValue();
@@ -158,7 +122,10 @@ export function PriorityList({
         meta: { className: "hidden sm:table-cell" },
       }),
       columnHelper.accessor("modernization_measures", {
-        header: "Åtgärd",
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Åtgärd" column={column} />
+        ),
+        enableSorting: false,
         cell: (info) => info.getValue() || "–",
         meta: { className: "hidden lg:table-cell" },
       }),
@@ -174,17 +141,8 @@ export function PriorityList({
         ),
       }),
     ],
-    [sorting],
+    [],
   );
-
-  function handleSort(field: string) {
-    setSorting((prev) => {
-      const existing = prev.find((s) => s.id === field);
-      if (!existing) return [{ id: field, desc: false }];
-      if (!existing.desc) return [{ id: field, desc: true }];
-      return [];
-    });
-  }
 
   const table = useReactTable({
     data: elevators,
@@ -198,10 +156,6 @@ export function PriorityList({
       pagination: { pageSize: 25 },
     },
   });
-
-  const { pageIndex, pageSize } = table.getState().pagination;
-  const totalCount = elevators.length;
-  const offset = pageIndex * pageSize;
 
   return (
     <div className="space-y-4">
@@ -220,7 +174,7 @@ export function PriorityList({
           </Badge>
         )}
         <span className="text-sm text-muted-foreground">
-          ({totalCount} hissar)
+          ({elevators.length} hissar)
         </span>
       </div>
 
@@ -230,111 +184,26 @@ export function PriorityList({
           {selectedPeriod ? " i vald period" : ""}.
         </p>
       ) : (
-        <>
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead
-                        key={header.id}
-                        className={
-                          (header.column.columnDef.meta as any)?.className
-                        }
-                      >
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext(),
-                            )}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow key={row.id}>
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          className={
-                            (cell.column.columnDef.meta as any)?.className
-                          }
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Building2 className="size-8" />
-                        <p>Inga hissar hittades.</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {totalCount > 25 && (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Visar {offset + 1}–
-                {Math.min(offset + pageSize, totalCount)} av {totalCount}
-              </p>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={String(pageSize)}
-                  onValueChange={(v) => table.setPageSize(Number(v))}
-                >
-                  <SelectTrigger className="h-9 w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="size-9"
-                  disabled={!table.getCanPreviousPage()}
-                  onClick={() => table.previousPage()}
-                >
-                  <ChevronLeft className="size-4" />
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  {pageIndex + 1} / {table.getPageCount()}
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="size-9"
-                  disabled={!table.getCanNextPage()}
-                  onClick={() => table.nextPage()}
-                >
-                  <ChevronRight className="size-4" />
-                </Button>
-              </div>
+        <DataGrid table={table} recordCount={elevators.length}
+          emptyMessage={
+            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+              <Building2 className="size-8" />
+              <p>Inga hissar hittades.</p>
             </div>
+          }
+        >
+          <DataGridContainer>
+            <div className="overflow-x-auto">
+              <DataGridTable />
+            </div>
+          </DataGridContainer>
+          {elevators.length > 25 && (
+            <DataGridPagination
+              sizes={[25, 50, 100]}
+              info="{from} - {to} av {count}"
+            />
           )}
-        </>
+        </DataGrid>
       )}
     </div>
   );

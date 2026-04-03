@@ -18,12 +18,11 @@ export function HissnummerField({
 }) {
   const elevatorNumber = field.state.value;
   const { data: checkResult } = useQuery({
-    ...convexQuery(
-      api.elevators.crud.checkElevatorNumber,
-      elevatorNumber
-        ? { elevator_number: elevatorNumber, excludeId: currentHissId as never }
-        : "skip",
-    ),
+    ...convexQuery(api.elevators.crud.checkElevatorNumber, {
+      elevator_number: elevatorNumber!,
+      excludeId: currentHissId as never,
+    }),
+    enabled: !!elevatorNumber,
   }) as { data: { exists: boolean } | undefined };
   const isDuplicate = checkResult?.exists === true;
 

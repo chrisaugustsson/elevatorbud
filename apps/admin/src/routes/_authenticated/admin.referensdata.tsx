@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
@@ -9,7 +9,6 @@ import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
-  flexRender,
   createColumnHelper,
   type SortingState,
 } from "@tanstack/react-table";
@@ -53,7 +52,6 @@ import {
 } from "@elevatorbud/ui/components/ui/dropdown-menu";
 import {
   Plus,
-  ArrowUpDown,
   Pencil,
   Merge,
   Ban,
@@ -61,6 +59,7 @@ import {
   Database,
   MoreHorizontal,
 } from "lucide-react";
+import { DataGrid, DataGridContainer, DataGridTable, DataGridColumnHeader } from "@elevatorbud/ui/components/ui/data-grid-table";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated/admin/referensdata")({
@@ -173,8 +172,11 @@ function Referensdata() {
   const deactivateValue = useMutation(api.suggestedValues.deactivate);
   const activateValue = useMutation(api.suggestedValues.activate);
 
-  const filteredValues = values.filter(
-    (item) => item.value.toLowerCase().includes(search.toLowerCase()),
+  const filteredValues = useMemo(
+    () => values.filter(
+      (item) => item.value.toLowerCase().includes(search.toLowerCase()),
+    ),
+    [values, search],
   );
 
   const activeCount = filteredValues.filter((v) => v.active).length;
@@ -182,81 +184,76 @@ function Referensdata() {
 
   const columnHelper = createColumnHelper<SuggestedValue>();
 
-  const columns = [
-    columnHelper.accessor("value", {
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-ml-3"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Värde
-          <ArrowUpDown className="ml-1 size-3" />
-        </Button>
-      ),
-      cell: (info) => <span className="font-medium">{info.getValue()}</span>,
-    }),
-    columnHelper.accessor("active", {
-      header: "Status",
-      cell: (info) => (
-        <Badge variant={info.getValue() ? "outline" : "secondary"}>
-          {info.getValue() ? "Aktiv" : "Inaktiv"}
-        </Badge>
-      ),
-    }),
-    columnHelper.display({
-      id: "actions",
-      header: "",
-      cell: (info) => {
-        const row = info.row.original;
-        return (
-          <div className="flex items-center justify-end">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-8">
-                  <MoreHorizontal className="size-4" />
-                  <span className="sr-only">Åtgärder</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setRenameItem(row)}>
-                  <Pencil className="mr-2 size-4" />
-                  Byt namn
-                </DropdownMenuItem>
-                {row.active && (
-                  <DropdownMenuItem onClick={() => setMergeItem(row)}>
-                    <Merge className="mr-2 size-4" />
-                    Slå ihop
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("value", {
+        header: ({ column }) => <DataGridColumnHeader title="Värde" column={column} />,
+        cell: (info) => <span className="font-medium">{info.getValue()}</span>,
+      }),
+      columnHelper.accessor("active", {
+        header: ({ column }) => <DataGridColumnHeader title="Status" column={column} />,
+        enableSorting: false,
+        cell: (info) => (
+          <Badge variant={info.getValue() ? "outline" : "secondary"}>
+            {info.getValue() ? "Aktiv" : "Inaktiv"}
+          </Badge>
+        ),
+      }),
+      columnHelper.display({
+        id: "actions",
+        header: "",
+        cell: (info) => {
+          const row = info.row.original;
+          return (
+            <div className="flex items-center justify-end">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="size-8">
+                    <MoreHorizontal className="size-4" />
+                    <span className="sr-only">Åtgärder</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setRenameItem(row)}>
+                    <Pencil className="mr-2 size-4" />
+                    Byt namn
                   </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                {row.active ? (
-                  <DropdownMenuItem
-                    onClick={async () => {
-                      await deactivateValue({ id: row._id as never });
-                    }}
-                  >
-                    <Ban className="mr-2 size-4" />
-                    Inaktivera
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem
-                    onClick={async () => {
-                      await activateValue({ id: row._id as never });
-                    }}
-                  >
-                    <CheckCircle className="mr-2 size-4" />
-                    Aktivera
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        );
-      },
-    }),
-  ];
+                  {row.active && (
+                    <DropdownMenuItem onClick={() => setMergeItem(row)}>
+                      <Merge className="mr-2 size-4" />
+                      Slå ihop
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  {row.active ? (
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        await deactivateValue({ id: row._id as never });
+                      }}
+                    >
+                      <Ban className="mr-2 size-4" />
+                      Inaktivera
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        await activateValue({ id: row._id as never });
+                      }}
+                    >
+                      <CheckCircle className="mr-2 size-4" />
+                      Aktivera
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          );
+        },
+      }),
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -319,59 +316,16 @@ function Referensdata() {
         {inactiveCount > 0 && <span>{inactiveCount} inaktiva</span>}
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className={
-                    !row.original.active ? "opacity-50" : undefined
-                  }
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Database className="size-8" />
-                    <p>Inga värden hittades.</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <DataGrid
+        table={table}
+        recordCount={filteredValues.length}
+      >
+        <DataGridContainer>
+          <div className="overflow-x-auto">
+            <DataGridTable />
+          </div>
+        </DataGridContainer>
+      </DataGrid>
 
       <CreateValueDialog
         open={createOpen}

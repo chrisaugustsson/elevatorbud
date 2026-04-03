@@ -119,10 +119,8 @@ export function GlobalSearch() {
   }, []);
 
   const { data: results, isFetching } = useQuery({
-    ...convexQuery(
-      api.search.global,
-      debouncedSearch ? { search: debouncedSearch } : "skip",
-    ),
+    ...convexQuery(api.search.global, { search: debouncedSearch! }),
+    enabled: !!debouncedSearch,
   }) as {
     data: { elevators: ElevatorResult[]; organizations: OrgResult[] } | undefined;
     isFetching: boolean;

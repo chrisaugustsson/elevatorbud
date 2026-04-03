@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import {
   PERIODS,
@@ -16,55 +17,51 @@ import { ModernizationSkeleton } from "../../features/modernization/components/m
 
 export const Route = createFileRoute("/_authenticated/modernisering")({
   component: ModerniseringPage,
+  pendingComponent: ModernizationSkeleton,
 });
 
 function ModerniseringPage() {
-  const user = useQuery(api.users.me);
-  const orgFilter = user?.organization_id
-    ? ({ organization_id: user.organization_id } as never)
-    : "skip";
+  const userOpts = convexQuery(api.users.me, {});
+  const { data: user } = useSuspenseQuery({
+    queryKey: userOpts.queryKey,
+    staleTime: userOpts.staleTime,
+  });
 
   const [selectedPeriod, setSelectedPeriod] = useState<TimelinePeriod | null>(
     null,
   );
 
-  const tidslinje = useQuery(
-    api.elevators.modernization.timeline,
-    orgFilter as never,
-  );
-  const budget = useQuery(api.elevators.modernization.budget, orgFilter as never);
-  const atgarder = useQuery(
-    api.elevators.modernization.measures,
-    orgFilter as never,
-  );
+  const orgArgs = { organization_id: user!.organization_id } as never;
+
+  const tidslinjeOpts = convexQuery(api.elevators.modernization.timeline, orgArgs);
+  const { data: tidslinje } = useSuspenseQuery({
+    queryKey: tidslinjeOpts.queryKey,
+    staleTime: tidslinjeOpts.staleTime,
+  });
+
+  const budgetOpts = convexQuery(api.elevators.modernization.budget, orgArgs);
+  const { data: budget } = useSuspenseQuery({
+    queryKey: budgetOpts.queryKey,
+    staleTime: budgetOpts.staleTime,
+  });
+
+  const atgarderOpts = convexQuery(api.elevators.modernization.measures, orgArgs);
+  const { data: atgarder } = useSuspenseQuery({
+    queryKey: atgarderOpts.queryKey,
+    staleTime: atgarderOpts.staleTime,
+  });
 
   const prioritetslistaArgs = useMemo(() => {
-    if (!user?.organization_id) return "skip";
-    const base = { organization_id: user.organization_id as never };
+    const base = { organization_id: user!.organization_id } as Record<string, unknown>;
     if (selectedPeriod) {
-      return {
-        ...base,
-        yearFrom: selectedPeriod.yearFrom,
-        yearTo: selectedPeriod.yearTo,
-      };
+      return { ...base, yearFrom: selectedPeriod.yearFrom, yearTo: selectedPeriod.yearTo };
     }
     return base;
-  }, [user?.organization_id, selectedPeriod]);
+  }, [user, selectedPeriod]);
 
-  const prioritetslista = useQuery(
-    api.elevators.modernization.priorityList,
-    prioritetslistaArgs as never,
-  );
-
-  if (
-    user === undefined ||
-    tidslinje === undefined ||
-    budget === undefined ||
-    atgarder === undefined ||
-    prioritetslista === undefined
-  ) {
-    return <ModernizationSkeleton />;
-  }
+  const { data: prioritetslista } = useQuery({
+    ...convexQuery(api.elevators.modernization.priorityList, prioritetslistaArgs as never),
+  });
 
   const tidslinjeData = tidslinje.map((t: { year: string; count: number }) => ({
     name: t.year,

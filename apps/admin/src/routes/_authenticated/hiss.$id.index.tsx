@@ -158,10 +158,10 @@ function HissDetail() {
     staleTime: hissOpts.staleTime,
   }) as { data: HissDoc | null };
   const { data: org } = useQuery({
-    ...convexQuery(
-      api.organizations.get,
-      hiss ? ({ id: hiss.organization_id } as never) : "skip",
-    ),
+    ...convexQuery(api.organizations.get, {
+      id: hiss?.organization_id,
+    } as never),
+    enabled: !!hiss,
   }) as { data: OrgDoc | undefined };
   const archiveMutation = useMutation(api.elevators.crud.archive);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);

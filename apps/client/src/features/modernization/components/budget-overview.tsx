@@ -5,18 +5,14 @@ import {
   CardTitle,
 } from "@elevatorbud/ui/components/ui/card";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  Legend,
-} from "recharts";
+  useChartColors,
+  sharedScaleOptions,
+  sharedTooltipOptions,
+  hoverColumnPlugin,
+} from "@elevatorbud/ui/lib/chart-helpers";
+import { Bar, Line } from "react-chartjs-2";
 import { TrendingUp } from "lucide-react";
+import { useMemo } from "react";
 
 type BudgetYearItem = {
   name: string;
@@ -36,18 +32,140 @@ type BudgetOverviewProps = {
   budgetPerTyp: BudgetCategoryItem[];
 };
 
-const tooltipStyle = {
-  backgroundColor: "hsl(var(--popover))",
-  border: "1px solid hsl(var(--border))",
-  borderRadius: "6px",
-  color: "hsl(var(--popover-foreground))",
-};
-
 function EmptyBudget() {
   return (
     <p className="py-8 text-center text-muted-foreground">
       Ingen budgetdata tillgänglig.
     </p>
+  );
+}
+
+function BudgetPerYearChart({ data }: { data: BudgetYearItem[] }) {
+  const colors = useChartColors();
+
+  const chartData = useMemo(
+    () => ({
+      labels: data.map((d) => d.name),
+      datasets: [
+        {
+          type: "bar" as const,
+          label: "Per år",
+          data: data.map((d) => d.amount),
+          backgroundColor: colors.chart1,
+          borderRadius: 4,
+          barPercentage: 0.7,
+          order: 2,
+        },
+        {
+          type: "line" as const,
+          label: "Kumulativt",
+          data: data.map((d) => d.kumulativt),
+          borderColor: colors.chart4,
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHitRadius: 10,
+          pointHoverRadius: 4,
+          pointHoverBackgroundColor: colors.chart4,
+          tension: 0.3,
+          fill: false,
+          order: 1,
+        },
+      ],
+    }),
+    [data, colors],
+  );
+
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index" as const, intersect: false },
+      plugins: {
+        legend: {
+          position: "bottom" as const,
+          labels: {
+            color: colors.label,
+            font: { size: 11, family: "Sora" },
+            usePointStyle: true,
+            pointStyle: "circle" as const,
+            padding: 16,
+          },
+        },
+        tooltip: {
+          ...sharedTooltipOptions,
+          callbacks: {
+            label: (ctx: {
+              dataset: { label?: string };
+              parsed: { y: number | null };
+            }) =>
+              `${ctx.dataset.label}: ${ctx.parsed.y?.toLocaleString("sv-SE")} tkr`,
+          },
+        },
+      },
+      scales: sharedScaleOptions(colors),
+    }),
+    [colors],
+  );
+
+  return (
+    <div className="h-[300px] w-full">
+      <Line
+        data={chartData as Parameters<typeof Line>[0]["data"]}
+        options={options}
+      />
+    </div>
+  );
+}
+
+function CategoryBarChart({
+  data,
+  color,
+}: {
+  data: BudgetCategoryItem[];
+  color: string;
+}) {
+  const colors = useChartColors();
+
+  const chartData = useMemo(
+    () => ({
+      labels: data.map((d) => d.name),
+      datasets: [
+        {
+          label: "Budget",
+          data: data.map((d) => d.amount),
+          backgroundColor: color,
+          borderRadius: 4,
+          barPercentage: 0.7,
+        },
+      ],
+    }),
+    [data, color],
+  );
+
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index" as const, intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...sharedTooltipOptions,
+          callbacks: {
+            label: (ctx: { parsed: { y: number | null } }) =>
+              `Budget: ${ctx.parsed.y?.toLocaleString("sv-SE")} tkr`,
+          },
+        },
+      },
+      scales: sharedScaleOptions(colors),
+    }),
+    [colors],
+  );
+
+  return (
+    <div className="h-[300px] w-full">
+      <Bar data={chartData} options={options} plugins={[hoverColumnPlugin]} />
+    </div>
   );
 }
 
@@ -57,6 +175,8 @@ export function BudgetOverview({
   budgetPerDistrikt,
   budgetPerTyp,
 }: BudgetOverviewProps) {
+  const colors = useChartColors();
+
   return (
     <div className="space-y-4">
       <h2 className="flex items-center gap-2 text-lg font-semibold">
@@ -79,55 +199,7 @@ export function BudgetOverview({
             {budgetCumulative.length === 0 ? (
               <EmptyBudget />
             ) : (
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={budgetCumulative}
-                    margin={{ top: 5, right: 20, left: 0, bottom: 60 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      className="stroke-border"
-                    />
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fontSize: 12 }}
-                      angle={-45}
-                      textAnchor="end"
-                      interval={0}
-                      height={60}
-                    />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      formatter={(value, name) => [
-                        `${String(value)} tkr`,
-                        name === "amount" ? "Per år" : "Kumulativt",
-                      ]}
-                    />
-                    <Legend
-                      wrapperStyle={{ fontSize: "12px" }}
-                      formatter={(value: string) => (
-                        <span className="text-foreground">
-                          {value === "amount" ? "Per år" : "Kumulativt"}
-                        </span>
-                      )}
-                    />
-                    <Bar
-                      dataKey="amount"
-                      fill="var(--color-chart-1, #2563eb)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="kumulativt"
-                      stroke="var(--color-chart-4, #dc2626)"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              <BudgetPerYearChart data={budgetCumulative} />
             )}
           </CardContent>
         </Card>
@@ -143,37 +215,10 @@ export function BudgetOverview({
             {budgetPerDistrikt.length === 0 ? (
               <EmptyBudget />
             ) : (
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={budgetPerDistrikt}
-                    margin={{ top: 5, right: 20, left: 0, bottom: 60 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      className="stroke-border"
-                    />
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fontSize: 12 }}
-                      angle={-45}
-                      textAnchor="end"
-                      interval={0}
-                      height={60}
-                    />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      formatter={(value) => [`${String(value)} tkr`, "Budget"]}
-                    />
-                    <Bar
-                      dataKey="amount"
-                      fill="var(--color-chart-2, #16a34a)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <CategoryBarChart
+                data={budgetPerDistrikt}
+                color={colors.chart2}
+              />
             )}
           </CardContent>
         </Card>
@@ -189,37 +234,10 @@ export function BudgetOverview({
             {budgetPerTyp.length === 0 ? (
               <EmptyBudget />
             ) : (
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={budgetPerTyp}
-                    margin={{ top: 5, right: 20, left: 0, bottom: 60 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      className="stroke-border"
-                    />
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fontSize: 12 }}
-                      angle={-45}
-                      textAnchor="end"
-                      interval={0}
-                      height={60}
-                    />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      formatter={(value) => [`${String(value)} tkr`, "Budget"]}
-                    />
-                    <Bar
-                      dataKey="amount"
-                      fill="var(--color-chart-3, #d97706)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <CategoryBarChart
+                data={budgetPerTyp}
+                color={colors.chart3}
+              />
             )}
           </CardContent>
         </Card>

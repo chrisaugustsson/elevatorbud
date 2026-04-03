@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   useSuspenseQuery,
   useQuery,
+  keepPreviousData,
 } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
@@ -12,7 +13,6 @@ import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import { RegisterToolbar } from "~/features/register/components/register-toolbar";
 import { RegisterFilters } from "~/features/register/components/register-filters";
 import { RegisterTable } from "~/features/register/components/register-table";
-import { RegisterPagination } from "~/features/register/components/register-pagination";
 
 export const Route = createFileRoute("/_authenticated/register")({
   component: Register,
@@ -142,20 +142,18 @@ function Register() {
   } as never;
 
   const listOpts = convexQuery(api.elevators.listing.list, queryArgs);
-  const { data: result } = useSuspenseQuery({
-    queryKey: listOpts.queryKey,
-    staleTime: listOpts.staleTime,
-  }) as { data: ListResult };
+  const { data: result, isLoading } = useQuery({
+    ...listOpts,
+    placeholderData: keepPreviousData,
+  }) as { data: ListResult | undefined; isLoading: boolean };
 
   // Export data query
   const [exportRequested, setExportRequested] = useState<
     "csv" | "xlsx" | null
   >(null);
   const { data: exportData } = useQuery({
-    ...convexQuery(
-      api.elevators.listing.exportData,
-      exportRequested ? (filterBaseArgs as never) : "skip",
-    ),
+    ...convexQuery(api.elevators.listing.exportData, filterBaseArgs as never),
+    enabled: !!exportRequested,
   }) as { data: Record<string, unknown>[] | undefined };
 
   const handleExport = useCallback((format: "csv" | "xlsx") => {
@@ -191,10 +189,11 @@ function Register() {
     setStatusFilter("active");
   }
 
-  const { totalCount, totalPages } = result;
+  const totalCount = result?.totalCount ?? 0;
+  const totalPages = result?.totalPages ?? 0;
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <RegisterToolbar
         totalCount={totalCount}
         search={search}
@@ -220,20 +219,16 @@ function Register() {
         onClearAllFilters={clearAllFilters}
       />
       <RegisterTable
-        data={result.data}
+        data={result?.data ?? []}
         sorting={sorting}
         onSortingChange={setSorting}
-        totalPages={totalPages}
-        page={page}
-        pageSize={limit}
-      />
-      <RegisterPagination
         totalCount={totalCount}
         totalPages={totalPages}
         page={page}
-        limit={limit}
+        pageSize={limit}
         onPageChange={setPage}
-        onLimitChange={setLimit}
+        onPageSizeChange={setLimit}
+        isLoading={isLoading}
       />
     </div>
   );

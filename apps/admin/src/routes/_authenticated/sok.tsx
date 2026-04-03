@@ -30,10 +30,10 @@ function SokHiss() {
   }, [input]);
 
   const { data: results, isFetching } = useQuery({
-    ...convexQuery(
-      api.elevators.crud.search,
-      debouncedSearch.trim() ? { search: debouncedSearch.trim() } : "skip",
-    ),
+    ...convexQuery(api.elevators.crud.search, {
+      search: debouncedSearch.trim(),
+    }),
+    enabled: !!debouncedSearch.trim(),
   }) as { data: SearchResult[] | undefined; isFetching: boolean };
 
   return (

@@ -65,14 +65,12 @@ export function OrgMaintenanceView({
     staleTime: nodOpts.staleTime,
   }) as { data: NodData };
 
-  const besiktningslistaArgs = selectedManad
-    ? { organization_id: organizationId as never, month: selectedManad }
-    : "skip";
   const { data: besiktningslista } = useQuery({
-    ...convexQuery(
-      api.elevators.maintenance.inspectionList,
-      besiktningslistaArgs as never,
-    ),
+    ...convexQuery(api.elevators.maintenance.inspectionList, {
+      organization_id: organizationId as never,
+      month: selectedManad!,
+    }),
+    enabled: !!selectedManad,
   }) as { data: BesiktningsListaItem[] | undefined };
 
   const kalenderData = kalender.map((k) => ({

@@ -13,22 +13,14 @@ import {
   TableRow,
 } from "@elevatorbud/ui/components/ui/table";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+  useChartColors,
+  sharedScaleOptions,
+  sharedTooltipOptions,
+  hoverColumnPlugin,
+} from "@elevatorbud/ui/lib/chart-helpers";
+import { Bar } from "react-chartjs-2";
 import { Wrench } from "lucide-react";
-
-const tooltipStyle = {
-  backgroundColor: "hsl(var(--popover))",
-  border: "1px solid hsl(var(--border))",
-  borderRadius: "6px",
-  color: "hsl(var(--popover-foreground))",
-};
+import { useMemo } from "react";
 
 export type ForetagData = {
   companies: {
@@ -66,6 +58,67 @@ function CompanyCountChart({
 }: {
   companies: ForetagData["companies"];
 }) {
+  const colors = useChartColors();
+
+  const chartData = useMemo(
+    () => ({
+      labels: companies.map((f) => f.name),
+      datasets: [
+        {
+          label: "Antal hissar",
+          data: companies.map((f) => f.count),
+          backgroundColor: colors.chart1,
+          borderRadius: 4,
+          barPercentage: 0.7,
+        },
+      ],
+    }),
+    [companies, colors],
+  );
+
+  const scales = useMemo(() => {
+    const base = sharedScaleOptions(colors);
+    return {
+      x: {
+        ...base.y,
+        ticks: {
+          ...base.y.ticks,
+          callback: undefined,
+        },
+      },
+      y: {
+        ...base.x,
+        ticks: {
+          ...base.x.ticks,
+          font: { size: 11, family: "Sora" },
+          maxRotation: 0,
+          minRotation: 0,
+        },
+      },
+    };
+  }, [colors]);
+
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: "y" as const,
+      interaction: { mode: "index" as const, intersect: false, axis: "y" as const },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...sharedTooltipOptions,
+          callbacks: {
+            label: (ctx: { parsed: { x: number | null } }) =>
+              `Antal hissar: ${ctx.parsed.x}`,
+          },
+        },
+      },
+      scales,
+    }),
+    [scales],
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -78,41 +131,11 @@ function CompanyCountChart({
           </p>
         ) : (
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={companies.map((f) => ({
-                  name: f.name,
-                  count: f.count,
-                }))}
-                layout="vertical"
-                margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  className="stroke-border"
-                />
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 12 }}
-                  allowDecimals={false}
-                />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  tick={{ fontSize: 11 }}
-                  width={120}
-                />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  formatter={(value) => [String(value), "Antal hissar"]}
-                />
-                <Bar
-                  dataKey="count"
-                  fill="var(--color-chart-1, #2563eb)"
-                  radius={[0, 4, 4, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            <Bar
+              data={chartData}
+              options={options}
+              plugins={[hoverColumnPlugin]}
+            />
           </div>
         )}
       </CardContent>

@@ -20,25 +20,29 @@ import { UserMenu } from "./user-menu";
 const navigation: NavGroup[] = [
   {
     items: [
+      { title: "Ny hiss", href: "/ny", icon: Plus, variant: "primary" },
+    ],
+  },
+  {
+    items: [
       { title: "Dashboard", href: "/dashboard", icon: BarChart3 },
-      { title: "Ny hiss", href: "/ny", icon: Plus },
       { title: "Register", href: "/register", icon: ClipboardList },
+      { title: "Organisationer", href: "/admin/organisationer", icon: Building2 },
       { title: "Modernisering", href: "/modernisering", icon: HardHat },
       { title: "Underhåll", href: "/underhall", icon: Wrench },
     ],
   },
   {
-    label: "Webbplats",
-    items: [{ title: "Webbplats", href: "/webbplats", icon: Globe }],
-  },
-  {
     label: "Admin",
     items: [
-      { title: "Organisationer", href: "/admin/organisationer", icon: Building2 },
       { title: "Användare", href: "/admin/anvandare", icon: Users },
       { title: "Import", href: "/admin/import", icon: Upload },
       { title: "Referensdata", href: "/admin/referensdata", icon: Database },
     ],
+  },
+  {
+    label: "Webbplats",
+    items: [{ title: "Webbplats", href: "/webbplats", icon: Globe }],
   },
 ];
 

@@ -1,22 +1,20 @@
 import { useMemo } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   useReactTable,
   getCoreRowModel,
-  flexRender,
   createColumnHelper,
   type SortingState,
+  type PaginationState,
 } from "@tanstack/react-table";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@elevatorbud/ui/components/ui/table";
-import { SortHeader } from "@elevatorbud/ui/components/ui/sort-header";
+  DataGrid,
+  DataGridContainer,
+  DataGridTable,
+  DataGridPagination,
+  DataGridColumnHeader,
+} from "@elevatorbud/ui/components/ui/data-grid-table";
 import { Building2, Pencil } from "lucide-react";
 
 type HissRow = {
@@ -34,79 +32,64 @@ type HissRow = {
   organizationName: string;
 };
 
-function getSortDirection(
-  sorting: SortingState,
-  field: string,
-): "asc" | "desc" | null {
-  const s = sorting.find((s) => s.id === field);
-  return s ? (s.desc ? "desc" : "asc") : null;
-}
-
 interface RegisterTableProps {
   data: HissRow[];
   sorting: SortingState;
   onSortingChange: (sorting: SortingState) => void;
+  totalCount: number;
   totalPages: number;
   page: number;
   pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+  isLoading?: boolean;
 }
 
 export function RegisterTable({
   data,
   sorting,
   onSortingChange,
+  totalCount,
   totalPages,
   page,
   pageSize,
+  onPageChange,
+  onPageSizeChange,
+  isLoading,
 }: RegisterTableProps) {
-  function handleSort(field: string) {
-    onSortingChange(
-      (() => {
-        const existing = sorting.find((s) => s.id === field);
-        if (!existing) return [{ id: field, desc: false }];
-        if (!existing.desc) return [{ id: field, desc: true }];
-        return [];
-      })(),
-    );
-  }
+  const navigate = useNavigate();
 
   const columnHelper = createColumnHelper<HissRow>();
   const columns = useMemo(
     () => [
       columnHelper.accessor("elevator_number", {
-        header: () => (
-          <SortHeader
-            label="Hissnummer"
-            sortDirection={getSortDirection(sorting, "elevator_number")}
-            onSort={() => handleSort("elevator_number")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Hissnummer" column={column} />
         ),
         cell: (info) => (
           <span className="font-medium">{info.getValue()}</span>
         ),
+        size: 130,
+        enableHiding: false,
       }),
       columnHelper.accessor("address", {
-        header: () => (
-          <SortHeader
-            label="Adress"
-            sortDirection={getSortDirection(sorting, "address")}
-            onSort={() => handleSort("address")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Adress" column={column} />
         ),
         cell: (info) => info.getValue() || "—",
+        size: 180,
       }),
       columnHelper.accessor("district", {
-        header: () => (
-          <SortHeader
-            label="Distrikt"
-            sortDirection={getSortDirection(sorting, "district")}
-            onSort={() => handleSort("district")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Distrikt" column={column} />
         ),
         cell: (info) => info.getValue() || "—",
+        size: 120,
       }),
       columnHelper.accessor("organizationName", {
-        header: () => "Organisation",
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Organisation" column={column} />
+        ),
         cell: (info) => (
           <Link
             to="/admin/organisationer/$id"
@@ -117,67 +100,47 @@ export function RegisterTable({
             {info.getValue()}
           </Link>
         ),
+        enableSorting: false,
+        size: 160,
       }),
       columnHelper.accessor("elevator_type", {
-        header: () => (
-          <SortHeader
-            label="Hisstyp"
-            sortDirection={getSortDirection(sorting, "elevator_type")}
-            onSort={() => handleSort("elevator_type")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Hisstyp" column={column} />
         ),
         cell: (info) => info.getValue() || "—",
+        size: 120,
       }),
       columnHelper.accessor("manufacturer", {
-        header: () => (
-          <SortHeader
-            label="Fabrikat"
-            sortDirection={getSortDirection(sorting, "manufacturer")}
-            onSort={() => handleSort("manufacturer")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Fabrikat" column={column} />
         ),
         cell: (info) => info.getValue() || "—",
+        size: 120,
       }),
       columnHelper.accessor("build_year", {
-        header: () => (
-          <SortHeader
-            label="Byggår"
-            sortDirection={getSortDirection(sorting, "build_year")}
-            onSort={() => handleSort("build_year")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Byggår" column={column} />
         ),
         cell: (info) => info.getValue() ?? "—",
+        size: 100,
       }),
       columnHelper.accessor("modernization_year", {
-        header: () => (
-          <SortHeader
-            label="Moderniserad"
-            sortDirection={getSortDirection(sorting, "modernization_year")}
-            onSort={() => handleSort("modernization_year")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Moderniserad" column={column} />
         ),
         cell: (info) => info.getValue() || "—",
+        size: 130,
       }),
       columnHelper.accessor("recommended_modernization_year", {
-        header: () => (
-          <SortHeader
-            label="Rek. modern."
-            sortDirection={getSortDirection(
-              sorting,
-              "recommended_modernization_year",
-            )}
-            onSort={() => handleSort("recommended_modernization_year")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Rek. modern." column={column} />
         ),
         cell: (info) => info.getValue() || "—",
+        size: 130,
       }),
       columnHelper.accessor("budget_amount", {
-        header: () => (
-          <SortHeader
-            label="Budget"
-            sortDirection={getSortDirection(sorting, "budget_amount")}
-            onSort={() => handleSort("budget_amount")}
-          />
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Budget" column={column} />
         ),
         cell: (info) => {
           const v = info.getValue();
@@ -185,6 +148,7 @@ export function RegisterTable({
             ? `${(v / 1000).toFixed(0)} tkr`
             : "—";
         },
+        size: 100,
       }),
       columnHelper.display({
         id: "actions",
@@ -199,9 +163,10 @@ export function RegisterTable({
             </Button>
           </Link>
         ),
+        size: 50,
       }),
     ],
-    [sorting],
+    [],
   );
 
   const table = useReactTable({
@@ -210,6 +175,7 @@ export function RegisterTable({
     manualSorting: true,
     manualPagination: true,
     pageCount: totalPages,
+    rowCount: totalCount,
     state: {
       sorting,
       pagination: { pageIndex: page, pageSize },
@@ -221,63 +187,48 @@ export function RegisterTable({
         onSortingChange(updater);
       }
     },
+    onPaginationChange: (updater) => {
+      const next =
+        typeof updater === "function"
+          ? updater({ pageIndex: page, pageSize })
+          : updater;
+      if (next.pageSize !== pageSize) {
+        onPageSizeChange(next.pageSize);
+        onPageChange(0);
+      } else {
+        onPageChange(next.pageIndex);
+      }
+    },
     getCoreRowModel: getCoreRowModel(),
   });
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                className="cursor-pointer"
-                onClick={() => {
-                  window.location.href = `/hiss/${row.original._id}`;
-                }}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(
-                      cell.column.columnDef.cell,
-                      cell.getContext(),
-                    )}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell
-                colSpan={columns.length}
-                className="h-24 text-center"
-              >
-                <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                  <Building2 className="size-8" />
-                  <p>Inga hissar hittades.</p>
-                </div>
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
+    <DataGrid
+      table={table}
+      recordCount={totalCount}
+      isLoading={isLoading}
+      onRowClick={(row) => navigate({ to: "/hiss/$id", params: { id: row._id } })}
+      emptyMessage={
+        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <Building2 className="size-8" />
+          <p>Inga hissar hittades.</p>
+        </div>
+      }
+    >
+      <DataGridContainer>
+        <div className="overflow-x-auto">
+          <DataGridTable />
+        </div>
+      </DataGridContainer>
+      <DataGridPagination
+        sizes={[25, 50, 100]}
+        info="{from} - {to} av {count}"
+        onPageChange={onPageChange}
+        onPageSizeChange={(size) => {
+          onPageSizeChange(size);
+          onPageChange(0);
+        }}
+      />
+    </DataGrid>
   );
 }

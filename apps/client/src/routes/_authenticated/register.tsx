@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import {
+  useSuspenseQuery,
+  useQuery,
+  keepPreviousData,
+} from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { downloadCSV, downloadExcel } from "@elevatorbud/utils/export";
 import type { SortingState } from "@tanstack/react-table";
@@ -12,6 +17,7 @@ import { RegisterPagination } from "../../features/register/components/register-
 
 export const Route = createFileRoute("/_authenticated/register")({
   component: RegisterPage,
+  pendingComponent: RegisterSkeleton,
 });
 
 type ListResult = {
@@ -42,7 +48,11 @@ type SuggestedValueItem = {
 };
 
 function RegisterPage() {
-  const user = useQuery(api.users.me);
+  const userOpts = convexQuery(api.users.me, {});
+  const { data: user } = useSuspenseQuery({
+    queryKey: userOpts.queryKey,
+    staleTime: userOpts.staleTime,
+  });
 
   // Search state
   const [search, setSearch] = useState("");
@@ -87,14 +97,15 @@ function RegisterPage() {
   ]);
 
   // Get filter options from suggestedValues
-  const allSuggestions = useQuery(api.suggestedValues.list, {});
+  const suggestionsOpts = convexQuery(api.suggestedValues.list, {});
+  const { data: allSuggestions } = useSuspenseQuery({
+    queryKey: suggestionsOpts.queryKey,
+    staleTime: suggestionsOpts.staleTime,
+  }) as { data: SuggestedValueItem[] };
   const filterOptions = useMemo(() => {
-    if (!allSuggestions) return null;
-    const activeItems = (allSuggestions as SuggestedValueItem[]).filter(
-      (s) => s.active,
-    );
+    const active = allSuggestions.filter((s) => s.active);
     const byCategory = (cat: string) =>
-      activeItems
+      active
         .filter((s) => s.category === cat)
         .map((s) => s.value)
         .sort((a, b) => a.localeCompare(b, "sv"));
@@ -110,52 +121,47 @@ function RegisterPage() {
   const sortOrder =
     sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : undefined;
 
-  const filterBaseArgs = user?.organization_id
-    ? {
-        ...(debouncedSearch ? { search: debouncedSearch } : {}),
-        ...(filterDistrict.length > 0 ? { district: filterDistrict } : {}),
-        ...(filterElevatorType.length > 0
-          ? { elevator_type: filterElevatorType }
-          : {}),
-        ...(filterManufacturer.length > 0
-          ? { manufacturer: filterManufacturer }
-          : {}),
-        ...(buildYearMin && !isNaN(parseInt(buildYearMin))
-          ? { buildYearMin: parseInt(buildYearMin) }
-          : {}),
-        ...(buildYearMax && !isNaN(parseInt(buildYearMax))
-          ? { buildYearMax: parseInt(buildYearMax) }
-          : {}),
-        organization_id: user.organization_id,
-        ...(statusFilter !== "alla" ? { status: statusFilter } : {}),
-      }
-    : null;
+  const filterBaseArgs = {
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    ...(filterDistrict.length > 0 ? { district: filterDistrict } : {}),
+    ...(filterElevatorType.length > 0
+      ? { elevator_type: filterElevatorType }
+      : {}),
+    ...(filterManufacturer.length > 0
+      ? { manufacturer: filterManufacturer }
+      : {}),
+    ...(buildYearMin && !isNaN(parseInt(buildYearMin))
+      ? { buildYearMin: parseInt(buildYearMin) }
+      : {}),
+    ...(buildYearMax && !isNaN(parseInt(buildYearMax))
+      ? { buildYearMax: parseInt(buildYearMax) }
+      : {}),
+    organization_id: user!.organization_id,
+    ...(statusFilter !== "alla" ? { status: statusFilter } : {}),
+  };
 
-  const queryArgs = filterBaseArgs
-    ? ({
-        ...filterBaseArgs,
-        ...(sortField ? { sort: sortField } : {}),
-        ...(sortOrder ? { order: sortOrder } : {}),
-        page,
-        limit,
-      } as never)
-    : "skip";
+  const queryArgs = {
+    ...filterBaseArgs,
+    ...(sortField ? { sort: sortField } : {}),
+    ...(sortOrder ? { order: sortOrder } : {}),
+    page,
+    limit,
+  } as never;
 
-  const result = useQuery(
-    api.elevators.listing.list,
-    queryArgs as never,
-  ) as ListResult | undefined;
+  const listOpts = convexQuery(api.elevators.listing.list, queryArgs);
+  const { data: result, isLoading } = useQuery({
+    ...listOpts,
+    placeholderData: keepPreviousData,
+  }) as { data: ListResult | undefined; isLoading: boolean };
 
   // Export data query — fetches all matching records (no pagination)
   const [exportRequested, setExportRequested] = useState<
     "csv" | "xlsx" | null
   >(null);
-  const exportArgs =
-    exportRequested && filterBaseArgs ? (filterBaseArgs as never) : "skip";
-  const exportData = useQuery(
-    api.elevators.listing.exportData,
-    exportArgs as never,
-  ) as Record<string, unknown>[] | undefined;
+  const { data: exportData } = useQuery({
+    ...convexQuery(api.elevators.listing.exportData, filterBaseArgs as never),
+    enabled: !!exportRequested,
+  }) as { data: Record<string, unknown>[] | undefined };
 
   const handleExport = useCallback((format: "csv" | "xlsx") => {
     setExportRequested(format);
@@ -190,11 +196,8 @@ function RegisterPage() {
     setStatusFilter("active");
   }
 
-  if (user === undefined || result === undefined) {
-    return <RegisterSkeleton />;
-  }
-
-  const { totalCount, totalPages } = result;
+  const totalCount = result?.totalCount ?? 0;
+  const totalPages = result?.totalPages ?? 0;
 
   return (
     <div className="space-y-4">
@@ -223,7 +226,7 @@ function RegisterPage() {
         onClearAllFilters={clearAllFilters}
       />
       <RegisterTable
-        data={result.data}
+        data={result?.data ?? []}
         sorting={sorting}
         onSortingChange={setSorting}
         totalPages={totalPages}

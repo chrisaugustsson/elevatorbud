@@ -67,10 +67,8 @@ export function useImportMachine() {
   }) as { data: { email?: string } | undefined };
 
   const { data: analysis } = useQuery({
-    ...convexQuery(
-      api.imports.analyze,
-      analysisArgs ?? "skip",
-    ),
+    ...convexQuery(api.imports.analyze, analysisArgs!),
+    enabled: !!analysisArgs,
   }) as { data: AnalysisResult | undefined };
 
   const handleFileSelect = useCallback(async (file: File) => {
