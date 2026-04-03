@@ -226,7 +226,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": "Use cmdk (shadcn command component) or similar command palette pattern. The org selector to remove is in org-selector.tsx or similar component used in the header layout. The org details route (/admin/organisationer/:id) will be created in US-014 — for now just wire up the navigation path."
     },
     {

@@ -17,6 +17,8 @@ Started: fre  3 apr. 2026 12:21:09 CEST
 - DropdownMenu: available at `@elevatorbud/ui/components/ui/dropdown-menu` — use DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator
 - Convex optional field clearing: `v.optional()` args with `if (field !== undefined)` pattern means `undefined` = "don't change". To clear a field, add explicit logic (e.g., clear org when role is admin) rather than relying on `undefined`
 - Optional URL search params: Avoid `validateSearch` on routes that are widely linked — it makes `search` required on ALL Link components. Instead use `useState(getInitialFromURL)` + `window.history.replaceState` for optional URL param persistence
+- Command palette: `cmdk` package + `@elevatorbud/ui/components/ui/command` — use `CommandDialog` for modal command palette, supports built-in keyboard navigation (arrow keys, Enter, Escape)
+- TanStack Router navigation to non-existent routes: cast `to` param as `string` to bypass type checking for routes that will be created later
 
 ---
 
@@ -198,4 +200,23 @@ Started: fre  3 apr. 2026 12:21:09 CEST
   - No full-text search indexes exist on elevators/organizations — using collect + filter pattern consistent with existing codebase
   - For org-name search on elevators: pre-compute matching org IDs into a Set, then check elevator's organization_id membership
   - Convex Id types need `as string` cast when used as Map keys due to branded type
+---
+
+## 2026-04-03 - US-013
+- Built command palette UI (Cmd+K) in the header, replacing the org selector dropdown
+- Installed `cmdk` package in `packages/ui` and created shadcn-style Command component
+- Created `GlobalSearch` component with debounced search (300ms), keyboard shortcut (Cmd+K), and results grouped by "Hissar" and "Organisationer"
+- Elevator results navigate to `/hiss/:id`, org results navigate to `/admin/organisationer/:id` (route placeholder for US-014)
+- Empty state shows "Börja skriva för att söka..." prompt, no-results state shows "Inga resultat hittades."
+- Keyboard navigation built in via cmdk: arrow keys to move, Enter to select, Escape to close
+- Files changed:
+  - `packages/ui/package.json` — added cmdk dependency
+  - `packages/ui/src/components/ui/command.tsx` — new Command component (shadcn pattern)
+  - `apps/admin/src/shared/components/global-search.tsx` — new GlobalSearch command palette component
+  - `apps/admin/src/routes/_authenticated.tsx` — replaced OrgSelector import with GlobalSearch
+- **Learnings for future iterations:**
+  - cmdk 1.1.1 works with radix-ui unified package and React 19
+  - `lucide-react` has no Elevator icon — used ArrowUpDown as alternative
+  - For routes that don't exist yet, cast `to` param as `string` to bypass TanStack Router strict typing
+  - Convex query results from `useQuery` with FunctionReference types need explicit type assertion for proper field access
 ---
