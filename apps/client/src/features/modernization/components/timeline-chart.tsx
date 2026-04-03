@@ -12,6 +12,7 @@ import {
 } from "@elevatorbud/ui/lib/chart-helpers";
 import { Bar } from "react-chartjs-2";
 import { Calendar } from "lucide-react";
+import { useState, useEffect } from "react";
 
 type TimelineDataItem = {
   name: string;
@@ -24,7 +25,11 @@ type TimelineChartProps = {
 };
 
 export function TimelineChart({ data }: TimelineChartProps) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const colors = useChartColors();
+
+  if (!mounted) return null;
 
   return (
     <Card>

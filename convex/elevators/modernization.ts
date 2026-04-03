@@ -100,22 +100,3 @@ export const priorityList = query({
     }));
   },
 });
-
-export const measures = query({
-  args: { organization_id: v.optional(v.id("organizations")) },
-  handler: async (ctx, { organization_id }) => {
-    const elevators = await queryElevators(ctx, organization_id);
-    const active = elevators.filter((h) => h.status === "active");
-
-    const counts: Record<string, number> = {};
-    for (const h of active) {
-      if (!h.modernization_measures) continue;
-      const measure = h.modernization_measures;
-      counts[measure] = (counts[measure] || 0) + 1;
-    }
-
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([measure, count]) => ({ measure, count }));
-  },
-});

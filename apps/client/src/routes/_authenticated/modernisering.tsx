@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import {
@@ -11,7 +11,6 @@ import {
 import { PeriodSummaryCards } from "../../features/modernization/components/period-summary-cards";
 import { TimelineChart } from "../../features/modernization/components/timeline-chart";
 import { BudgetOverview } from "../../features/modernization/components/budget-overview";
-import { MeasuresCard } from "../../features/modernization/components/measures-card";
 import { PriorityList } from "../../features/modernization/components/priority-list";
 import { ModernizationSkeleton } from "../../features/modernization/components/modernization-skeleton";
 
@@ -45,12 +44,6 @@ function ModerniseringPage() {
     staleTime: budgetOpts.staleTime,
   });
 
-  const atgarderOpts = convexQuery(api.elevators.modernization.measures, orgArgs);
-  const { data: atgarder } = useSuspenseQuery({
-    queryKey: atgarderOpts.queryKey,
-    staleTime: atgarderOpts.staleTime,
-  });
-
   const prioritetslistaArgs = useMemo(() => {
     const base = { organization_id: user!.organization_id } as Record<string, unknown>;
     if (selectedPeriod) {
@@ -59,7 +52,7 @@ function ModerniseringPage() {
     return base;
   }, [user, selectedPeriod]);
 
-  const { data: prioritetslista } = useQuery({
+  const { data: prioritetslista } = useSuspenseQuery({
     ...convexQuery(api.elevators.modernization.priorityList, prioritetslistaArgs as never),
   });
 
@@ -132,10 +125,6 @@ function ModerniseringPage() {
         budgetCumulative={budgetCumulative}
         budgetPerDistrikt={budgetPerDistrikt}
         budgetPerTyp={budgetPerTyp}
-      />
-
-      <MeasuresCard
-        measures={atgarder as { measure: string; count: number }[]}
       />
 
       <PriorityList

@@ -11,7 +11,6 @@ import {
 import { PeriodSummaryCards } from "../../features/modernization/components/period-summary-cards";
 import { TimelineChart } from "../../features/modernization/components/timeline-chart";
 import { BudgetOverview } from "../../features/modernization/components/budget-overview";
-import { MeasuresCard } from "../../features/modernization/components/measures-card";
 import { PriorityList } from "../../features/modernization/components/priority-list";
 import { ModernizationSkeleton } from "../../features/modernization/components/modernization-skeleton";
 
@@ -35,12 +34,6 @@ function Modernisering() {
   const { data: budget } = useSuspenseQuery({
     queryKey: budgetOpts.queryKey,
     staleTime: budgetOpts.staleTime,
-  });
-
-  const atgarderOpts = convexQuery(api.elevators.modernization.measures, {});
-  const { data: atgarder } = useSuspenseQuery({
-    queryKey: atgarderOpts.queryKey,
-    staleTime: atgarderOpts.staleTime,
   });
 
   const prioritetslistaArgs = useMemo(() => {
@@ -136,10 +129,6 @@ function Modernisering() {
         budgetCumulative={budgetCumulative}
         budgetPerDistrikt={budgetPerDistrikt}
         budgetPerTyp={budgetPerTyp}
-      />
-
-      <MeasuresCard
-        measures={atgarder as { measure: string; count: number }[]}
       />
 
       <PriorityList

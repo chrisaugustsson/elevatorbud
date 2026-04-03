@@ -14,8 +14,11 @@ import {
   SidebarTrigger,
 } from "@elevatorbud/ui/components/ui/sidebar";
 import { Separator } from "@elevatorbud/ui/components/ui/separator";
+import { Button } from "@elevatorbud/ui/components/ui/button";
+import { useClerk } from "@elevatorbud/auth";
 import { AppSidebar } from "../shared/components/app-sidebar";
 import { OrgDisplay } from "../shared/components/org-display";
+import { GlobalSearch } from "../shared/components/global-search";
 
 const authGuard = createServerFn().handler(async () => {
   const { isAuthenticated } = await auth();
@@ -34,6 +37,7 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedLayout() {
+  const { signOut } = useClerk();
   const userQuery = convexQuery(api.users.me, {});
   const { data: user } = useSuspenseQuery({
     queryKey: userQuery.queryKey,
@@ -62,6 +66,13 @@ function AuthenticatedLayout() {
           <p className="mt-2 text-muted-foreground">
             Du har inte behörighet att komma åt kundportalen.
           </p>
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={() => signOut()}
+          >
+            Logga ut
+          </Button>
         </div>
       </div>
     );
@@ -80,6 +91,9 @@ function AuthenticatedLayout() {
           {user.organization_id && (
             <OrgDisplay organisationId={user.organization_id} />
           )}
+          <div className="ml-auto">
+            <GlobalSearch />
+          </div>
         </header>
         <div className="min-w-0 flex-1 overflow-auto p-6">
           <Outlet />

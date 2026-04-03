@@ -12,19 +12,22 @@ import {
 } from "chart.js";
 import { useMemo } from "react";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Filler,
-  Tooltip,
-  Legend
-);
+if (typeof document !== "undefined") {
+  ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    BarElement,
+    ArcElement,
+    Filler,
+    Tooltip,
+    Legend
+  );
+}
 
 export function resolveToHex(cssColor: string): string {
+  if (typeof document === "undefined") return cssColor;
   // Resolve CSS var() references via a temporary DOM element
   if (cssColor.includes("var(")) {
     const el = document.createElement("div");
@@ -40,8 +43,19 @@ export function resolveToHex(cssColor: string): string {
   return ctx.fillStyle;
 }
 
+const defaultColors = {
+  chart1: "#2563eb",
+  chart2: "#16a34a",
+  chart3: "#d97706",
+  chart4: "#dc2626",
+  chart5: "#7c3aed",
+  grid: "rgba(255,255,255,0.1)",
+  label: "rgba(255,255,255,0.5)",
+};
+
 export function useChartColors() {
   return useMemo(() => {
+    if (typeof document === "undefined") return defaultColors;
     const root = document.documentElement;
     const get = (name: string) =>
       getComputedStyle(root).getPropertyValue(name).trim();

@@ -12,7 +12,7 @@ import {
 } from "@elevatorbud/ui/lib/chart-helpers";
 import { Bar, Line } from "react-chartjs-2";
 import { TrendingUp } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 type BudgetYearItem = {
   name: string;
@@ -175,7 +175,11 @@ export function BudgetOverview({
   budgetPerDistrikt,
   budgetPerTyp,
 }: BudgetOverviewProps) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const colors = useChartColors();
+
+  if (!mounted) return null;
 
   return (
     <div className="space-y-4">
