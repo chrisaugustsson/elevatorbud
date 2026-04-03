@@ -39,7 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@elevatorbud/ui/components/ui/select";
-import { Plus, ArrowUpDown, Users } from "lucide-react";
+import { Plus, ArrowUpDown, Users, Pencil } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/anvandare")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -76,6 +76,7 @@ function Anvandare() {
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<Anvandare | null>(null);
 
   // Debounce search text — clear immediately, otherwise wait 300ms
   useEffect(() => {
@@ -170,6 +171,21 @@ function Anvandare() {
         if (!val) return "—";
         return new Date(val).toLocaleDateString("sv-SE");
       },
+    }),
+    columnHelper.display({
+      id: "actions",
+      header: "",
+      cell: (info) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          onClick={() => setEditingUser(info.row.original)}
+          title="Redigera användare"
+        >
+          <Pencil className="size-4" />
+        </Button>
+      ),
     }),
   ];
 
@@ -299,6 +315,18 @@ function Anvandare() {
         onSubmit={async (values) => {
           await createUser(values);
           setCreateOpen(false);
+        }}
+      />
+
+      <EditUserDialog
+        user={editingUser}
+        onOpenChange={(open) => {
+          if (!open) setEditingUser(null);
+        }}
+        orgs={orgs as Organisation[]}
+        onSubmit={async (values) => {
+          await updateUser(values);
+          setEditingUser(null);
         }}
       />
     </div>
@@ -474,9 +502,12 @@ function CreateUserDialogInner({
                 </Label>
                 <Select
                   value={field.state.value}
-                  onValueChange={(val) =>
-                    field.handleChange(val as "admin" | "customer")
-                  }
+                  onValueChange={(val) => {
+                    field.handleChange(val as "admin" | "customer");
+                    if (val === "admin") {
+                      form.setFieldValue("organization_id", "");
+                    }
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -552,6 +583,267 @@ function CreateUserDialogInner({
               {([canSubmit, isSubmitting]) => (
                 <Button type="submit" disabled={!canSubmit}>
                   {isSubmitting ? "Skapar..." : "Skapa"}
+                </Button>
+              )}
+            </form.Subscribe>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditUserDialog({
+  user,
+  onOpenChange,
+  orgs,
+  onSubmit,
+}: {
+  user: Anvandare | null;
+  onOpenChange: (open: boolean) => void;
+  orgs: Organisation[];
+  onSubmit: (values: {
+    id: string;
+    name?: string;
+    email?: string;
+    role?: "admin" | "customer";
+    organization_id?: string;
+  }) => Promise<void>;
+}) {
+  if (!user) return null;
+
+  return (
+    <EditUserDialogInner
+      key={user._id}
+      user={user}
+      orgs={orgs}
+      onOpenChange={onOpenChange}
+      onSubmit={onSubmit}
+    />
+  );
+}
+
+function EditUserDialogInner({
+  user,
+  orgs,
+  onOpenChange,
+  onSubmit,
+}: {
+  user: Anvandare;
+  orgs: Organisation[];
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (values: {
+    id: string;
+    name?: string;
+    email?: string;
+    role?: "admin" | "customer";
+    organization_id?: string;
+  }) => Promise<void>;
+}) {
+  const form = useForm({
+    defaultValues: {
+      name: user.name,
+      email: user.email,
+      role: user.role as "admin" | "customer",
+      organization_id: user.organization_id ?? "",
+    },
+    onSubmit: async ({ value }) => {
+      await onSubmit({
+        id: user._id as never,
+        name: value.name,
+        email: value.email,
+        role: value.role,
+        organization_id: value.organization_id
+          ? (value.organization_id as never)
+          : undefined,
+      });
+      form.reset();
+    },
+  });
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next) form.reset();
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Redigera användare</DialogTitle>
+          <DialogDescription>
+            Ändra uppgifter för {user.name}.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            form.handleSubmit();
+          }}
+          className="space-y-4"
+        >
+          <form.Field
+            name="name"
+            validators={{
+              onChange: ({ value }) =>
+                !value.trim() ? "Namn krävs" : undefined,
+            }}
+          >
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>
+                  Namn <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id={field.name}
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  onBlur={field.handleBlur}
+                  placeholder="Förnamn Efternamn"
+                  aria-invalid={
+                    field.state.meta.isTouched &&
+                    field.state.meta.errors.length > 0
+                  }
+                />
+                {field.state.meta.isTouched &&
+                  field.state.meta.errors.map((error, i) => (
+                    <p key={i} className="text-sm text-destructive">
+                      {error}
+                    </p>
+                  ))}
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field
+            name="email"
+            validators={{
+              onChange: ({ value }) => {
+                if (!value.trim()) return "E-post krävs";
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
+                  return "Ogiltig e-postadress";
+                return undefined;
+              },
+            }}
+          >
+            {(field) => (
+              <div className="space-y-2">
+                <Label htmlFor={field.name}>
+                  E-post <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id={field.name}
+                  type="email"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  onBlur={field.handleBlur}
+                  placeholder="namn@foretag.se"
+                  aria-invalid={
+                    field.state.meta.isTouched &&
+                    field.state.meta.errors.length > 0
+                  }
+                />
+                {field.state.meta.isTouched &&
+                  field.state.meta.errors.map((error, i) => (
+                    <p key={i} className="text-sm text-destructive">
+                      {error}
+                    </p>
+                  ))}
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="role">
+            {(field) => (
+              <div className="space-y-2">
+                <Label>
+                  Roll <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={field.state.value}
+                  onValueChange={(val) => {
+                    field.handleChange(val as "admin" | "customer");
+                    if (val === "admin") {
+                      form.setFieldValue("organization_id", "");
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="customer">Kund</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </form.Field>
+
+          <form.Subscribe selector={(state) => state.values.role}>
+            {(role) =>
+              role === "customer" ? (
+                <form.Field
+                  name="organization_id"
+                  validators={{
+                    onChange: ({ value }) => {
+                      const currentRole = form.getFieldValue("role");
+                      if (currentRole === "customer" && !value)
+                        return "Organisation krävs för kundanvändare";
+                      return undefined;
+                    },
+                  }}
+                >
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label>
+                        Organisation{" "}
+                        <span className="text-destructive">*</span>
+                      </Label>
+                      <Select
+                        value={field.state.value}
+                        onValueChange={field.handleChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Välj organisation" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {orgs.map((org) => (
+                            <SelectItem key={org._id} value={org._id}>
+                              {org.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {field.state.meta.isTouched &&
+                        field.state.meta.errors.map((error, i) => (
+                          <p key={i} className="text-sm text-destructive">
+                            {error}
+                          </p>
+                        ))}
+                    </div>
+                  )}
+                </form.Field>
+              ) : null
+            }
+          </form.Subscribe>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Avbryt
+            </Button>
+            <form.Subscribe
+              selector={(state) => [state.canSubmit, state.isSubmitting]}
+            >
+              {([canSubmit, isSubmitting]) => (
+                <Button type="submit" disabled={!canSubmit}>
+                  {isSubmitting ? "Sparar..." : "Spara"}
                 </Button>
               )}
             </form.Subscribe>
