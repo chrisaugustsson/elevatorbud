@@ -280,3 +280,32 @@ Started: fre  3 apr. 2026 12:21:09 CEST
   - The `api.userAdmin.list` query already accepts `organization_id` filter — no backend changes needed
   - Reusing patterns (table, dropdown menu, confirmation dialogs) from the users page ensures consistency across the admin app
 ---
+
+## 2026-04-03 - US-017
+- Removed OrgProvider from `_authenticated.tsx` layout and `useSelectedOrg()` from all 4 pages (register, modernisering, underhall, dashboard)
+- All top-level pages now show ALL data across all organizations (no org filter)
+- Added clickable Organisation column to register table, modernization priority list, and maintenance inspection list
+- Organization names link to `/admin/organisationer/:id` detail page
+- Updated Convex queries (`modernization.priorityList`, `maintenance.inspectionList`) to return `organization_id` in results
+- Deleted `org-context.tsx` and `org-selector.tsx` (no longer referenced anywhere)
+- Updated type definitions in org-scoped view components to include `organization_id`
+- Files changed:
+  - `apps/admin/src/routes/_authenticated.tsx` — removed OrgProvider wrapper
+  - `apps/admin/src/routes/_authenticated/register.tsx` — removed org filter
+  - `apps/admin/src/routes/_authenticated/modernisering.tsx` — removed org filter
+  - `apps/admin/src/routes/_authenticated/underhall.tsx` — removed org filter
+  - `apps/admin/src/routes/_authenticated/dashboard.tsx` — removed org filter
+  - `apps/admin/src/features/register/components/register-table.tsx` — added Organisation column with link
+  - `apps/admin/src/features/modernization/components/priority-list.tsx` — added Organisation column with link
+  - `apps/admin/src/features/maintenance/components/inspection-calendar.tsx` — made Organisation cell clickable
+  - `apps/admin/src/features/maintenance/types.ts` — added organization_id to BesiktningsListaItem
+  - `apps/admin/src/features/organization/components/org-register-view.tsx` — updated ListResult type
+  - `apps/admin/src/features/organization/components/org-modernization-view.tsx` — updated type cast
+  - `convex/elevators/modernization.ts` — added organization_id to priorityList return
+  - `convex/elevators/maintenance.ts` — added organization_id to inspectionList return
+  - Deleted: `apps/admin/src/shared/lib/org-context.tsx`, `apps/admin/src/shared/components/org-selector.tsx`
+- **Learnings for future iterations:**
+  - The org filter was optional in all Convex queries (`v.optional(v.id("organizations"))`) — removing the frontend filter was straightforward, just pass `{}` instead of the org filter
+  - Backend queries that manually construct return objects (not `...h` spread) need explicit field additions when frontend types change
+  - Org-scoped view components (org-register-view, org-modernization-view) share types with the main table components, so type changes cascade
+---

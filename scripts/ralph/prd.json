@@ -298,7 +298,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 17,
-      "passes": false,
+      "passes": true,
       "notes": "This is a significant change. Grep for useSelectedOrg and OrgProvider to find all usage sites. Update Convex queries to not require orgId (or make it optional). The org-selector component can be deleted. Make sure the org details page (US-014) and global search (US-013) are in place first as alternatives to the org selector."
     },
     {
