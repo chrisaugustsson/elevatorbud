@@ -26,7 +26,12 @@ import {
   Calendar,
   ArrowUpDown,
   Users,
+  ClipboardList,
+  Wrench,
 } from "lucide-react";
+import { OrgRegisterView } from "~/features/organization/components/org-register-view";
+import { OrgModernizationView } from "~/features/organization/components/org-modernization-view";
+import { OrgMaintenanceView } from "~/features/organization/components/org-maintenance-view";
 
 export const Route = createFileRoute(
   "/_authenticated/admin/organisationer/$id",
@@ -37,6 +42,9 @@ export const Route = createFileRoute(
 const tabSlugs = ["oversikt", "hissar", "anvandare"] as const;
 type TabSlug = (typeof tabSlugs)[number];
 
+const hissarSubTabs = ["register", "modernisering", "underhall"] as const;
+type HissarSubTab = (typeof hissarSubTabs)[number];
+
 function getInitialTab(): TabSlug {
   if (typeof window === "undefined") return "oversikt";
   const params = new URLSearchParams(window.location.search);
@@ -45,10 +53,21 @@ function getInitialTab(): TabSlug {
   return "oversikt";
 }
 
+function getInitialHissarSubTab(): HissarSubTab {
+  if (typeof window === "undefined") return "register";
+  const params = new URLSearchParams(window.location.search);
+  const sub = params.get("sub");
+  if (sub && hissarSubTabs.includes(sub as HissarSubTab))
+    return sub as HissarSubTab;
+  return "register";
+}
+
 function OrganisationDetail() {
   const { id } = Route.useParams();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabSlug>(getInitialTab);
+  const [hissarSubTab, setHissarSubTab] =
+    useState<HissarSubTab>(getInitialHissarSubTab);
 
   const org = useQuery(api.organizations.get, { id } as never) as
     | {
@@ -95,6 +114,17 @@ function OrganisationDetail() {
     setActiveTab(tab);
     const url = new URL(window.location.href);
     url.searchParams.set("tab", tab);
+    if (tab !== "hissar") {
+      url.searchParams.delete("sub");
+    }
+    window.history.replaceState({}, "", url.toString());
+  }
+
+  function handleHissarSubTabChange(value: string) {
+    const sub = value as HissarSubTab;
+    setHissarSubTab(sub);
+    const url = new URL(window.location.href);
+    url.searchParams.set("sub", sub);
     window.history.replaceState({}, "", url.toString());
   }
 
@@ -235,11 +265,43 @@ function OrganisationDetail() {
           )}
         </TabsContent>
 
-        {/* Hissar tab — placeholder for US-015 */}
-        <TabsContent value="hissar">
-          <div className="py-12 text-center text-muted-foreground">
-            Hissar-vyn implementeras i nästa steg.
-          </div>
+        {/* Hissar tab */}
+        <TabsContent value="hissar" className="space-y-4">
+          <Tabs value={hissarSubTab} onValueChange={handleHissarSubTabChange}>
+            <TabsList variant="line">
+              <TabsTrigger
+                value="register"
+                className="flex items-center gap-1.5"
+              >
+                <ClipboardList className="size-3.5" />
+                Register
+              </TabsTrigger>
+              <TabsTrigger
+                value="modernisering"
+                className="flex items-center gap-1.5"
+              >
+                <Hammer className="size-3.5" />
+                Modernisering
+              </TabsTrigger>
+              <TabsTrigger
+                value="underhall"
+                className="flex items-center gap-1.5"
+              >
+                <Wrench className="size-3.5" />
+                Underhåll
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="register">
+              <OrgRegisterView organizationId={id} />
+            </TabsContent>
+            <TabsContent value="modernisering">
+              <OrgModernizationView organizationId={id} />
+            </TabsContent>
+            <TabsContent value="underhall">
+              <OrgMaintenanceView organizationId={id} />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         {/* Användare tab — placeholder for US-016 */}
