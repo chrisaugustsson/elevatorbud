@@ -7,7 +7,7 @@ import {
   SidebarInset,
 } from "@elevatorbud/ui/components/ui/sidebar";
 import { AppSidebar } from "../shared/components/app-sidebar";
-import { OrgSelector } from "../shared/components/org-selector";
+import { GlobalSearch } from "../shared/components/global-search";
 import { OrgProvider } from "../shared/lib/org-context";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -71,7 +71,7 @@ function AuthenticatedLayout() {
         <AppSidebar />
         <SidebarInset>
           <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-            <OrgSelector />
+            <GlobalSearch />
           </header>
           <div className="flex-1 overflow-auto p-6">
             <Outlet />
