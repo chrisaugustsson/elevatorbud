@@ -69,6 +69,9 @@ declare module "@convex/_generated/api" {
     search: {
       global: FunctionReference<"query", "public">;
     };
+    dashboard: {
+      overview: FunctionReference<"query", "public">;
+    };
     cms: {
       getPage: FunctionReference<"query", "public">;
       listPages: FunctionReference<"query", "public">;
