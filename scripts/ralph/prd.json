@@ -314,7 +314,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 18,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on US-017 (OrgProvider removed). The dashboard route file is likely apps/admin/src/routes/_authenticated/index.tsx or similar. May need new Convex queries for recent activity and cross-org stats."
     }
   ]

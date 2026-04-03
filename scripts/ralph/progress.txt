@@ -309,3 +309,24 @@ Started: fre  3 apr. 2026 12:21:09 CEST
   - Backend queries that manually construct return objects (not `...h` spread) need explicit field additions when frontend types change
   - Org-scoped view components (org-register-view, org-modernization-view) share types with the main table components, so type changes cascade
 ---
+
+## 2026-04-03 - US-018
+- Restructured dashboard as a landing page with quick stats, top organizations, recent activity, and shortcuts
+- Created new Convex query `convex/dashboard.ts` with `overview` function that returns:
+  - Total elevator/org counts, upcoming inspections (current + next month), modernization within 3 years
+  - Top 5 organizations by elevator count with links to org details
+  - Last 10 recently updated elevators with relative timestamps
+- Dashboard layout: 4 stat cards at top, 3-column grid below (orgs + shortcuts left, recent activity right)
+- Organization links navigate to `/admin/organisationer/:id` detail page
+- Shortcut buttons: Ny hiss, Importera, Referensdata
+- Recent activity items link to `/hiss/:id` with relative time display (Swedish: "just nu", "5 min sedan", "igår")
+- Files changed:
+  - `convex/dashboard.ts` — new file with overview query
+  - `apps/admin/src/routes/_authenticated/dashboard.tsx` — complete rewrite as landing page
+  - `apps/admin/src/convex-api.d.ts` — added dashboard.overview type
+  - `apps/client/src/convex-api.d.ts` — added dashboard.overview type
+- **Learnings for future iterations:**
+  - Dashboard queries that aggregate across all data (no org filter) use the same collect+filter pattern as analytics.ts
+  - Swedish month names from `toLocaleDateString("sv-SE")` need first-letter capitalization to match `inspection_month` field values
+  - `formatRelativeTime` helper provides Swedish-localized relative timestamps for activity feeds
+---
