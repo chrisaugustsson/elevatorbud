@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useQuery } from "convex/react";
+import { useQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -117,10 +118,15 @@ export function GlobalSearch() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const results = useQuery(
-    api.search.global,
-    debouncedSearch ? { search: debouncedSearch } : "skip",
-  ) as { elevators: ElevatorResult[]; organizations: OrgResult[] } | undefined;
+  const { data: results, isFetching } = useQuery({
+    ...convexQuery(
+      api.search.global,
+      debouncedSearch ? { search: debouncedSearch } : "skip",
+    ),
+  }) as {
+    data: { elevators: ElevatorResult[]; organizations: OrgResult[] } | undefined;
+    isFetching: boolean;
+  };
 
   const handleSelect = useCallback(
     (type: "elevator" | "organization", id: string) => {
@@ -208,11 +214,11 @@ export function GlobalSearch() {
         />
         <CommandList>
           {/* Search results */}
-          {isSearching && !hasResults && results !== undefined && (
+          {isSearching && !hasResults && !isFetching && (
             <CommandEmpty>Inga resultat för "{debouncedSearch}"</CommandEmpty>
           )}
 
-          {isSearching && results === undefined && (
+          {isSearching && isFetching && (
             <div className="py-6 text-center text-sm text-muted-foreground">
               Söker...
             </div>
