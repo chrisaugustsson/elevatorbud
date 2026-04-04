@@ -11,48 +11,54 @@ const FALLBACK = {
   hero: {
     title: "Om Hisskompetens",
     subtitle:
-      "Vi är specialister på hisshantering med lång erfarenhet av att hjälpa fastighetsägare att hålla sina hissar säkra, moderna och kostnadseffektiva.",
+      "Oberoende hisskonsulter sedan 2002. Vi hjälper fastighetsägare att ta kontroll över sitt hissbestånd — med trygghet, säkerhet och kvalitet i fokus.",
   },
   mission: {
     title: "Vårt uppdrag",
     content:
-      "Hisskompetens grundades med målet att modernisera hur fastighetsägare och förvaltare hanterar sina hissar. Vi tror att bättre data leder till bättre beslut — och att alla hissar förtjänar professionell uppföljning oavsett storlek på beståndet.",
+      "Hisskompetens grundades med en enkel insikt: fastighetsägare förtjänar oberoende rådgivning om sina hissar. Tillverkare och serviceföretag har egna intressen — vi har bara ditt. Sedan 2002 har vi hjälpt hundratals fastighetsägare att sänka kostnader, förbättra säkerheten och fatta bättre beslut om sina hissbestånd.",
   },
   values: [
     {
       icon: "Target",
-      title: "Precision",
+      title: "Oberoende",
       description:
-        "Vi jobbar med exakta data och strukturerade processer. Varje hiss i systemet har komplett dokumentation med alla tekniska specifikationer.",
+        "Vi har inga bindningar till tillverkare, serviceföretag eller leverantörer. Våra rekommendationer baseras enbart på vad som är bäst för dig som fastighetsägare.",
     },
     {
       icon: "Eye",
       title: "Transparens",
       description:
-        "Våra kunder har full insyn i sin hissdata via en dedikerad kundportal. Inga dolda uppgifter — all information tillgänglig dygnet runt.",
+        "Du får alltid tydlig redovisning av vad vi gör, varför vi gör det och vad det kostar. Inga dolda avgifter eller oklara avtal.",
     },
     {
       icon: "Users",
-      title: "Samarbete",
+      title: "Personlig kontakt",
       description:
-        "Vi arbetar nära våra kunder för att förstå deras behov. Plattformen utvecklas kontinuerligt baserat på användarfeedback.",
+        "Du vet alltid vem du pratar med. Våra konsulter är tillgängliga direkt — inte via växel eller ärendesystem.",
     },
     {
       icon: "Award",
-      title: "Kvalitet",
+      title: "Kvalitet & säkerhet",
       description:
-        "Från besiktning till modernisering — vi säkerställer att varje steg följer gällande regelverk och branschstandarder.",
+        "Varje rekommendation vi ger utgår från gällande regelverk och branschstandarder. Trygghet och säkerhet går alltid först.",
     },
   ],
   story: {
     title: "Vår historia",
     paragraphs: [
-      "Hisskompetens startade som ett svar på en tydlig brist i branschen: fastighetsägare saknade ett enkelt och överskådligt sätt att hålla koll på sitt hissbestånd. Excel-listor och pappersarkiv räckte inte längre.",
-      "Vi byggde en digital plattform som samlar all hissdata på ett ställe — från tekniska specifikationer och besiktningshistorik till moderniseringsplaner och budgetprognoser. Idag hjälper vi organisationer av alla storlekar att fatta bättre beslut om sina hissar.",
-      "Vår plattform hanterar idag över tusen hissar och vi fortsätter att växa. Vi är stolta över att bidra till säkrare och mer effektiv hisshantering i Sverige.",
+      "Hisskompetens startade 2002 med en tydlig vision: att ge fastighetsägare tillgång till oberoende expertis inom hisshantering. Alltför ofta fattades stora investeringsbeslut utan ett oberoende perspektiv — och resultatet blev onödigt höga kostnader och undermålig kvalitet.",
+      "Sedan starten har vi byggt upp en bred erfarenhet som sträcker sig från stora hotellkomplex som Gothia Towers till enskilda bostadsrättsföreningar. Oavsett storlek på uppdrag är vår grundfilosofi densamma: oberoende rådgivning som sätter fastighetsägarens intressen först.",
+      "Idag hanterar vi rådgivning för över 2 000 hissar och har genomfört fler än 500 projekt. Vi är stolta över det förtroende vi fått och fortsätter att utveckla vår verksamhet för att hjälpa fler fastighetsägare i Sverige.",
     ],
   },
 };
+
+const MILESTONES = [
+  { year: "2002", label: "Grundat" },
+  { year: "2 000+", label: "Hissar" },
+  { year: "500+", label: "Projekt" },
+];
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Target,
@@ -81,13 +87,14 @@ function OmOss() {
   return (
     <div>
       {/* Hero */}
-      <section className="bg-gradient-to-b from-slate-50 to-white border-b border-slate-200">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+      <section className="relative bg-slate-950 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(59,130,246,0.2),transparent)]" />
+        <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
           <div className="mx-auto max-w-3xl text-center">
-            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
+            <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
               {heroSection?.title || FALLBACK.hero.title}
             </h1>
-            <p className="mt-6 text-lg leading-relaxed text-slate-500">
+            <p className="mt-6 text-lg leading-relaxed text-slate-300">
               {heroSection?.subtitle || FALLBACK.hero.subtitle}
             </p>
           </div>
@@ -96,7 +103,7 @@ function OmOss() {
 
       {/* Mission */}
       <section className="mx-auto max-w-4xl px-4 py-20 sm:px-6">
-        <div className="rounded-2xl bg-blue-50 border border-blue-100 p-8 sm:p-12">
+        <div className="rounded-2xl bg-blue-50/50 border border-blue-100 p-8 sm:p-12">
           <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
             {missionSection?.title || FALLBACK.mission.title}
           </h2>
@@ -117,9 +124,12 @@ function OmOss() {
               const IconComponent =
                 iconMap[(value as { icon?: string }).icon || ""] || Target;
               return (
-                <div key={i} className="flex gap-5">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white">
-                    <IconComponent className="h-6 w-6" />
+                <div
+                  key={i}
+                  className="flex gap-5 rounded-xl bg-white p-6 border border-slate-200 shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
+                    <IconComponent className="h-7 w-7" />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900">
@@ -141,7 +151,25 @@ function OmOss() {
         <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
           {storySection?.title || FALLBACK.story.title}
         </h2>
-        <div className="mt-8 space-y-6">
+
+        {/* Milestones */}
+        <div className="mt-8 flex flex-wrap gap-6">
+          {MILESTONES.map((m) => (
+            <div
+              key={m.label}
+              className="flex items-center gap-3 rounded-lg bg-slate-50 border border-slate-200 px-5 py-3"
+            >
+              <span className="text-2xl font-extrabold text-blue-600">
+                {m.year}
+              </span>
+              <span className="text-sm font-medium text-slate-500">
+                {m.label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-10 space-y-6">
           {storyParagraphs.map((paragraph, i) => (
             <p key={i} className="text-base leading-relaxed text-slate-500">
               {paragraph}
@@ -149,6 +177,7 @@ function OmOss() {
           ))}
         </div>
       </section>
+
     </div>
   );
 }

@@ -19,7 +19,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Hisskompetens" },
+      { title: "Hisskompetens — Komplett hisshantering för fastighetsägare" },
       {
         name: "description",
         content:
@@ -30,7 +30,7 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: appCss },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap",
       },
     ],
   }),
@@ -42,7 +42,7 @@ function RootComponent() {
     <RootDocument>
       <ConvexProvider client={convex}>
         <SiteHeader />
-        <main className="min-h-[calc(100vh-4rem)]">
+        <main>
           <Outlet />
         </main>
         <SiteFooter />
@@ -74,15 +74,32 @@ const navLinks = [
 
 function SiteHeader() {
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [scrolled, setScrolled] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 16);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled
+          ? "border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80"
+          : "bg-transparent"
+      }`}
+    >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-lg">
+        <Link to="/" className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-lg shadow-sm">
             H
           </div>
-          <span className="text-lg font-bold tracking-tight text-slate-900">
+          <span
+            className={`text-lg font-bold tracking-tight transition-colors duration-300 ${
+              scrolled ? "text-slate-900" : "text-white"
+            }`}
+          >
             Hisskompetens
           </span>
         </Link>
@@ -92,14 +109,18 @@ function SiteHeader() {
             <Link
               key={link.to}
               to={link.to}
-              className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 hover:bg-slate-100 [&.active]:text-blue-600 [&.active]:bg-blue-50"
+              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                scrolled
+                  ? "text-slate-600 hover:text-slate-900 hover:bg-slate-100 [&.active]:text-blue-600 [&.active]:bg-blue-50"
+                  : "text-white/70 hover:text-white hover:bg-white/10 [&.active]:text-white [&.active]:bg-white/15"
+              }`}
             >
               {link.label}
             </Link>
           ))}
           <a
             href="https://admin.hisskompetens.se"
-            className="ml-3 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            className="ml-3 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 cursor-pointer"
           >
             Logga in
           </a>
@@ -107,7 +128,11 @@ function SiteHeader() {
 
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="md:hidden flex h-10 w-10 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+          className={`md:hidden flex h-10 w-10 items-center justify-center rounded-md transition-colors cursor-pointer ${
+            scrolled
+              ? "text-slate-600 hover:bg-slate-100"
+              : "text-white hover:bg-white/10"
+          }`}
           aria-label="Meny"
         >
           <svg
@@ -149,7 +174,7 @@ function SiteHeader() {
             ))}
             <a
               href="https://admin.hisskompetens.se"
-              className="block rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white text-center hover:bg-blue-700 mt-2"
+              className="block rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white text-center hover:bg-blue-500 mt-2 cursor-pointer"
             >
               Logga in
             </a>
@@ -162,11 +187,11 @@ function SiteHeader() {
 
 function SiteFooter() {
   return (
-    <footer className="border-t border-slate-200 bg-slate-50">
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+    <footer className="border-t border-slate-200 bg-white">
+      <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2.5 mb-5">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-sm">
                 H
               </div>
@@ -179,10 +204,10 @@ function SiteFooter() {
           </div>
 
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-slate-900">
+            <h3 className="mb-4 text-sm font-semibold text-slate-900">
               Sidor
             </h3>
-            <ul className="space-y-2">
+            <ul className="space-y-2.5">
               {navLinks.map((link) => (
                 <li key={link.to}>
                   <Link
@@ -197,10 +222,10 @@ function SiteFooter() {
           </div>
 
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-slate-900">
+            <h3 className="mb-4 text-sm font-semibold text-slate-900">
               Tjänster
             </h3>
-            <ul className="space-y-2 text-sm text-slate-500">
+            <ul className="space-y-2.5 text-sm text-slate-500">
               <li>Hissbesiktning</li>
               <li>Modernisering</li>
               <li>Underhållsplanering</li>
@@ -209,10 +234,10 @@ function SiteFooter() {
           </div>
 
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-slate-900">
+            <h3 className="mb-4 text-sm font-semibold text-slate-900">
               Kontakt
             </h3>
-            <ul className="space-y-2 text-sm text-slate-500">
+            <ul className="space-y-2.5 text-sm text-slate-500">
               <li>info@hisskompetens.se</li>
               <li>08-123 456 78</li>
               <li>Stockholm, Sverige</li>
@@ -220,9 +245,25 @@ function SiteFooter() {
           </div>
         </div>
 
-        <div className="mt-10 border-t border-slate-200 pt-6 text-center text-sm text-slate-400">
-          &copy; {new Date().getFullYear()} Hisskompetens. Alla rättigheter
-          förbehållna.
+        <div className="mt-12 border-t border-slate-100 pt-8 flex flex-col items-center justify-between gap-4 sm:flex-row">
+          <p className="text-sm text-slate-400">
+            &copy; {new Date().getFullYear()} Hisskompetens. Alla rättigheter
+            förbehållna.
+          </p>
+          <div className="flex gap-6">
+            <a
+              href="#"
+              className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              Integritetspolicy
+            </a>
+            <a
+              href="#"
+              className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              Villkor
+            </a>
+          </div>
         </div>
       </div>
     </footer>
