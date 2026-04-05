@@ -12,6 +12,7 @@ import {
   ClerkProvider,
   ConvexProviderWithClerk,
   useAuth,
+  svSE,
 } from "@elevatorbud/auth";
 import { Toaster } from "@elevatorbud/ui/components/ui/sonner";
 import { ThemeProvider } from "@elevatorbud/ui/hooks/use-theme";
@@ -68,7 +69,7 @@ function RootLayout() {
   const { convexClient } = Route.useRouteContext();
 
   return (
-    <ClerkProvider>
+    <ClerkProvider localization={svSE}>
       <ConvexProviderWithClerk client={convexClient} useAuth={useAuth}>
         <Outlet />
         <Toaster />

@@ -21,15 +21,12 @@ function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
-      <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Hisskompetens
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Logga in för att komma åt kundportalen
-        </p>
-      </div>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background">
+      <img
+        src="/hisskompetens-logo.png"
+        alt="Hisskompetens"
+        className="mb-8 h-20"
+      />
       <SignIn
         routing="hash"
         forceRedirectUrl="/"

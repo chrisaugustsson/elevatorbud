@@ -19,3 +19,4 @@ export {
   useSession,
   useClerk,
 } from "@clerk/tanstack-react-start";
+export { svSE } from "@clerk/localizations";

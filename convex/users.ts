@@ -2,19 +2,8 @@ import { internalMutation, query } from "./_generated/server";
 import { getCurrentUser } from "./auth";
 import { v } from "convex/values";
 
-// Validates the subset of Clerk UserJSON fields we actually use
-const clerkUserData = v.object({
-  id: v.string(),
-  first_name: v.optional(v.union(v.string(), v.null())),
-  last_name: v.optional(v.union(v.string(), v.null())),
-  email_addresses: v.array(
-    v.object({
-      id: v.string(),
-      email_address: v.string(),
-    }),
-  ),
-  primary_email_address_id: v.optional(v.union(v.string(), v.null())),
-});
+// Clerk webhook payload - use v.any() since Clerk can add fields at any time
+const clerkUserData = v.any();
 
 export const me = query({
   handler: async (ctx) => {
@@ -31,7 +20,7 @@ export const upsertFromClerk = internalMutation({
       .unique();
 
     const email =
-      data.email_addresses.find((e) => e.id === data.primary_email_address_id)
+      data.email_addresses.find((e: { id: string; email_address: string }) => e.id === data.primary_email_address_id)
         ?.email_address ?? data.email_addresses[0]?.email_address ?? "";
 
     const name =
