@@ -207,7 +207,9 @@ export const listByOrganization = query({
     await requireAdmin(ctx);
     return await ctx.db
       .query("users")
-      .filter((q) => q.eq(q.field("organization_id"), organization_id))
+      .withIndex("by_organization_id", (q) =>
+        q.eq("organization_id", organization_id),
+      )
       .collect();
   },
 });

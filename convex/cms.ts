@@ -30,17 +30,34 @@ const sectionValidator = v.object({
 export const getPage = query({
   args: { slug: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const page = await ctx.db
       .query("pages")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .unique();
+    // Public (unauthenticated) query — only return published pages
+    if (page && !page.published) return null;
+    return page;
   },
 });
 
 export const listPages = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db.query("pages").collect();
+    const pages = await ctx.db.query("pages").collect();
+    // Public (unauthenticated) query — only return published pages
+    return pages.filter((p) => p.published);
+  },
+});
+
+// Admin-only query that returns pages regardless of published status
+export const getPageAdmin = query({
+  args: { slug: v.string() },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    return await ctx.db
+      .query("pages")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .unique();
   },
 });
 

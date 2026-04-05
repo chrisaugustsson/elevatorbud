@@ -6,6 +6,7 @@ import { v } from "convex/values";
 const clerkUserData = v.any();
 
 export const me = query({
+  args: {},
   handler: async (ctx) => {
     return await getCurrentUser(ctx);
   },

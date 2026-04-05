@@ -15,6 +15,8 @@ export async function getCurrentUser(ctx: Ctx) {
   if (identity === null) {
     return null;
   }
+  // Using identity.subject here (not tokenIdentifier) because the users table
+  // stores Clerk user IDs (set via webhook data.id) which match the JWT subject claim.
   return await userByClerkId(ctx, identity.subject);
 }
 
@@ -33,6 +35,9 @@ export async function requireAuth(ctx: Ctx) {
   const user = await getCurrentUser(ctx);
   if (!user) {
     throw new Error("Ej autentiserad");
+  }
+  if (!user.active) {
+    throw new Error("Kontot är inaktiverat");
   }
   return user;
 }
@@ -58,10 +63,7 @@ export async function requireTenantAccess(
   ctx: Ctx,
   organizationId: Id<"organizations">,
 ) {
-  const user = await getCurrentUser(ctx);
-  if (!user) {
-    throw new Error("Ej autentiserad");
-  }
+  const user = await requireAuth(ctx);
   if (user.role === "admin") {
     return user;
   }

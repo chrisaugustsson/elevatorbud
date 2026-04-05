@@ -76,7 +76,7 @@ function Webbplats() {
 }
 
 function PageTab({ slug, label }: { slug: string; label: string }) {
-  const opts = convexQuery(api.cms.getPage, { slug });
+  const opts = convexQuery(api.cms.getPageAdmin, { slug });
   const { data: page } = useSuspenseQuery({
     queryKey: opts.queryKey,
     staleTime: opts.staleTime,

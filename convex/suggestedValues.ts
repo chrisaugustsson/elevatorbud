@@ -19,34 +19,23 @@ const CATEGORIES = [
 
 type Category = (typeof CATEGORIES)[number];
 
-// Category names map directly to elevators field names
-const CATEGORY_TO_FIELD: Record<Category, string> = {
-  elevator_type: "elevator_type",
-  manufacturer: "manufacturer",
-  district: "district",
-  maintenance_company: "maintenance_company",
-  inspection_authority: "inspection_authority",
-  elevator_designation: "elevator_designation",
-  door_type: "door_type",
-  collective: "collective",
-  drive_system: "drive_system",
-  machine_placement: "machine_placement",
-  modernization_measures: "modernization_measures",
-};
+// Category names map directly to elevator field names (same key = field name)
+const VALID_CATEGORIES = new Set<string>(CATEGORIES);
 
+// NOTE: This scans the full elevators table in a single mutation transaction.
+// At scale, consider refactoring to use ctx.scheduler.runAfter for batch processing.
 async function updateElevatorsField(
   ctx: MutationCtx,
   category: string,
   oldValue: string,
   newValue: string,
 ) {
-  const fieldName = CATEGORY_TO_FIELD[category as Category];
-  if (!fieldName) return;
+  if (!VALID_CATEGORIES.has(category)) return;
 
   const allElevators = await ctx.db.query("elevators").collect();
   for (const elevator of allElevators) {
-    if ((elevator as Record<string, unknown>)[fieldName] === oldValue) {
-      await ctx.db.patch(elevator._id, { [fieldName]: newValue });
+    if ((elevator as Record<string, unknown>)[category] === oldValue) {
+      await ctx.db.patch(elevator._id, { [category]: newValue });
     }
   }
 }
