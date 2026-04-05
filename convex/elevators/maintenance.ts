@@ -1,32 +1,45 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
 import { requireAuth, getOrgScope } from "../auth";
+import { byInspectionMonth } from "../aggregates";
 import { queryElevators, enrichWithOrgName } from "./helpers";
+
+const MONTHS = [
+  "Januari", "Februari", "Mars", "April", "Maj", "Juni",
+  "Juli", "Augusti", "September", "Oktober", "November", "December",
+];
 
 export const inspectionCalendar = query({
   args: { organization_id: v.optional(v.id("organizations")) },
   handler: async (ctx, { organization_id }) => {
-    const elevators = await queryElevators(ctx, organization_id);
-    const active = elevators.filter((h) => h.status === "active");
+    const user = await requireAuth(ctx);
+    const orgId = getOrgScope(user, organization_id);
 
-    const MONTHS = [
-      "Januari", "Februari", "Mars", "April", "Maj", "Juni",
-      "Juli", "Augusti", "September", "Oktober", "November", "December",
-    ];
+    if (orgId) {
+      const counts = await byInspectionMonth.countBatch(
+        ctx,
+        MONTHS.map((m) => ({
+          namespace: orgId,
+          bounds: { prefix: ["active", m] as [string, string] },
+        })),
+      );
+      return MONTHS.map((month, i) => ({ month, count: counts[i] }));
+    }
+
+    // Admin without org scope: fall back to .collect()
+    const allElevators = await ctx.db.query("elevators").collect();
+    const active = allElevators.filter((h) => h.status === "active");
 
     const byMonth: Record<string, number> = {};
     for (const m of MONTHS) {
       byMonth[m] = 0;
     }
-
     for (const h of active) {
       if (!h.inspection_month) continue;
-      const key = h.inspection_month;
-      if (key in byMonth) {
-        byMonth[key] = byMonth[key] + 1;
+      if (h.inspection_month in byMonth) {
+        byMonth[h.inspection_month] += 1;
       }
     }
-
     return MONTHS.map((month) => ({ month, count: byMonth[month] }));
   },
 });

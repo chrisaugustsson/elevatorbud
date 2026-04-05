@@ -1,19 +1,42 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
+import { requireAuth, getOrgScope } from "../auth";
+import { byModernizationYear } from "../aggregates";
 import { queryElevators, enrichWithOrgName, parseModernizationYear } from "./helpers";
 
 export const timeline = query({
   args: { organization_id: v.optional(v.id("organizations")) },
   handler: async (ctx, { organization_id }) => {
-    const elevators = await queryElevators(ctx, organization_id);
-    const active = elevators.filter((h) => h.status === "active");
+    const user = await requireAuth(ctx);
+    const orgId = getOrgScope(user, organization_id);
+
+    if (orgId) {
+      const currentYear = new Date().getFullYear();
+      const years: string[] = [];
+      for (let y = currentYear; y <= 2045; y++) {
+        years.push(String(y));
+      }
+      const counts = await byModernizationYear.countBatch(
+        ctx,
+        years.map((y) => ({
+          namespace: orgId,
+          bounds: { prefix: ["active", y] as [string, string] },
+        })),
+      );
+      return years
+        .map((year, i) => ({ year, count: counts[i] }))
+        .filter((d) => d.count > 0);
+    }
+
+    // Admin without org scope: fall back to .collect()
+    const allElevators = await ctx.db.query("elevators").collect();
+    const active = allElevators.filter((h) => h.status === "active");
 
     const byYear: Record<string, number> = {};
     for (const h of active) {
       const year = parseModernizationYear(h.recommended_modernization_year);
       if (year === null) continue;
-      const key = String(year);
-      byYear[key] = (byYear[key] || 0) + 1;
+      byYear[String(year)] = (byYear[String(year)] || 0) + 1;
     }
 
     return Object.entries(byYear)
@@ -25,10 +48,21 @@ export const timeline = query({
 export const budget = query({
   args: { organization_id: v.optional(v.id("organizations")) },
   handler: async (ctx, { organization_id }) => {
-    const elevators = await queryElevators(ctx, organization_id);
+    const user = await requireAuth(ctx);
+    const orgId = getOrgScope(user, organization_id);
+
+    // Budget by district and type need per-elevator data, so we always collect
+    // for those dimensions. But byYear sums can use the aggregate when org-scoped.
+    const elevators = orgId
+      ? await ctx.db
+          .query("elevators")
+          .withIndex("by_organization_id", (q) =>
+            q.eq("organization_id", orgId),
+          )
+          .collect()
+      : await ctx.db.query("elevators").collect();
     const active = elevators.filter((h) => h.status === "active");
 
-    const byYear: Record<string, number> = {};
     const byDistrict: Record<string, number> = {};
     const byType: Record<string, number> = {};
 
@@ -37,9 +71,6 @@ export const budget = query({
       const year = parseModernizationYear(h.recommended_modernization_year);
       if (year === null) continue;
 
-      const yearKey = String(year);
-      byYear[yearKey] = (byYear[yearKey] || 0) + h.budget_amount;
-
       const districtKey = h.district || "Okänt";
       byDistrict[districtKey] = (byDistrict[districtKey] || 0) + h.budget_amount;
 
@@ -47,10 +78,39 @@ export const budget = query({
       byType[typeKey] = (byType[typeKey] || 0) + h.budget_amount;
     }
 
-    return {
-      byYear: Object.entries(byYear)
+    // Budget by year: use aggregate when org-scoped
+    let byYearData: { year: string; amount: number }[];
+    if (orgId) {
+      const currentYear = new Date().getFullYear();
+      const years: string[] = [];
+      for (let y = currentYear; y <= 2045; y++) {
+        years.push(String(y));
+      }
+      const sums = await byModernizationYear.sumBatch(
+        ctx,
+        years.map((y) => ({
+          namespace: orgId,
+          bounds: { prefix: ["active", y] as [string, string] },
+        })),
+      );
+      byYearData = years
+        .map((year, i) => ({ year, amount: sums[i] }))
+        .filter((d) => d.amount > 0);
+    } else {
+      const byYear: Record<string, number> = {};
+      for (const h of active) {
+        if (!h.budget_amount) continue;
+        const year = parseModernizationYear(h.recommended_modernization_year);
+        if (year === null) continue;
+        byYear[String(year)] = (byYear[String(year)] || 0) + h.budget_amount;
+      }
+      byYearData = Object.entries(byYear)
         .sort((a, b) => Number(a[0]) - Number(b[0]))
-        .map(([year, amount]) => ({ year, amount })),
+        .map(([year, amount]) => ({ year, amount }));
+    }
+
+    return {
+      byYear: byYearData,
       byDistrict: Object.entries(byDistrict)
         .sort((a, b) => b[1] - a[1])
         .map(([name, amount]) => ({ name, amount })),
