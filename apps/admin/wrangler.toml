@@ -10,6 +10,6 @@ workers_dev = true
 # ]
 
 [env.dev]
-name = "elevatorbud-admin-prod"
+name = "elevatorbud-admin-dev"
 workers_dev = true
 routes = []
