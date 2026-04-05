@@ -1,44 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAuth, requireAdmin } from "./auth";
-import { MutationCtx } from "./_generated/server";
-
-const CATEGORIES = [
-  "elevator_type",
-  "manufacturer",
-  "district",
-  "maintenance_company",
-  "inspection_authority",
-  "elevator_designation",
-  "door_type",
-  "collective",
-  "drive_system",
-  "machine_placement",
-  "modernization_measures",
-] as const;
-
-type Category = (typeof CATEGORIES)[number];
-
-// Category names map directly to elevator field names (same key = field name)
-const VALID_CATEGORIES = new Set<string>(CATEGORIES);
-
-// NOTE: This scans the full elevators table in a single mutation transaction.
-// At scale, consider refactoring to use ctx.scheduler.runAfter for batch processing.
-async function updateElevatorsField(
-  ctx: MutationCtx,
-  category: string,
-  oldValue: string,
-  newValue: string,
-) {
-  if (!VALID_CATEGORIES.has(category)) return;
-
-  const allElevators = await ctx.db.query("elevators").collect();
-  for (const elevator of allElevators) {
-    if ((elevator as Record<string, unknown>)[category] === oldValue) {
-      await ctx.db.patch(elevator._id, { [category]: newValue });
-    }
-  }
-}
 
 export const list = query({
   args: { category: v.optional(v.string()) },
@@ -84,14 +46,7 @@ export const update = mutation({
       throw new Error("Förslagsvärdet hittades inte");
     }
 
-    const oldValue = existing.value;
-
-    // Update the suggested_values record
     await ctx.db.patch(id, { value });
-
-    // Update all elevators that use the old value
-    await updateElevatorsField(ctx, existing.category, oldValue, value);
-
     return id;
   },
 });
@@ -113,10 +68,6 @@ export const merge = mutation({
       throw new Error("Kan bara slå ihop värden inom samma kategori");
     }
 
-    // Update all elevators from source value to target value
-    await updateElevatorsField(ctx, source.category, source.value, target.value);
-
-    // Delete the source value
     await ctx.db.delete(sourceId);
 
     return targetId;
