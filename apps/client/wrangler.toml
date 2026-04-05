@@ -1,4 +1,4 @@
-name = 'elevatorbud-client-dev'
+name = 'elevatorbud-client-prod'
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 main = "@tanstack/react-start/server-entry"
