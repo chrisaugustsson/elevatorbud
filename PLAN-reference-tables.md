@@ -1,258 +1,184 @@
-# Plan: Replace suggested_values with reference tables
+# Plan: Fix suggested_values merge/rename + add budget aggregates
 
 ## Overview
 
-Replace the single `suggested_values` table with 8 dedicated reference tables.
-Elevator fields change from `v.string()` to `v.id("manufacturers")` etc.
-The `suggested_values` table and all related code is removed.
-
-Data can be wiped and re-imported from Excel.
+Keep the current architecture (elevators store strings, `suggested_values` provides
+dropdown hints). Fix the merge/rename gap by propagating changes to elevator
+documents. Add 2 budget aggregates for the remaining `.collect()` chart queries.
 
 ---
 
-## 1. New reference tables (schema.ts)
+## 1. Add propagation to merge and rename (convex/suggestedValues.ts)
 
-Create these 8 tables, all with the same shape:
+Currently, `merge` deletes the source suggested value but doesn't touch elevators.
+`update` (rename) changes the suggested value string but elevators keep the old one.
 
-```
-name: v.string()        // "KONE", "Personhiss", etc.
-active: v.boolean()     // soft-delete / hide from dropdowns
-created_at: v.number()
-```
+### Merge fix
 
-Each gets an index on `name` for fast lookup during import.
+When merging source into target within a category:
 
-| Table | Replaces field | Example values |
-|---|---|---|
-| `elevator_types` | `elevator_type` | Personhiss, Varupersonhiss |
-| `manufacturers` | `manufacturer` | KONE, Schindler, OTIS |
-| `districts` | `district` | Centrum, Söder, Norr |
-| `maintenance_companies` | `maintenance_company` | KONE, Schindler Service |
-| `inspection_authorities` | `inspection_authority` | Kiwa, RISE |
-| `door_types` | `door_type` | Teleskop, Central |
-| `collectives` | `collective` | Fullkollektiv, Nedkollektiv |
-| `drive_systems` | `drive_system` | Linhydraulisk, Hydraulisk |
-
-## 2. Update elevator schema
-
-Change these 8 fields from `v.optional(v.string())` to `v.optional(v.id("table"))`:
+1. Find the elevator field name for the category (e.g. `"manufacturer"` -> `"manufacturer"`)
+2. Query all elevators where that field equals `source.value`
+3. Patch each elevator to use `target.value`
+4. Delete the source suggested value
 
 ```ts
-elevator_type:        v.optional(v.id("elevator_types"))
-manufacturer:         v.optional(v.id("manufacturers"))
-district:             v.optional(v.id("districts"))
-maintenance_company:  v.optional(v.id("maintenance_companies"))
-inspection_authority: v.optional(v.id("inspection_authorities"))
-door_type:            v.optional(v.id("door_types"))
-collective:           v.optional(v.id("collectives"))
-drive_system:         v.optional(v.id("drive_systems"))
+// In merge mutation, after validation:
+const field = categoryToField(source.category); // maps category -> elevator field name
+const elevators = await ctx.db.query("elevators").collect();
+const toUpdate = elevators.filter(e => e[field] === source.value);
+for (const elevator of toUpdate) {
+  await ctx.db.patch(elevator._id, { [field]: target.value });
+}
+await ctx.db.delete(sourceId);
 ```
 
-Keep as plain strings (no table needed):
-- `elevator_designation`, `machine_placement`, `modernization_measures`
-- All other free-text fields (speed, cab_size, etc.)
+Note: at 50k elevators the `.collect()` is fine within transaction limits (read-only
+scan + targeted patches). The number of actual patches will be much smaller (only
+elevators matching the source value).
 
-## 3. Drop suggested_values
+### Rename fix
 
-- Delete `convex/suggestedValues.ts` entirely
-- Remove `suggested_values` from `schema.ts`
-- Remove `autoAddSuggestedValues()` from `convex/elevators/helpers.ts`
-- Remove the call to it in `convex/elevators/crud.ts` (update mutation)
+When renaming a suggested value:
 
-## 4. Reference data CRUD (backend)
+1. Find the elevator field name for the category
+2. Query all elevators where that field equals the old value
+3. Patch each elevator to use the new value
+4. Update the suggested value
 
-Create `convex/referenceData.ts` with generic helpers or per-table mutations:
+Same pattern as merge, just updating to the new name instead of the target's value.
 
-- `list(table)` — return all rows (or filtered by active)
-- `create(table, name)` — insert new, check for duplicate name
-- `rename(table, id, newName)` — update name
-- `merge(table, sourceId, targetId)` — re-point all elevators from source to target, then delete source
-- `deactivate(table, id)` / `activate(table, id)` — toggle active flag
+### Category-to-field mapping
 
-**Merge is the key difference from today**: because elevators now store IDs,
-merging means updating all `elevator.manufacturer` from `sourceId` to `targetId`.
-This is a proper cascade that the old string-based system couldn't do.
-
-Consider: merge may need to be an internal mutation + action if elevator count
-exceeds transaction limits. For 600 elevators per org this is fine. For 60k total,
-a paginated approach may be needed (merge within one org at a time, or use a
-scheduled function).
-
-## 5. Reference data admin page (frontend)
-
-Update `apps/admin/src/routes/_authenticated/admin.referensdata.tsx`:
-
-- Instead of categories in a dropdown, show 8 tabs (one per table)
-- CRUD operations call the new mutations
-- Merge dialog: select target from same table, confirm, backend cascades to elevators
-- Rename: just patches the reference row — all elevators automatically show new name
-  (this is the big win over strings)
-
-## 6. Update aggregates
-
-### Existing aggregates — change sortKey from string to ID
-
-The aggregate keys currently use the string value (e.g. `doc.district ?? "Okant"`).
-After migration they should use the reference ID:
+Most categories map 1:1 to the elevator field name. Define a mapping:
 
 ```ts
-// Before
-sortKey: (doc) => [doc.status, doc.district ?? "Okant"]
-
-// After
-sortKey: (doc) => [doc.status, doc.district ?? "none"]
+const CATEGORY_TO_FIELD: Record<string, string> = {
+  elevator_type: "elevator_type",
+  manufacturer: "manufacturer",
+  district: "district",
+  maintenance_company: "maintenance_company",
+  inspection_authority: "inspection_authority",
+  elevator_designation: "elevator_designation",
+  door_type: "door_type",
+  collective: "collective",
+  drive_system: "drive_system",
+  machine_placement: "machine_placement",
+  modernization_measures: "modernization_measures",
+};
 ```
 
-The key becomes `[status, Id<"districts">]` or `[status, "none"]` for unset.
+### Transaction limit consideration
 
-Chart queries change: instead of getting string names from suggested_values,
-they get all rows from the reference table, countBatch by ID, then map IDs to names.
+Convex limit: 16,384 document reads+writes per transaction. A merge that touches
+many elevators could approach this. At 50k total elevators:
+- The `.collect()` read costs 50k reads
+- Each patch costs 1 read + 1 write
+- Worst case: 50k reads + N patches
 
-### New budget aggregates
+If a single value appears on more than ~8k elevators AND the total table exceeds
+~8k rows, we'd need to paginate. For realistic data (50k elevators, largest
+manufacturer maybe 5k), this is fine.
 
-Add 2 new aggregate instances:
+If needed later: split into a Convex action that processes in batches via
+scheduled internal mutations.
+
+---
+
+## 2. Add budget aggregates (convex/aggregates.ts)
+
+Two new aggregate instances to eliminate `.collect()` in the budget query's
+byDistrict and byType breakdowns.
+
+### New aggregates
 
 | Aggregate | Key | sumValue |
 |---|---|---|
-| `byDistrictBudget` | `[status, district \|\| "none"]` | `budget_amount ?? 0` |
-| `byTypeBudget` | `[status, elevator_type \|\| "none"]` | `budget_amount ?? 0` |
+| `byDistrictBudget` | `[status, district \|\| "Okänt"]` | `budget_amount ?? 0` |
+| `byTypeBudget` | `[status, elevator_type \|\| "Okänt"]` | `budget_amount ?? 0` |
 
-Register in `convex.config.ts` and `convex/aggregates.ts`.
-Update `modernization.ts budget` query to use these instead of `.collect()`.
+### Changes needed
 
-### Backfill
-
-After deploying and re-importing data, run `npx convex run aggregates:backfill`
-to populate all aggregate trees.
-
-## 7. Update elevator forms (frontend)
-
-### ComboboxField -> SelectField
-
-`apps/admin/src/features/elevator/components/combobox-field.tsx` currently takes
-a `category` string and calls `useSuggestions(category)` to get string options.
-
-Replace with a hook like `useReferenceData("manufacturers")` that returns
-`{ _id, name }[]`. The combobox/select stores the `_id` as the form value
-instead of the string name.
-
-**Files to update:**
-- `basic-info-section.tsx` — district, elevator_designation (designation stays string)
-- `technical-section.tsx` (or similar) — elevator_type, manufacturer
-- `doors-and-cab-section.tsx` — door_type, collective
-- `machinery-section.tsx` — drive_system
-- `inspection-section.tsx` — inspection_authority, maintenance_company
-
-The form type `HissFormValues` changes these 8 fields from `string` to `string`
-(still string in the form, but it's the ID string). The submit handler sends
-the ID to the backend.
-
-### Display
-
-Anywhere that displays these fields needs to resolve ID -> name.
-Options:
-- Eager: backend queries join/enrich before returning
-- Lazy: frontend resolves with a lookup map from reference data
-
-Recommended: backend enrichment (like `enrichWithOrgName` does for org names).
-Add a similar helper that resolves all reference IDs on elevator documents.
-
-## 8. Update Excel import
-
-### Import flow changes
-
-`convex/importsInternal.ts` `importBatch` currently receives string values
-and stores them directly. After migration:
-
-1. **Option A — resolve on backend**: Import sends raw strings. Backend mutation
-   looks up or creates reference rows by name, then stores the ID on the elevator.
-   Simpler for the import UI but may hit transaction limits for large batches.
-
-2. **Option B — resolve on frontend**: Before calling `importBatch`, the frontend
-   reads all reference tables, builds a name->ID map, and resolves strings to IDs.
-   Unmatched strings create new reference rows first. More work but keeps mutations small.
-
-**Recommended: Option A** (resolve on backend). The import mutation already processes
-rows one at a time. For each string field, do:
-
+**convex/convex.config.ts** — add 2 new component instances:
 ```ts
-async function resolveOrCreate(ctx, table, name) {
-  const existing = await ctx.db.query(table)
-    .withIndex("by_name", q => q.eq("name", name))
-    .first();
-  if (existing) return existing._id;
-  return await ctx.db.insert(table, { name, active: true, created_at: Date.now() });
-}
+app.use(aggregate, { name: "byDistrictBudget" });
+app.use(aggregate, { name: "byTypeBudget" });
 ```
 
-This replaces `autoAddSuggestedValues` — new values are created as reference rows
-during import automatically.
-
-### Export
-
-`convex/elevators/listing.ts` `exportData` returns elevator docs directly.
-After migration, the exported data needs ID -> name resolution for the 8 fields.
-Add enrichment before returning.
-
-## 9. Update remaining query files
-
-These files read elevator string fields and need to resolve IDs to names:
-
-- `convex/elevators/analytics.ts` — chartData uses field values for chart labels
-- `convex/elevators/maintenance.ts` — companies, emergencyPhoneStatus, inspectionList
-- `convex/elevators/modernization.ts` — budget byDistrict/byType, priorityList
-- `convex/dashboard.ts` — recentActivity
-
-For aggregate-based chart queries: load reference table, countBatch by ID,
-zip IDs with names.
-
-For .collect()-based queries: enrich elevator docs with resolved names.
-
-## 10. Filters
-
-`convex/elevators/helpers.ts` `filterArgs` and `fetchAndFilter`:
-
-- Change filter args from `v.array(v.string())` to `v.array(v.id("table"))`
-  for the 8 fields that become references
-- Filter comparison changes from string matching to ID equality
-- Frontend filter dropdowns load from reference tables instead of suggested_values
-
-## 11. Search
-
-`fetchAndFilter` text search currently searches string values:
+**convex/aggregates.ts** — add 2 new TableAggregate definitions + register triggers:
 ```ts
-h.manufacturer && h.manufacturer.toLowerCase().includes(s)
+export const byDistrictBudget = new TableAggregate<{
+  Namespace: string;
+  Key: [string, string];
+  DataModel: DataModel;
+  TableName: "elevators";
+}>(components.byDistrictBudget, {
+  namespace: (doc) => doc.organization_id,
+  sortKey: (doc) => [doc.status, doc.district ?? "Okänt"],
+  sumValue: (doc) => doc.budget_amount ?? 0,
+});
+
+export const byTypeBudget = new TableAggregate<{
+  Namespace: string;
+  Key: [string, string];
+  DataModel: DataModel;
+  TableName: "elevators";
+}>(components.byTypeBudget, {
+  namespace: (doc) => doc.organization_id,
+  sortKey: (doc) => [doc.status, doc.elevator_type ?? "Okänt"],
+  sumValue: (doc) => doc.budget_amount ?? 0,
+});
 ```
 
-After migration, `h.manufacturer` is an ID. Text search on these fields would need
-to resolve IDs first, or maintain a denormalized search field. Consider:
-- Skip searching reference fields in text search (search by elevator_number, address only)
-- Or: add a `search_text` computed field on elevator that concatenates resolved names
+Register both triggers and add to ALL_AGGREGATES for backfill.
+
+**convex/elevators/modernization.ts** — update `budget` query:
+- byYear: already uses `byModernizationYear.sumBatch` (done)
+- byDistrict: use `byDistrictBudget.sumBatch` with suggested_values list
+- byType: use `byTypeBudget.sumBatch` with suggested_values list
+- Removes the `.collect()` from the org-scoped path entirely
+
+---
+
+## 3. Use custom mutation in suggestedValues.ts
+
+Currently `suggestedValues.ts` imports raw `mutation` from `_generated/server`.
+Since merge/rename now patches elevator documents, it needs to use the custom
+`mutation` from `aggregates.ts` so that aggregate triggers fire on the elevator
+updates.
+
+```ts
+// Before
+import { query, mutation } from "./_generated/server";
+
+// After
+import { query } from "./_generated/server";
+import { mutation } from "./aggregates";
+```
 
 ---
 
 ## Execution order
 
-1. Create 8 reference tables in schema.ts (add indexes)
-2. Update elevator schema (8 fields become IDs)
-3. Create referenceData.ts (CRUD + merge mutations)
-4. Update aggregates (sortKey uses IDs, add 2 budget aggregates)
-5. Delete suggestedValues.ts + autoAddSuggestedValues
-6. Update importsInternal.ts (resolve-or-create during import)
-7. Update all backend query files (analytics, maintenance, modernization, dashboard, listing export)
-8. Update helpers.ts (filterArgs, fetchAndFilter, remove autoAddSuggestedValues)
-9. Update frontend forms (ComboboxField -> reference data selects)
-10. Update frontend referensdata page (tabs per table, merge with cascade)
-11. Update frontend filters (load options from reference tables)
-12. Handle search (decide approach)
-13. Wipe elevator data, re-import from Excel
-14. Run aggregates:backfill
+1. Add `CATEGORY_TO_FIELD` mapping and propagation logic to `suggestedValues.ts`
+2. Switch `suggestedValues.ts` to use custom `mutation` from aggregates
+3. Add 2 budget aggregates to `convex.config.ts` and `convex/aggregates.ts`
+4. Update `modernization.ts budget` query to use budget aggregates
+5. Deploy and run `npx convex run aggregates:backfill`
 
 ---
 
+## What this doesn't change
+
+- Elevator schema stays as-is (strings)
+- `suggested_values` table stays as-is
+- Forms, filters, import, export — all unchanged
+- `autoAddSuggestedValues` stays (auto-creates suggested values on elevator create/update)
+- Admin referensdata page stays (just merge/rename now actually propagate)
+
 ## Notes
 
-- The 3 fields staying as strings: `elevator_designation`, `machine_placement`, `modernization_measures` — no autocomplete after migration
-- Admin global views (dashboard.ts) still use `.collect()` — acceptable for admin-only
-- Merge cascade: test with large datasets. May need pagination if merging across 60k elevators
-- After this migration, renaming "KONE AB" to "KONE" is just a patch on the reference row — zero elevator updates needed
+- After merge/rename, the aggregate triggers fire automatically because we use
+  the custom mutation. No manual aggregate update needed.
+- The admin UI already has merge and rename dialogs — they just work better now.
+- If scale exceeds transaction limits later, paginate with scheduled functions.
