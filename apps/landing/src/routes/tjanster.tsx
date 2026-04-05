@@ -19,6 +19,18 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
+type CmsSection = {
+  id: string;
+  type: string;
+  title?: string;
+  subtitle?: string;
+  content?: string;
+  items?: Array<{ title?: string; description?: string; icon?: string }>;
+  cta?: { text: string; href: string };
+  imageUrl?: string;
+  order: number;
+};
+
 export const Route = createFileRoute("/tjanster")({
   component: Tjanster,
 });
@@ -139,7 +151,7 @@ const TARGET_AUDIENCES = [
 
 function Tjanster() {
   const page = useQuery(api.cms.getPage, { slug: "tjanster" });
-  const heroSection = page?.sections?.find((s) => s.type === "hero");
+  const heroSection = page?.sections?.find((s: CmsSection) => s.type === "hero");
 
   return (
     <div>

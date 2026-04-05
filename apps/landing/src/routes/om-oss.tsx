@@ -3,6 +3,20 @@ import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Target, Eye, Users, Award } from "lucide-react";
 
+type CmsSection = {
+  id: string;
+  type: string;
+  title?: string;
+  subtitle?: string;
+  content?: string;
+  items?: Array<{ title?: string; description?: string; icon?: string }>;
+  cta?: { text: string; href: string };
+  imageUrl?: string;
+  order: number;
+};
+
+type CmsItem = { title?: string; description?: string; icon?: string };
+
 export const Route = createFileRoute("/om-oss")({
   component: OmOss,
 });
@@ -70,10 +84,10 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 function OmOss() {
   const page = useQuery(api.cms.getPage, { slug: "om-oss" });
 
-  const heroSection = page?.sections?.find((s) => s.type === "hero");
-  const missionSection = page?.sections?.find((s) => s.type === "mission");
-  const valuesSection = page?.sections?.find((s) => s.type === "values");
-  const storySection = page?.sections?.find((s) => s.type === "story");
+  const heroSection = page?.sections?.find((s: CmsSection) => s.type === "hero");
+  const missionSection = page?.sections?.find((s: CmsSection) => s.type === "mission");
+  const valuesSection = page?.sections?.find((s: CmsSection) => s.type === "values");
+  const storySection = page?.sections?.find((s: CmsSection) => s.type === "story");
 
   const values =
     valuesSection?.items && valuesSection.items.length > 0
@@ -120,7 +134,7 @@ function OmOss() {
             {valuesSection?.title || "Våra värderingar"}
           </h2>
           <div className="mt-14 grid gap-8 sm:grid-cols-2">
-            {values.map((value, i) => {
+            {values.map((value: CmsItem, i: number) => {
               const IconComponent =
                 iconMap[(value as { icon?: string }).icon || ""] || Target;
               return (
@@ -170,7 +184,7 @@ function OmOss() {
         </div>
 
         <div className="mt-10 space-y-6">
-          {storyParagraphs.map((paragraph, i) => (
+          {storyParagraphs.map((paragraph: string, i: number) => (
             <p key={i} className="text-base leading-relaxed text-slate-500">
               {paragraph}
             </p>

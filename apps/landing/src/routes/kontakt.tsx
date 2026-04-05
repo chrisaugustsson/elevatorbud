@@ -5,6 +5,20 @@ import { api } from "@convex/_generated/api";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { Mail, Phone, MapPin, Clock, ArrowRight, Check } from "lucide-react";
 
+type CmsSection = {
+  id: string;
+  type: string;
+  title?: string;
+  subtitle?: string;
+  content?: string;
+  items?: Array<{ title?: string; description?: string; icon?: string }>;
+  cta?: { text: string; href: string };
+  imageUrl?: string;
+  order: number;
+};
+
+type CmsItem = { title?: string; description?: string; icon?: string };
+
 export const Route = createFileRoute("/kontakt")({
   component: Kontakt,
 });
@@ -54,9 +68,9 @@ function Kontakt() {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileInstance>(null);
 
-  const heroSection = page?.sections?.find((s) => s.type === "hero");
-  const contactSection = page?.sections?.find((s) => s.type === "contact");
-  const formSection = page?.sections?.find((s) => s.type === "form");
+  const heroSection = page?.sections?.find((s: CmsSection) => s.type === "hero");
+  const contactSection = page?.sections?.find((s: CmsSection) => s.type === "contact");
+  const formSection = page?.sections?.find((s: CmsSection) => s.type === "form");
 
   const contactItems =
     contactSection?.items && contactSection.items.length > 0
@@ -94,7 +108,7 @@ function Kontakt() {
             </p>
 
             <div className="mt-10 space-y-5">
-              {contactItems.map((item, i) => {
+              {contactItems.map((item: CmsItem, i: number) => {
                 const IconComponent =
                   iconMap[(item as { icon?: string }).icon || ""] || Mail;
                 return (

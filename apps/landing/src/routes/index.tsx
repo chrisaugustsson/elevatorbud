@@ -18,6 +18,18 @@ import {
   type MotionValue,
 } from "framer-motion";
 import { useRef, useEffect } from "react";
+
+type CmsSection = {
+  id: string;
+  type: string;
+  title?: string;
+  subtitle?: string;
+  content?: string;
+  items?: Array<{ title?: string; description?: string; icon?: string }>;
+  cta?: { text: string; href: string };
+  imageUrl?: string;
+  order: number;
+};
 import { cn } from "@elevatorbud/ui/lib/utils";
 import { InfiniteSlider } from "../components/infinite-slider";
 
@@ -591,10 +603,10 @@ function CtaSection({
 function Startsida() {
   const page = useQuery(api.cms.getPage, { slug: "startsida" });
 
-  const heroSection = page?.sections?.find((s) => s.type === "hero");
-  const featuresSection = page?.sections?.find((s) => s.type === "features");
-  const statsSection = page?.sections?.find((s) => s.type === "stats");
-  const ctaSection = page?.sections?.find((s) => s.type === "cta");
+  const heroSection = page?.sections?.find((s: CmsSection) => s.type === "hero");
+  const featuresSection = page?.sections?.find((s: CmsSection) => s.type === "features");
+  const statsSection = page?.sections?.find((s: CmsSection) => s.type === "stats");
+  const ctaSection = page?.sections?.find((s: CmsSection) => s.type === "cta");
 
   const hero = {
     title: heroSection?.title || FALLBACK_SECTIONS.hero.title,
@@ -609,7 +621,7 @@ function Startsida() {
 
   const stats =
     statsSection?.items && statsSection.items.length > 0
-      ? statsSection.items.map((item) => ({
+      ? statsSection.items.map((item: { title?: string; description?: string; icon?: string }) => ({
           value: item.title || "",
           label: item.description || "",
         }))

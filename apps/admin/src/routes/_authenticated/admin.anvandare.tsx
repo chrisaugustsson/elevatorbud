@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import type { Id } from "@convex/_generated/dataModel";
 import { useAction } from "convex/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
@@ -478,7 +479,7 @@ function CreateUserDialog({
     name: string;
     email: string;
     role: "admin" | "customer";
-    organization_id?: string;
+    organization_id?: Id<"organizations">;
   }) => Promise<void>;
 }) {
   if (!open) return null;
@@ -507,7 +508,7 @@ function CreateUserDialogInner({
     name: string;
     email: string;
     role: "admin" | "customer";
-    organization_id?: string;
+    organization_id?: Id<"organizations">;
   }) => Promise<void>;
 }) {
   const form = useForm({
@@ -733,11 +734,11 @@ function EditUserDialog({
   onOpenChange: (open: boolean) => void;
   orgs: Organisation[];
   onSubmit: (values: {
-    id: string;
+    id: Id<"users">;
     name?: string;
     email?: string;
     role?: "admin" | "customer";
-    organization_id?: string;
+    organization_id?: Id<"organizations">;
   }) => Promise<void>;
 }) {
   if (!user) return null;
@@ -763,11 +764,11 @@ function EditUserDialogInner({
   orgs: Organisation[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
-    id: string;
+    id: Id<"users">;
     name?: string;
     email?: string;
     role?: "admin" | "customer";
-    organization_id?: string;
+    organization_id?: Id<"organizations">;
   }) => Promise<void>;
 }) {
   const form = useForm({

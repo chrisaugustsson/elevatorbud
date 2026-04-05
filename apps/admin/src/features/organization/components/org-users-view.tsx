@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { Id } from "@convex/_generated/dataModel";
 import { useAction } from "convex/react";
 import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
@@ -370,11 +371,11 @@ function EditUserDialogInner({
   user: UserRecord;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
-    id: string;
+    id: Id<"users">;
     name?: string;
     email?: string;
     role?: "admin" | "customer";
-    organization_id?: string;
+    organization_id?: Id<"organizations">;
   }) => Promise<void>;
 }) {
   const { data: orgs } = useQuery({
