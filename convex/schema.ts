@@ -71,7 +71,11 @@ export default defineSchema({
     last_updated_at: v.optional(v.number()),
   })
     .index("by_organization_id", ["organization_id"])
-    .index("by_elevator_number", ["elevator_number"]),
+    .index("by_elevator_number", ["elevator_number"])
+    .index("by_organization_id_and_elevator_number", [
+      "organization_id",
+      "elevator_number",
+    ]),
 
   organizations: defineTable({
     name: v.string(),

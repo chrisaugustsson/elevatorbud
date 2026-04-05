@@ -1,4 +1,5 @@
-import { mutation, query } from "../_generated/server";
+import { query } from "../_generated/server";
+import { mutation } from "../aggregates";
 import { v } from "convex/values";
 import { requireAdmin, requireAuth } from "../auth";
 import { autoAddSuggestedValues, queryElevators, enrichWithOrgName } from "./helpers";

@@ -1,4 +1,5 @@
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalQuery } from "./_generated/server";
+import { internalMutation } from "./aggregates";
 import { v } from "convex/values";
 import { requireAdmin } from "./auth";
 

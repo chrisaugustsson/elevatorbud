@@ -28,5 +28,9 @@
       "sharp",
       "workerd"
     ]
+  },
+  "dependencies": {
+    "@convex-dev/aggregate": "^0.2.1",
+    "convex-helpers": "^0.1.114"
   }
 }
