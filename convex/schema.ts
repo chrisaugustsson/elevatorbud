@@ -102,6 +102,15 @@ export default defineSchema({
     created_at: v.number(),
   }).index("by_category", ["category"]),
 
+  contactSubmissions: defineTable({
+    name: v.string(),
+    email: v.string(),
+    phone: v.optional(v.string()),
+    message: v.string(),
+    status: v.union(v.literal("new"), v.literal("read"), v.literal("archived")),
+    createdAt: v.number(),
+  }).index("by_status", ["status"]),
+
   pages: defineTable({
     slug: v.string(),
     title: v.string(),

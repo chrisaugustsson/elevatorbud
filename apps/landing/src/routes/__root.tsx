@@ -251,18 +251,18 @@ function SiteFooter() {
             förbehållna.
           </p>
           <div className="flex gap-6">
-            <a
-              href="#"
+            <Link
+              to="/integritetspolicy"
               className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
             >
               Integritetspolicy
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              to="/villkor"
               className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
             >
               Villkor
-            </a>
+            </Link>
           </div>
         </div>
       </div>

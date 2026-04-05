@@ -1,11 +1,12 @@
 import {
   createFileRoute,
+  Link,
   Outlet,
   redirect,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { auth } from "@elevatorbud/auth/server";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery, useQuery as useTanstackQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import {
@@ -15,6 +16,7 @@ import {
 } from "@elevatorbud/ui/components/ui/sidebar";
 import { Separator } from "@elevatorbud/ui/components/ui/separator";
 import { Button } from "@elevatorbud/ui/components/ui/button";
+import { Bell } from "lucide-react";
 import { useClerk } from "@elevatorbud/auth";
 import { AppSidebar } from "../shared/components/app-sidebar";
 import { GlobalSearch } from "../shared/components/global-search";
@@ -88,11 +90,37 @@ function AuthenticatedLayout() {
             className="mr-2 data-[orientation=vertical]:h-4"
           />
           <GlobalSearch />
+          <div className="ml-auto">
+            <NotificationBell />
+          </div>
         </header>
         <div className="min-w-0 flex-1 overflow-auto p-6">
           <Outlet />
         </div>
       </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+function NotificationBell() {
+  const opts = convexQuery(api.contactSubmissions.unreadCount, {});
+  const { data: count } = useTanstackQuery({
+    queryKey: opts.queryKey,
+    staleTime: opts.staleTime,
+  });
+
+  const unread = typeof count === "number" ? count : 0;
+
+  return (
+    <Button variant="ghost" size="icon" className="relative" asChild>
+      <Link to="/admin/meddelanden">
+        <Bell className={`size-5 ${unread > 0 ? "text-foreground" : "text-muted-foreground"}`} />
+        {unread > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </Link>
+    </Button>
   );
 }

@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as cms from "../cms.js";
+import type * as contactSubmissions from "../contactSubmissions.js";
 import type * as dashboard from "../dashboard.js";
 import type * as elevators_analytics from "../elevators/analytics.js";
 import type * as elevators_crud from "../elevators/crud.js";
@@ -23,6 +24,7 @@ import type * as imports from "../imports.js";
 import type * as importsInternal from "../importsInternal.js";
 import type * as organizations from "../organizations.js";
 import type * as search from "../search.js";
+import type * as seed from "../seed.js";
 import type * as suggestedValues from "../suggestedValues.js";
 import type * as userAdmin from "../userAdmin.js";
 import type * as userAdminInternal from "../userAdminInternal.js";
@@ -37,6 +39,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   cms: typeof cms;
+  contactSubmissions: typeof contactSubmissions;
   dashboard: typeof dashboard;
   "elevators/analytics": typeof elevators_analytics;
   "elevators/crud": typeof elevators_crud;
@@ -50,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   importsInternal: typeof importsInternal;
   organizations: typeof organizations;
   search: typeof search;
+  seed: typeof seed;
   suggestedValues: typeof suggestedValues;
   userAdmin: typeof userAdmin;
   userAdminInternal: typeof userAdminInternal;

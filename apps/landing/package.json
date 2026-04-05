@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@elevatorbud/ui": "workspace:*",
+    "@marsidev/react-turnstile": "^1.5.0",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/react-router": "^1.168.10",
     "@tanstack/react-start": "^1.167.16",

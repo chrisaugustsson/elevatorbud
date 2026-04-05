@@ -5,6 +5,7 @@ import {
   Database,
   Globe,
   HardHat,
+  Mail,
   Plus,
   Upload,
   Users,
@@ -42,7 +43,10 @@ const navigation: NavGroup[] = [
   },
   {
     label: "Webbplats",
-    items: [{ title: "Webbplats", href: "/webbplats", icon: Globe }],
+    items: [
+      { title: "Webbplats", href: "/webbplats", icon: Globe },
+      { title: "Meddelanden", href: "/admin/meddelanden", icon: Mail },
+    ],
   },
 ];
 

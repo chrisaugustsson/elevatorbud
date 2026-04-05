@@ -1,7 +1,9 @@
+import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { Mail, Phone, MapPin, Clock, ArrowRight } from "lucide-react";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+import { Mail, Phone, MapPin, Clock, ArrowRight, Check } from "lucide-react";
 
 export const Route = createFileRoute("/kontakt")({
   component: Kontakt,
@@ -46,6 +48,11 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 
 function Kontakt() {
   const page = useQuery(api.cms.getPage, { slug: "kontakt" });
+  const submitContact = useAction(api.contactSubmissions.submit);
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   const heroSection = page?.sections?.find((s) => s.type === "hero");
   const contactSection = page?.sections?.find((s) => s.type === "contact");
@@ -139,18 +146,49 @@ function Kontakt() {
                 "Fyll i formuläret så kontaktar vi dig inom kort."}
             </p>
 
+            {submitted ? (
+              <div className="mt-8 flex flex-col items-center gap-4 py-12 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                  <Check className="h-7 w-7 text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Tack för ditt meddelande!
+                </h3>
+                <p className="text-sm text-slate-500">
+                  Vi har tagit emot din förfrågan och återkommer så snart vi kan.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSubmitted(false)}
+                  className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
+                >
+                  Skicka ett nytt meddelande
+                </button>
+              </div>
+            ) : (
             <form
               className="mt-8 space-y-5"
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                const form = e.currentTarget;
-                const formData = new FormData(form);
-                const mailto = `mailto:info@hisskompetens.se?subject=${encodeURIComponent(
-                  `Kontaktförfrågan från ${formData.get("namn")}`,
-                )}&body=${encodeURIComponent(
-                  `Namn: ${formData.get("namn")}\nE-post: ${formData.get("epost")}\nTelefon: ${formData.get("telefon") || "-"}\n\n${formData.get("meddelande")}`,
-                )}`;
-                window.location.href = mailto;
+                if (!turnstileToken) return;
+                setSubmitting(true);
+                try {
+                  const form = e.currentTarget;
+                  const formData = new FormData(form);
+                  await submitContact({
+                    name: formData.get("namn") as string,
+                    email: formData.get("epost") as string,
+                    phone: (formData.get("telefon") as string) || undefined,
+                    message: formData.get("meddelande") as string,
+                    turnstileToken,
+                  });
+                  setSubmitted(true);
+                } catch {
+                  turnstileRef.current?.reset();
+                  setTurnstileToken(null);
+                } finally {
+                  setSubmitting(false);
+                }
               }}
             >
               <div>
@@ -221,14 +259,47 @@ function Kontakt() {
                 />
               </div>
 
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="consent"
+                  required
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 cursor-pointer"
+                />
+                <span className="text-sm text-slate-500">
+                  Jag godkänner att Hisskompetens lagrar mina uppgifter för att
+                  hantera min förfrågan. Läs vår{" "}
+                  <a
+                    href="/integritetspolicy"
+                    target="_blank"
+                    className="text-blue-600 underline underline-offset-2 hover:text-blue-700"
+                  >
+                    integritetspolicy
+                  </a>
+                  .
+                </span>
+              </label>
+
+              <Turnstile
+                ref={turnstileRef}
+                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                onSuccess={setTurnstileToken}
+                onExpire={() => setTurnstileToken(null)}
+                options={{ theme: "light", size: "flexible" }}
+              />
+
               <button
                 type="submit"
-                className="group w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/20 focus:ring-2 focus:ring-blue-500/20 focus:outline-none cursor-pointer"
+                disabled={submitting || !turnstileToken}
+                className="group w-full flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/20 focus:ring-2 focus:ring-blue-500/20 focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Skicka meddelande
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                {submitting ? "Skickar..." : "Skicka meddelande"}
+                {!submitting && (
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                )}
               </button>
             </form>
+            )}
           </div>
         </div>
       </section>
