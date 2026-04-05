@@ -1,76 +1,39 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { createFileRoute } from "@tanstack/react-router";
+import {
+  useSuspenseQuery,
+  useQuery,
+  keepPreviousData,
+} from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
-import { useSelectedOrg } from "../../lib/org-context";
 import { downloadCSV, downloadExcel } from "@elevatorbud/utils/export";
-import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  createColumnHelper,
-  type SortingState,
-} from "@tanstack/react-table";
-import { Button } from "@elevatorbud/ui/components/ui/button";
-import { Input } from "@elevatorbud/ui/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@elevatorbud/ui/components/ui/table";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@elevatorbud/ui/components/ui/popover";
-import { Checkbox } from "@elevatorbud/ui/components/ui/checkbox";
-import { Badge } from "@elevatorbud/ui/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@elevatorbud/ui/components/ui/select";
+import type { SortingState } from "@tanstack/react-table";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
-import {
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Search,
-  X,
-  Building2,
-  ChevronLeft,
-  ChevronRight,
-  Pencil,
-  Download,
-  FileSpreadsheet,
-  FileText,
-} from "lucide-react";
+import { RegisterToolbar } from "~/features/register/components/register-toolbar";
+import { RegisterFilters } from "~/features/register/components/register-filters";
+import { RegisterTable } from "~/features/register/components/register-table";
 
 export const Route = createFileRoute("/_authenticated/register")({
   component: Register,
+  pendingComponent: RegisterSkeleton,
 });
 
-type HissRow = {
-  _id: string;
-  elevator_number: string;
-  address?: string;
-  district?: string;
-  elevator_type?: string;
-  manufacturer?: string;
-  build_year?: number;
-  modernization_year?: string;
-  recommended_modernization_year?: string;
-  budget_amount?: number;
-  organizationName: string;
-};
-
 type ListResult = {
-  data: HissRow[];
+  data: Array<{
+    _id: string;
+    elevator_number: string;
+    address?: string;
+    district?: string;
+    elevator_type?: string;
+    manufacturer?: string;
+    build_year?: number;
+    modernization_year?: string;
+    recommended_modernization_year?: string;
+    budget_amount?: number;
+    organization_id: string;
+    organizationName: string;
+  }>;
   totalCount: number;
   page: number;
   limit: number;
@@ -84,109 +47,7 @@ type SuggestedValueItem = {
   active: boolean;
 };
 
-function SortHeader({
-  label,
-  field,
-  sorting,
-  onSort,
-}: {
-  label: string;
-  field: string;
-  sorting: SortingState;
-  onSort: (field: string) => void;
-}) {
-  const active = sorting.find((s) => s.id === field);
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="-ml-3"
-      onClick={() => onSort(field)}
-    >
-      {label}
-      {active ? (
-        active.desc ? (
-          <ArrowDown className="ml-1 size-3" />
-        ) : (
-          <ArrowUp className="ml-1 size-3" />
-        )
-      ) : (
-        <ArrowUpDown className="ml-1 size-3" />
-      )}
-    </Button>
-  );
-}
-
-function MultiSelectFilter({
-  title,
-  options,
-  selected,
-  onSelectedChange,
-}: {
-  title: string;
-  options: string[];
-  selected: string[];
-  onSelectedChange: (selected: string[]) => void;
-}) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-9">
-          {title}
-          {selected.length > 0 && (
-            <Badge
-              variant="secondary"
-              className="ml-1 rounded-sm px-1 text-xs"
-            >
-              {selected.length}
-            </Badge>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-56 p-2" align="start">
-        <div className="max-h-60 space-y-1 overflow-y-auto">
-          {options.map((opt) => (
-            <label
-              key={opt}
-              className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-            >
-              <Checkbox
-                checked={selected.includes(opt)}
-                onCheckedChange={(checked) => {
-                  if (checked) {
-                    onSelectedChange([...selected, opt]);
-                  } else {
-                    onSelectedChange(selected.filter((s) => s !== opt));
-                  }
-                }}
-              />
-              {opt}
-            </label>
-          ))}
-          {options.length === 0 && (
-            <p className="px-2 py-1 text-sm text-muted-foreground">
-              Inga alternativ
-            </p>
-          )}
-        </div>
-        {selected.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mt-1 w-full text-xs"
-            onClick={() => onSelectedChange([])}
-          >
-            Rensa
-          </Button>
-        )}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 function Register() {
-  const { selectedOrgId } = useSelectedOrg();
-
   // Search state
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -226,15 +87,17 @@ function Register() {
     filterManufacturer,
     buildYearMin,
     buildYearMax,
-    selectedOrgId,
     statusFilter,
   ]);
 
   // Get filter options from suggestedValues
-  const allSuggestions = useQuery(api.suggestedValues.list, {});
+  const suggestionsOpts = convexQuery(api.suggestedValues.list, {});
+  const { data: allSuggestions } = useSuspenseQuery({
+    queryKey: suggestionsOpts.queryKey,
+    staleTime: suggestionsOpts.staleTime,
+  }) as { data: SuggestedValueItem[] };
   const filterOptions = useMemo(() => {
-    if (!allSuggestions) return null;
-    const active = (allSuggestions as SuggestedValueItem[]).filter((s) => s.active);
+    const active = allSuggestions.filter((s) => s.active);
     const byCategory = (cat: string) =>
       active
         .filter((s) => s.category === cat)
@@ -255,15 +118,18 @@ function Register() {
   const filterBaseArgs = {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(filterDistrict.length > 0 ? { district: filterDistrict } : {}),
-    ...(filterElevatorType.length > 0 ? { elevator_type: filterElevatorType } : {}),
-    ...(filterManufacturer.length > 0 ? { manufacturer: filterManufacturer } : {}),
+    ...(filterElevatorType.length > 0
+      ? { elevator_type: filterElevatorType }
+      : {}),
+    ...(filterManufacturer.length > 0
+      ? { manufacturer: filterManufacturer }
+      : {}),
     ...(buildYearMin && !isNaN(parseInt(buildYearMin))
       ? { buildYearMin: parseInt(buildYearMin) }
       : {}),
     ...(buildYearMax && !isNaN(parseInt(buildYearMax))
       ? { buildYearMax: parseInt(buildYearMax) }
       : {}),
-    ...(selectedOrgId ? { organization_id: selectedOrgId } : {}),
     ...(statusFilter !== "all" ? { status: statusFilter } : {}),
   };
 
@@ -275,26 +141,24 @@ function Register() {
     limit,
   } as never;
 
-  const result = useQuery(api.elevators.list, queryArgs) as
-    | ListResult
-    | undefined;
+  const listOpts = convexQuery(api.elevators.listing.list, queryArgs);
+  const { data: result, isLoading } = useQuery({
+    ...listOpts,
+    placeholderData: keepPreviousData,
+  }) as { data: ListResult | undefined; isLoading: boolean };
 
-  // Export data query — fetches all matching records (no pagination)
+  // Export data query
   const [exportRequested, setExportRequested] = useState<
     "csv" | "xlsx" | null
   >(null);
-  const exportArgs = exportRequested ? (filterBaseArgs as never) : "skip";
-  const exportData = useQuery(
-    api.elevators.exportData,
-    exportArgs as never,
-  ) as Record<string, unknown>[] | undefined;
+  const { data: exportData } = useQuery({
+    ...convexQuery(api.elevators.listing.exportData, filterBaseArgs as never),
+    enabled: !!exportRequested,
+  }) as { data: Record<string, unknown>[] | undefined };
 
-  const handleExport = useCallback(
-    (format: "csv" | "xlsx") => {
-      setExportRequested(format);
-    },
-    [],
-  );
+  const handleExport = useCallback((format: "csv" | "xlsx") => {
+    setExportRequested(format);
+  }, []);
 
   // Trigger download when export data arrives
   useEffect(() => {
@@ -325,393 +189,47 @@ function Register() {
     setStatusFilter("active");
   }
 
-  function handleSort(field: string) {
-    setSorting((prev) => {
-      const existing = prev.find((s) => s.id === field);
-      if (!existing) return [{ id: field, desc: false }];
-      if (!existing.desc) return [{ id: field, desc: true }];
-      return [];
-    });
-  }
-
-  const columnHelper = createColumnHelper<HissRow>();
-  const columns = useMemo(
-    () => [
-      columnHelper.accessor("elevator_number", {
-        header: () => (
-          <SortHeader
-            label="Hissnummer"
-            field="elevator_number"
-            sorting={sorting}
-            onSort={handleSort}
-          />
-        ),
-        cell: (info) => (
-          <span className="font-medium">{info.getValue()}</span>
-        ),
-      }),
-      columnHelper.accessor("address", {
-        header: () => (
-          <SortHeader
-            label="Adress"
-            field="address"
-            sorting={sorting}
-            onSort={handleSort}
-          />
-        ),
-        cell: (info) => info.getValue() || "\u2014",
-      }),
-      columnHelper.accessor("district", {
-        header: () => (
-          <SortHeader
-            label="Distrikt"
-            field="district"
-            sorting={sorting}
-            onSort={handleSort}
-          />
-        ),
-        cell: (info) => info.getValue() || "\u2014",
-      }),
-      columnHelper.accessor("elevator_type", {
-        header: () => (
-          <SortHeader
-            label="Hisstyp"
-            field="elevator_type"
-            sorting={sorting}
-            onSort={handleSort}
-          />
-        ),
-        cell: (info) => info.getValue() || "\u2014",
-      }),
-      columnHelper.accessor("manufacturer", {
-        header: () => (
-          <SortHeader
-            label="Fabrikat"
-            field="manufacturer"
-            sorting={sorting}
-            onSort={handleSort}
-          />
-        ),
-        cell: (info) => info.getValue() || "\u2014",
-      }),
-      columnHelper.accessor("build_year", {
-        header: () => (
-          <SortHeader
-            label="Byggår"
-            field="build_year"
-            sorting={sorting}
-            onSort={handleSort}
-          />
-        ),
-        cell: (info) => info.getValue() ?? "\u2014",
-      }),
-      columnHelper.accessor("modernization_year", {
-        header: () => (
-          <SortHeader
-            label="Moderniserad"
-            field="modernization_year"
-            sorting={sorting}
-            onSort={handleSort}
-          />
-        ),
-        cell: (info) => info.getValue() || "\u2014",
-      }),
-      columnHelper.accessor("recommended_modernization_year", {
-        header: () => (
-          <SortHeader
-            label="Rek. modern."
-            field="recommended_modernization_year"
-            sorting={sorting}
-            onSort={handleSort}
-          />
-        ),
-        cell: (info) => info.getValue() || "\u2014",
-      }),
-      columnHelper.accessor("budget_amount", {
-        header: () => (
-          <SortHeader
-            label="Budget"
-            field="budget_amount"
-            sorting={sorting}
-            onSort={handleSort}
-          />
-        ),
-        cell: (info) => {
-          const v = info.getValue();
-          return v !== undefined && v !== null
-            ? `${(v / 1000).toFixed(0)} tkr`
-            : "\u2014";
-        },
-      }),
-      columnHelper.display({
-        id: "actions",
-        cell: (info) => (
-          <Link
-            to="/hiss/$id/redigera"
-            params={{ id: info.row.original._id }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Button variant="ghost" size="icon" className="size-8">
-              <Pencil className="size-3.5" />
-            </Button>
-          </Link>
-        ),
-      }),
-    ],
-    [sorting],
-  );
-
-  const table = useReactTable({
-    data: result?.data ?? [],
-    columns,
-    manualSorting: true,
-    manualPagination: true,
-    pageCount: result?.totalPages ?? -1,
-    state: {
-      sorting,
-      pagination: { pageIndex: page, pageSize: limit },
-    },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-  });
-
-  if (result === undefined) {
-    return <RegisterSkeleton />;
-  }
-
-  const { totalCount, totalPages } = result;
-  const offset = page * limit;
+  const totalCount = result?.totalCount ?? 0;
+  const totalPages = result?.totalPages ?? 0;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Register</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {totalCount} hissar i registret
-          </p>
-        </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" disabled={totalCount === 0}>
-              <Download className="mr-1.5 size-4" />
-              Exportera
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-44 p-1" align="end">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start"
-              disabled={exportRequested === "csv"}
-              onClick={() => handleExport("csv")}
-            >
-              <FileText className="mr-2 size-4" />
-              {exportRequested === "csv" ? "Laddar..." : "CSV"}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start"
-              disabled={exportRequested === "xlsx"}
-              onClick={() => handleExport("xlsx")}
-            >
-              <FileSpreadsheet className="mr-2 size-4" />
-              {exportRequested === "xlsx" ? "Laddar..." : "Excel (.xlsx)"}
-            </Button>
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      {/* Search bar */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="S\u00f6k hissnummer, adress, distrikt..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
-        {search && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-1 top-1/2 size-7 -translate-y-1/2"
-            onClick={() => setSearch("")}
-          >
-            <X className="size-3.5" />
-          </Button>
-        )}
-      </div>
-
-      {/* Filter row */}
-      <div className="flex flex-wrap items-center gap-2">
-        {filterOptions && (
-          <>
-            <MultiSelectFilter
-              title="Distrikt"
-              options={filterOptions.district}
-              selected={filterDistrict}
-              onSelectedChange={setFilterDistrict}
-            />
-            <MultiSelectFilter
-              title="Hisstyp"
-              options={filterOptions.elevator_type}
-              selected={filterElevatorType}
-              onSelectedChange={setFilterElevatorType}
-            />
-            <MultiSelectFilter
-              title="Fabrikat"
-              options={filterOptions.manufacturer}
-              selected={filterManufacturer}
-              onSelectedChange={setFilterManufacturer}
-            />
-          </>
-        )}
-
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
-          <SelectTrigger className="h-9 w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="active">Aktiva</SelectItem>
-            <SelectItem value="demolished">Rivda</SelectItem>
-            <SelectItem value="archived">Arkiverade</SelectItem>
-            <SelectItem value="all">Alla</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <div className="flex items-center gap-1">
-          <span className="text-sm text-muted-foreground">Bygg\u00e5r:</span>
-          <Input
-            type="number"
-            placeholder="Från"
-            value={buildYearMin}
-            onChange={(e) => setBuildYearMin(e.target.value)}
-            className="h-9 w-20"
-          />
-          <span className="text-muted-foreground">–</span>
-          <Input
-            type="number"
-            placeholder="Till"
-            value={buildYearMax}
-            onChange={(e) => setBuildYearMax(e.target.value)}
-            className="h-9 w-20"
-          />
-        </div>
-
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={clearAllFilters}>
-            <X className="mr-1 size-3" />
-            Rensa filter
-          </Button>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="cursor-pointer"
-                  onClick={() => {
-                    window.location.href = `/hiss/${row.original._id}`;
-                  }}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Building2 className="size-8" />
-                    <p>Inga hissar hittades.</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Pagination */}
-      {totalCount > 0 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Visar {offset + 1}\u2013{Math.min(offset + limit, totalCount)} av{" "}
-            {totalCount}
-          </p>
-          <div className="flex items-center gap-2">
-            <Select
-              value={String(limit)}
-              onValueChange={(v) => {
-                setLimit(Number(v));
-                setPage(0);
-              }}
-            >
-              <SelectTrigger className="h-9 w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="25">25</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-9"
-              disabled={page === 0}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              {page + 1} / {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-9"
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+    <div className="min-w-0 space-y-4">
+      <RegisterToolbar
+        totalCount={totalCount}
+        search={search}
+        onSearchChange={setSearch}
+        exportRequested={exportRequested}
+        onExport={handleExport}
+      />
+      <RegisterFilters
+        filterOptions={filterOptions}
+        filterDistrict={filterDistrict}
+        onFilterDistrictChange={setFilterDistrict}
+        filterElevatorType={filterElevatorType}
+        onFilterElevatorTypeChange={setFilterElevatorType}
+        filterManufacturer={filterManufacturer}
+        onFilterManufacturerChange={setFilterManufacturer}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        buildYearMin={buildYearMin}
+        onBuildYearMinChange={setBuildYearMin}
+        buildYearMax={buildYearMax}
+        onBuildYearMaxChange={setBuildYearMax}
+        hasActiveFilters={hasActiveFilters}
+        onClearAllFilters={clearAllFilters}
+      />
+      <RegisterTable
+        data={result?.data ?? []}
+        sorting={sorting}
+        onSortingChange={setSorting}
+        totalCount={totalCount}
+        totalPages={totalPages}
+        page={page}
+        pageSize={limit}
+        onPageChange={setPage}
+        onPageSizeChange={setLimit}
+        isLoading={isLoading}
+      />
     </div>
   );
 }

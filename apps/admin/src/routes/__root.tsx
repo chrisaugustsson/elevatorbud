@@ -3,15 +3,28 @@ import {
   HeadContent,
   Outlet,
   Scripts,
-  createRootRoute,
+  createRootRouteWithContext,
 } from "@tanstack/react-router";
 import * as React from "react";
-import { ConvexClerkProvider } from "@elevatorbud/auth";
+import { createServerFn } from "@tanstack/react-start";
+import { auth } from "@elevatorbud/auth/server";
+import {
+  ClerkProvider,
+  ConvexProviderWithClerk,
+  useAuth,
+} from "@elevatorbud/auth";
+import { Toaster } from "@elevatorbud/ui/components/ui/sonner";
+import { ThemeProvider } from "@elevatorbud/ui/hooks/use-theme";
+import type { RouterContext } from "../router";
 import appCss from "../styles/app.css?url";
 
-const convexUrl = import.meta.env.VITE_CONVEX_URL as string;
+const getConvexToken = createServerFn().handler(async () => {
+  const { getToken } = await auth();
+  const token = await getToken({ template: "convex" });
+  return token;
+});
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -20,18 +33,20 @@ export const Route = createRootRoute({
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),
-  component: RootComponent,
+  beforeLoad: async ({ context }) => {
+    try {
+      const token = await getConvexToken();
+      if (token) {
+        context.convexQueryClient.serverHttpClient?.setAuth(token);
+      }
+    } catch {
+      // Token fetch failed — SSR queries will be unauthenticated
+      // Client-side auth via ClerkProvider will still work
+    }
+  },
+  shellComponent: RootDocument,
+  component: RootLayout,
 });
-
-function RootComponent() {
-  return (
-    <RootDocument>
-      <ConvexClerkProvider convexUrl={convexUrl}>
-        <Outlet />
-      </ConvexClerkProvider>
-    </RootDocument>
-  );
-}
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
@@ -40,9 +55,24 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
         <Scripts />
       </body>
     </html>
+  );
+}
+
+function RootLayout() {
+  const { convexClient } = Route.useRouteContext();
+
+  return (
+    <ClerkProvider>
+      <ConvexProviderWithClerk client={convexClient} useAuth={useAuth}>
+        <Outlet />
+        <Toaster />
+      </ConvexProviderWithClerk>
+    </ClerkProvider>
   );
 }

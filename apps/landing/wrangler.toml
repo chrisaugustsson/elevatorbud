@@ -1,7 +1,4 @@
-name = "elevatorbud-landing"
+name = 'hisskompetens-web-dev'
 compatibility_date = "2025-04-01"
-
-routes = [
-  { pattern = "hisskompetens.se", custom_domain = true },
-  { pattern = "www.hisskompetens.se", custom_domain = true },
-]
+compatibility_flags = ["nodejs_compat"]
+main = "@tanstack/react-start/server-entry"

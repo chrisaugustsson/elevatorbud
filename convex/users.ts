@@ -1,7 +1,20 @@
 import { internalMutation, query } from "./_generated/server";
 import { getCurrentUser } from "./auth";
-import type { UserJSON } from "@clerk/backend";
-import { v, type Validator } from "convex/values";
+import { v } from "convex/values";
+
+// Validates the subset of Clerk UserJSON fields we actually use
+const clerkUserData = v.object({
+  id: v.string(),
+  first_name: v.optional(v.union(v.string(), v.null())),
+  last_name: v.optional(v.union(v.string(), v.null())),
+  email_addresses: v.array(
+    v.object({
+      id: v.string(),
+      email_address: v.string(),
+    }),
+  ),
+  primary_email_address_id: v.optional(v.union(v.string(), v.null())),
+});
 
 export const me = query({
   handler: async (ctx) => {
@@ -10,7 +23,7 @@ export const me = query({
 });
 
 export const upsertFromClerk = internalMutation({
-  args: { data: v.any() as Validator<UserJSON> },
+  args: { data: clerkUserData },
   async handler(ctx, { data }) {
     const existingUser = await ctx.db
       .query("users")

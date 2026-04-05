@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { KpiCards } from "@elevatorbud/ui/components/dashboard/kpi-cards";
 import type { KpiItem } from "@elevatorbud/ui/components/dashboard/kpi-cards";
@@ -19,24 +20,31 @@ import {
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
+  pendingComponent: DashboardSkeleton,
 });
 
 function DashboardPage() {
-  const user = useQuery(api.users.me);
-  const orgFilter = user?.organization_id
-    ? ({ organization_id: user.organization_id } as never)
-    : "skip";
+  const userOpts = convexQuery(api.users.me, {});
+  const { data: user } = useSuspenseQuery({
+    queryKey: userOpts.queryKey,
+    staleTime: userOpts.staleTime,
+  });
 
-  const stats = useQuery(api.elevators.stats, orgFilter as never);
-  const chartData = useQuery(api.elevators.chartData, orgFilter as never);
+  const statsOpts = convexQuery(api.elevators.analytics.stats, {
+    organization_id: user!.organization_id,
+  } as never);
+  const { data: stats } = useSuspenseQuery({
+    queryKey: statsOpts.queryKey,
+    staleTime: statsOpts.staleTime,
+  });
 
-  if (
-    user === undefined ||
-    stats === undefined ||
-    chartData === undefined
-  ) {
-    return <DashboardSkeleton />;
-  }
+  const chartOpts = convexQuery(api.elevators.analytics.chartData, {
+    organization_id: user!.organization_id,
+  } as never);
+  const { data: chartData } = useSuspenseQuery({
+    queryKey: chartOpts.queryKey,
+    staleTime: chartOpts.staleTime,
+  });
 
   const kpiItems: KpiItem[] = [
     {

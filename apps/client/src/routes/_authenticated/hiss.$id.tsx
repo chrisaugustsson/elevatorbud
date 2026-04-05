@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import {
   Card,
@@ -15,6 +16,7 @@ import { ArrowLeft, Phone, MessageSquare } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/hiss/$id")({
   component: HissDetail,
+  pendingComponent: DetailSkeleton,
 });
 
 type HissDoc = {
@@ -73,7 +75,7 @@ function DetailField({
 }) {
   let display: string;
   if (value === undefined || value === null || value === "") {
-    display = "\u2014";
+    display = "—";
   } else if (typeof value === "boolean") {
     display = value ? "Ja" : "Nej";
   } else {
@@ -116,12 +118,18 @@ function DetailSection({
 
 function HissDetail() {
   const { id } = Route.useParams();
-  const hiss = useQuery(api.elevators.get, { id } as never) as
-    | HissDoc
-    | undefined;
+  const hissOpts = convexQuery(api.elevators.crud.get, { id } as never);
+  const { data: hiss } = useSuspenseQuery({
+    queryKey: hissOpts.queryKey,
+    staleTime: hissOpts.staleTime,
+  }) as { data: HissDoc | null };
 
-  if (hiss === undefined) {
-    return <DetailSkeleton />;
+  if (hiss === null) {
+    return (
+      <div className="mx-auto max-w-4xl py-12 text-center text-muted-foreground">
+        Hissen hittades inte.
+      </div>
+    );
   }
 
   const statusLabel: Record<string, string> = {

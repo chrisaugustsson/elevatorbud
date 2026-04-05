@@ -13,6 +13,7 @@ const internalRef = anyApi as unknown as {
     insertUser: FunctionReference<"mutation", "internal">;
     updateUser: FunctionReference<"mutation", "internal">;
     deactivateUser: FunctionReference<"mutation", "internal">;
+    activateUser: FunctionReference<"mutation", "internal">;
     removeUser: FunctionReference<"mutation", "internal">;
   };
 };
@@ -102,9 +103,13 @@ export const update = action({
       clerkUpdate.lastName = nameParts.slice(1).join(" ") || undefined;
     }
 
+    const effectiveRole = args.role ?? currentData.role;
     clerkUpdate.publicMetadata = {
-      role: args.role ?? currentData.role,
-      organization_id: args.organization_id ?? currentData.organization_id,
+      role: effectiveRole,
+      organization_id:
+        effectiveRole === "admin"
+          ? undefined
+          : (args.organization_id ?? currentData.organization_id),
     };
 
     await clerk.users.updateUser(currentData.clerk_user_id, clerkUpdate);
@@ -123,6 +128,21 @@ export const deactivate = action({
 
     const clerk = getClerkClient();
     await clerk.users.banUser(clerkUserId);
+  },
+});
+
+export const activate = action({
+  args: { id: v.id("users") },
+  handler: async (ctx, { id }) => {
+    await ctx.runQuery(internalRef.userAdminInternal.checkAdmin);
+
+    const clerkUserId = await ctx.runMutation(
+      internalRef.userAdminInternal.activateUser,
+      { id },
+    );
+
+    const clerk = getClerkClient();
+    await clerk.users.unbanUser(clerkUserId);
   },
 });
 

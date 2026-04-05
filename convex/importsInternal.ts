@@ -2,7 +2,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { requireAdmin } from "./auth";
-import { autoAddSuggestedValues } from "./elevators";
+import { autoAddSuggestedValues } from "./elevators/helpers";
 
 export const checkAdmin = internalQuery({
   args: {},
@@ -21,11 +21,18 @@ export const createOrg = internalMutation({
 
 export const importBatch = internalMutation({
   args: {
-    elevators: v.array(v.any()),
-    orgMapping: v.any(),
-    adminId: v.any(),
+    elevators: v.array(v.record(v.string(), v.any())),
+    orgMappingNames: v.array(v.string()),
+    orgMappingIds: v.array(v.string()),
+    adminId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    // Reconstruct org mapping from parallel arrays
+    const orgMapping: Record<string, string> = {};
+    for (let i = 0; i < args.orgMappingNames.length; i++) {
+      orgMapping[args.orgMappingNames[i]] = args.orgMappingIds[i];
+    }
+
     let created = 0;
     let updated = 0;
     const errors: { elevator_number: string; error: string }[] = [];
@@ -33,8 +40,7 @@ export const importBatch = internalMutation({
     for (const elevator of args.elevators) {
       try {
         const orgName = elevator._organisation_namn as string | undefined;
-        const mapping = args.orgMapping as Record<string, string>;
-        const orgId = orgName ? mapping[orgName] : undefined;
+        const orgId = orgName ? orgMapping[orgName] : undefined;
 
         if (!orgId) {
           errors.push({
@@ -64,8 +70,8 @@ export const importBatch = internalMutation({
         // Check if elevator_number exists
         const existing = await ctx.db
           .query("elevators")
-          .withIndex("by_elevator_number", (q: any) =>
-            q.eq("elevator_number", fields.elevator_number),
+          .withIndex("by_elevator_number", (q) =>
+            q.eq("elevator_number", fields.elevator_number as string),
           )
           .unique();
 
@@ -78,7 +84,7 @@ export const importBatch = internalMutation({
             ...(importStatus
               ? { status: importStatus as "active" | "demolished" | "archived" }
               : {}),
-            last_updated_by: args.adminId as Id<"users">,
+            last_updated_by: args.adminId,
             last_updated_at: Date.now(),
           });
           updated++;
@@ -87,17 +93,17 @@ export const importBatch = internalMutation({
           await autoAddSuggestedValues(ctx, fields);
 
           // Create new elevator
-          const insertData = {
+          await ctx.db.insert("elevators", {
+            elevator_number: fields.elevator_number as string,
             ...fields,
             organization_id: orgId as Id<"organizations">,
             status: ((importStatus as string) || "active") as
               | "active"
               | "demolished"
               | "archived",
-            created_by: args.adminId as Id<"users">,
+            created_by: args.adminId,
             created_at: Date.now(),
-          } as any;
-          await ctx.db.insert("elevators", insertData);
+          });
           created++;
         }
       } catch (e) {

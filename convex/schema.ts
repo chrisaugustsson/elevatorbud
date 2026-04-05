@@ -90,7 +90,10 @@ export default defineSchema({
     active: v.boolean(),
     created_at: v.number(),
     last_login: v.optional(v.number()),
-  }).index("by_clerk_user_id", ["clerk_user_id"]),
+  })
+    .index("by_clerk_user_id", ["clerk_user_id"])
+    .index("by_organization_id", ["organization_id"])
+    .index("by_role", ["role"]),
 
   suggested_values: defineTable({
     category: v.string(),
@@ -98,6 +101,15 @@ export default defineSchema({
     active: v.boolean(),
     created_at: v.number(),
   }).index("by_category", ["category"]),
+
+  contactSubmissions: defineTable({
+    name: v.string(),
+    email: v.string(),
+    phone: v.optional(v.string()),
+    message: v.string(),
+    status: v.union(v.literal("new"), v.literal("read"), v.literal("archived")),
+    createdAt: v.number(),
+  }).index("by_status", ["status"]),
 
   pages: defineTable({
     slug: v.string(),

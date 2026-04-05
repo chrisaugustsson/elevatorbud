@@ -1,6 +1,15 @@
-name = "elevatorbud-admin"
+name = "elevatorbud-admin-dev"
 compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+main = "@tanstack/react-start/server-entry"
+workers_dev = true
 
-routes = [
-  { pattern = "admin.hisskompetens.se", custom_domain = true },
-]
+# TODO: Add custom domain when hisskompetens.se is set up in Cloudflare
+# routes = [
+#   { pattern = "admin.hisskompetens.se", custom_domain = true },
+# ]
+
+[env.dev]
+name = "elevatorbud-admin-dev"
+workers_dev = true
+routes = []

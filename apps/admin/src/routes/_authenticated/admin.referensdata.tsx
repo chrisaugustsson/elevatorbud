@@ -1,8 +1,17 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { useForm } from "@tanstack/react-form";
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  createColumnHelper,
+  type SortingState,
+} from "@tanstack/react-table";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Input } from "@elevatorbud/ui/components/ui/input";
 import { Label } from "@elevatorbud/ui/components/ui/label";
@@ -10,10 +19,15 @@ import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
 } from "@elevatorbud/ui/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@elevatorbud/ui/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -30,16 +44,27 @@ import {
   DialogFooter,
 } from "@elevatorbud/ui/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@elevatorbud/ui/components/ui/dropdown-menu";
+import {
   Plus,
   Pencil,
   Merge,
   Ban,
-  Database,
   CheckCircle,
+  Database,
+  MoreHorizontal,
 } from "lucide-react";
+import { DataGrid, DataGridContainer, DataGridTable, DataGridColumnHeader } from "@elevatorbud/ui/components/ui/data-grid-table";
+import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated/admin/referensdata")({
   component: Referensdata,
+  pendingComponent: ReferensdataSkeleton,
 });
 
 const CATEGORIES = [
@@ -80,6 +105,53 @@ type SuggestedValue = {
   created_at: number;
 };
 
+function ReferensdataSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Referensdata</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Hantera förslagsvärden som används i formulärfält.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <div className="space-y-2 sm:w-64">
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+        <div className="flex-1">
+          <Skeleton className="h-10 max-w-sm" />
+        </div>
+        <Skeleton className="h-10 w-28" />
+      </div>
+
+      <Skeleton className="h-4 w-24" />
+
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead><Skeleton className="h-4 w-20" /></TableHead>
+              <TableHead><Skeleton className="h-4 w-16" /></TableHead>
+              <TableHead><Skeleton className="h-4 w-8" /></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <TableRow key={i}>
+                <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                <TableCell className="text-right"><Skeleton className="ml-auto h-8 w-8" /></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
 function Referensdata() {
   const [selectedCategory, setSelectedCategory] = useState<Category>("elevator_type");
   const [search, setSearch] = useState("");
@@ -87,20 +159,112 @@ function Referensdata() {
   const [renameItem, setRenameItem] = useState<SuggestedValue | null>(null);
   const [mergeItem, setMergeItem] = useState<SuggestedValue | null>(null);
 
-  const values = useQuery(api.suggestedValues.list, {
+  const opts = convexQuery(api.suggestedValues.list, {
     category: selectedCategory,
   });
+  const { data: values } = useSuspenseQuery({
+    queryKey: opts.queryKey,
+    staleTime: opts.staleTime,
+  }) as { data: SuggestedValue[] };
   const createValue = useMutation(api.suggestedValues.create);
   const updateValue = useMutation(api.suggestedValues.update);
   const mergeValue = useMutation(api.suggestedValues.merge);
   const deactivateValue = useMutation(api.suggestedValues.deactivate);
+  const activateValue = useMutation(api.suggestedValues.activate);
 
-  const filteredValues = (values as SuggestedValue[] | undefined)?.filter(
-    (item) => item.value.toLowerCase().includes(search.toLowerCase()),
+  const filteredValues = useMemo(
+    () => values.filter(
+      (item) => item.value.toLowerCase().includes(search.toLowerCase()),
+    ),
+    [values, search],
   );
 
-  const activeCount = filteredValues?.filter((v) => v.active).length ?? 0;
-  const inactiveCount = filteredValues?.filter((v) => !v.active).length ?? 0;
+  const activeCount = filteredValues.filter((v) => v.active).length;
+  const inactiveCount = filteredValues.filter((v) => !v.active).length;
+
+  const columnHelper = createColumnHelper<SuggestedValue>();
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("value", {
+        header: ({ column }) => <DataGridColumnHeader title="Värde" column={column} />,
+        cell: (info) => <span className="font-medium">{info.getValue()}</span>,
+      }),
+      columnHelper.accessor("active", {
+        header: ({ column }) => <DataGridColumnHeader title="Status" column={column} />,
+        enableSorting: false,
+        cell: (info) => (
+          <Badge variant={info.getValue() ? "outline" : "secondary"}>
+            {info.getValue() ? "Aktiv" : "Inaktiv"}
+          </Badge>
+        ),
+      }),
+      columnHelper.display({
+        id: "actions",
+        header: "",
+        cell: (info) => {
+          const row = info.row.original;
+          return (
+            <div className="flex items-center justify-end">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="size-8">
+                    <MoreHorizontal className="size-4" />
+                    <span className="sr-only">Åtgärder</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setRenameItem(row)}>
+                    <Pencil className="mr-2 size-4" />
+                    Byt namn
+                  </DropdownMenuItem>
+                  {row.active && (
+                    <DropdownMenuItem onClick={() => setMergeItem(row)}>
+                      <Merge className="mr-2 size-4" />
+                      Slå ihop
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  {row.active ? (
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        await deactivateValue({ id: row._id as never });
+                      }}
+                    >
+                      <Ban className="mr-2 size-4" />
+                      Inaktivera
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        await activateValue({ id: row._id as never });
+                      }}
+                    >
+                      <CheckCircle className="mr-2 size-4" />
+                      Aktivera
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          );
+        },
+      }),
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+
+  const table = useReactTable({
+    data: filteredValues,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
 
   return (
     <div className="space-y-6">
@@ -113,7 +277,7 @@ function Referensdata() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
         <div className="space-y-2 sm:w-64">
-          <Label>Category</Label>
+          <Label>Kategori</Label>
           <Select
             value={selectedCategory}
             onValueChange={(val) => {
@@ -147,81 +311,21 @@ function Referensdata() {
         </Button>
       </div>
 
-      {values === undefined ? (
-        <div className="flex items-center justify-center py-12">
-          <p className="text-muted-foreground">Laddar värden...</p>
-        </div>
-      ) : (
-        <>
-          <div className="flex gap-3 text-sm text-muted-foreground">
-            <span>{activeCount} aktiva</span>
-            {inactiveCount > 0 && <span>{inactiveCount} inaktiva</span>}
-          </div>
+      <div className="flex gap-3 text-sm text-muted-foreground">
+        <span>{activeCount} aktiva</span>
+        {inactiveCount > 0 && <span>{inactiveCount} inaktiva</span>}
+      </div>
 
-          {filteredValues && filteredValues.length > 0 ? (
-            <div className="grid gap-2">
-              {filteredValues.map((item) => (
-                <Card
-                  key={item._id}
-                  className={
-                    !item.active ? "border-dashed opacity-60" : undefined
-                  }
-                >
-                  <CardContent className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="font-medium">{item.value}</span>
-                      {!item.active && (
-                        <Badge variant="secondary">Inaktiv</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setRenameItem(item)}
-                        title="Byt namn"
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      {item.active && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setMergeItem(item)}
-                          title="Slå ihop med annat värde"
-                        >
-                          <Merge className="size-4" />
-                        </Button>
-                      )}
-                      {item.active && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={async () => {
-                            await deactivateValue({
-                              id: item._id as never,
-                            });
-                          }}
-                          title="Inaktivera"
-                        >
-                          <Ban className="size-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
-                <Database className="size-8" />
-                <p>Inga värden hittades.</p>
-              </CardContent>
-            </Card>
-          )}
-        </>
-      )}
+      <DataGrid
+        table={table}
+        recordCount={filteredValues.length}
+      >
+        <DataGridContainer>
+          <div className="overflow-x-auto">
+            <DataGridTable />
+          </div>
+        </DataGridContainer>
+      </DataGrid>
 
       <CreateValueDialog
         open={createOpen}
@@ -247,9 +351,7 @@ function Referensdata() {
 
       <MergeDialog
         item={mergeItem}
-        allValues={
-          (values as SuggestedValue[] | undefined)?.filter((v) => v.active) ?? []
-        }
+        allValues={values.filter((v) => v.active)}
         onOpenChange={(open) => {
           if (!open) setMergeItem(null);
         }}

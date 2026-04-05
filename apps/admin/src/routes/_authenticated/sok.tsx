@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useQuery } from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import { Input } from "@elevatorbud/ui/components/ui/input";
 import { Search, MapPin, Building2, ArrowRight } from "lucide-react";
@@ -28,10 +29,12 @@ function SokHiss() {
     return () => clearTimeout(timer);
   }, [input]);
 
-  const results = useQuery(
-    api.elevators.search,
-    debouncedSearch.trim() ? { search: debouncedSearch.trim() } : "skip",
-  ) as SearchResult[] | undefined;
+  const { data: results, isFetching } = useQuery({
+    ...convexQuery(api.elevators.crud.search, {
+      search: debouncedSearch.trim(),
+    }),
+    enabled: !!debouncedSearch.trim(),
+  }) as { data: SearchResult[] | undefined; isFetching: boolean };
 
   return (
     <div className="space-y-6">
@@ -53,7 +56,7 @@ function SokHiss() {
         />
       </div>
 
-      {debouncedSearch.trim() && results === undefined && (
+      {isFetching && (
         <p className="text-sm text-muted-foreground">Söker...</p>
       )}
 

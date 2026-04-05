@@ -1,1 +1,1 @@
-export { clerkMiddleware } from "@clerk/tanstack-react-start/server";
+export { clerkMiddleware, auth } from "@clerk/tanstack-react-start/server";

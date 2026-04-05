@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
+import {
+  useSuspenseQuery,
+  useQuery,
+} from "@tanstack/react-query";
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@convex/_generated/api";
 import {
   Card,
@@ -39,6 +44,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/hiss/$id/")({
   component: HissDetail,
+  pendingComponent: DetailSkeleton,
 });
 
 type HissDoc = {
@@ -102,7 +108,7 @@ function DetailField({
 }) {
   let display: string;
   if (value === undefined || value === null || value === "") {
-    display = "\u2014";
+    display = "—";
   } else if (typeof value === "boolean") {
     display = value ? "Ja" : "Nej";
   } else {
@@ -146,20 +152,28 @@ function DetailSection({
 function HissDetail() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
-  const hiss = useQuery(api.elevators.get, { id } as never) as
-    | HissDoc
-    | undefined;
-  const org = useQuery(
-    api.organizations.get,
-    hiss ? ({ id: hiss.organization_id } as never) : "skip",
-  ) as OrgDoc | undefined;
-  const archiveMutation = useMutation(api.elevators.archive);
+  const hissOpts = convexQuery(api.elevators.crud.get, { id } as never);
+  const { data: hiss } = useSuspenseQuery({
+    queryKey: hissOpts.queryKey,
+    staleTime: hissOpts.staleTime,
+  }) as { data: HissDoc | null };
+  const { data: org } = useQuery({
+    ...convexQuery(api.organizations.get, {
+      id: hiss?.organization_id,
+    } as never),
+    enabled: !!hiss,
+  }) as { data: OrgDoc | undefined };
+  const archiveMutation = useMutation(api.elevators.crud.archive);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [archiveStatus, setArchiveStatus] = useState<"demolished" | "archived">("demolished");
   const [isArchiving, setIsArchiving] = useState(false);
 
-  if (hiss === undefined) {
-    return <DetailSkeleton />;
+  if (hiss === null) {
+    return (
+      <div className="mx-auto max-w-4xl py-12 text-center text-muted-foreground">
+        Hissen hittades inte.
+      </div>
+    );
   }
 
   const statusLabel: Record<string, string> = {
@@ -384,14 +398,43 @@ function HissDetail() {
 function DetailSkeleton() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex items-center gap-2">
-        <Skeleton className="size-8" />
-        <Skeleton className="h-8 w-48" />
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Skeleton className="size-8" />
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-5 w-16 rounded-full" />
+          </div>
+          <Skeleton className="ml-10 h-4 w-64" />
+          <Skeleton className="ml-10 h-4 w-40" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 w-28" />
+          <Skeleton className="h-9 w-28" />
+        </div>
       </div>
-      <Skeleton className="h-px w-full" />
-      <Skeleton className="h-48 w-full rounded-lg" />
-      <Skeleton className="h-48 w-full rounded-lg" />
-      <Skeleton className="h-48 w-full rounded-lg" />
+      <Separator />
+      {/* Card sections */}
+      {Array.from({ length: 7 }).map((_, i) => (
+        <Card key={i}>
+          <CardHeader className="pb-3">
+            <Skeleton className="h-5 w-48" />
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+              {Array.from({ length: i === 0 ? 4 : i === 1 ? 8 : 5 }).map(
+                (_, j) => (
+                  <div key={j} className="space-y-1">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                ),
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }

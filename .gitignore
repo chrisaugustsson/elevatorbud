@@ -4,8 +4,6 @@ dist
 .vinxi
 .output
 .wrangler
-.env
 .env.local
 *.tsbuildinfo
 routeTree.gen.ts
-convex/_generated

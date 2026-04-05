@@ -1,0 +1,321 @@
+{
+  "project": "Hisskompetens",
+  "branchName": "ralph/convex-tanstack-query-migration",
+  "description": "Migrate admin app from Convex useQuery to ConvexQueryClient + TanStack Query for SSR, streaming, prefetch-on-hover, and Suspense-based loading states",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Install dependencies and configure router with ConvexQueryClient",
+      "description": "As a developer, I need TanStack Query + Convex integration packages installed and the router configured so Convex queries can run through TanStack Query on both server and client.",
+      "acceptanceCriteria": [
+        "Install @convex-dev/react-query, @tanstack/react-query, and @tanstack/react-router-with-query in apps/admin",
+        "apps/admin/src/router.tsx creates ConvexReactClient, ConvexQueryClient, and QueryClient with correct wiring (hashFn, queryFn, connect)",
+        "Router created via routerWithQueryClient() with { queryClient, convexClient, convexQueryClient } in context",
+        "Router Wrap renders <ConvexProvider> around children",
+        "RouterContext type is exported for use by root route",
+        "defaultPreload: 'intent' is enabled on the router",
+        "Existing pages still load and function (backwards compatible — Convex useQuery still works inside ConvexProvider)",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "This is the foundation. Read @convex-dev/react-query docs carefully. Verify no Node.js-specific APIs are pulled in — app runs on Cloudflare Workers. ConvexQueryClient's serverHttpClient uses fetch which is available in Workers."
+    },
+    {
+      "id": "US-002",
+      "title": "Rewrite root route with server-side auth token and provider restructure",
+      "description": "As a developer, I need the root route to fetch the Clerk auth token server-side and set it on ConvexQueryClient's HTTP client so SSR queries can authenticate against Convex.",
+      "acceptanceCriteria": [
+        "Root route uses createRootRouteWithContext<RouterContext>()()",
+        "beforeLoad calls a server function that fetches Clerk token via auth().getToken({ template: 'convex' }) and sets it on convexQueryClient.serverHttpClient?.setAuth(token)",
+        "shellComponent (RootDocument) contains only HTML shell: <html>, <head>, <body>, ThemeProvider, <Scripts> — no data providers",
+        "Root route component (RootLayout) renders ClerkProvider → ConvexProviderWithClerk → <Outlet> + <Toaster>",
+        "ConvexProviderWithClerk receives convexClient from route context and useAuth from Clerk",
+        "Module-level ConvexReactClient instantiation removed from __root.tsx (moved to router.tsx in US-001)",
+        "App loads without console errors",
+        "Clerk UI components (SignIn, UserButton) still render correctly",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Provider nesting order matters: Router Wrap provides ConvexProvider (for SSR). Root route component provides ConvexProviderWithClerk (for client auth). Both share the same ConvexReactClient instance. The inner provider overrides the outer context. Moving ClerkProvider from shellComponent to component changes SSR rendering order — verify Clerk UI still works."
+    },
+    {
+      "id": "US-003",
+      "title": "Migrate _authenticated.tsx to ensureQueryData + useSuspenseQuery",
+      "description": "As a developer, I need the authenticated layout to use ConvexQueryClient integration instead of the manual ConvexHttpClient workaround.",
+      "acceptanceCriteria": [
+        "ConvexHttpClient import and manual server-side prefetch logic removed",
+        "convex/browser import removed",
+        "Route loader uses ensureQueryData(convexQuery(api.users.me, {})) to prefetch user data",
+        "Component uses useSuspenseQuery(convexQuery(api.users.me, {})) instead of useQuery from convex/react",
+        "The prefetchedUser / liveUser fallback pattern removed",
+        "The if (user === undefined) loading state removed",
+        "beforeLoad auth guard (redirect to /login if unauthenticated) kept",
+        "Null check (webhook not synced yet) and user.role !== 'admin' check kept",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "This is the ONLY route that uses a blocking loader with ensureQueryData — needed for the admin role gate. All other routes will stream via Suspense. The loader receives context with queryClient and convexQueryClient."
+    },
+    {
+      "id": "US-004",
+      "title": "Migrate dashboard page to useSuspenseQuery",
+      "description": "As a developer, I need the dashboard page to stream server-rendered content instead of showing a client-side loading state.",
+      "acceptanceCriteria": [
+        "useQuery from convex/react replaced with useSuspenseQuery from @tanstack/react-query + convexQuery from @convex-dev/react-query",
+        "if (data === undefined) loading check removed",
+        "Skeleton pendingComponent added to route definition matching the dashboard layout",
+        "useMutation/useAction from convex/react remain unchanged (if any)",
+        "Real-time updates still work",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "File: apps/admin/src/routes/_authenticated/dashboard.tsx. Dashboard was recently rewritten (US-018 of admin-ux-improvements) as a landing page with stat cards, org links, recent activity, and shortcuts."
+    },
+    {
+      "id": "US-005",
+      "title": "Migrate organisationer index page to useSuspenseQuery",
+      "description": "As a developer, I need the organizations list page to use useSuspenseQuery with skeleton pendingComponent.",
+      "acceptanceCriteria": [
+        "useQuery replaced with useSuspenseQuery + convexQuery",
+        "Existing skeleton loading state extracted to pendingComponent",
+        "Inline if (orgs === undefined) check removed",
+        "useMutation calls (create, update) remain on convex/react",
+        "Creating/updating an organization updates the table without manual cache invalidation",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "File: apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx. Mutations auto-propagate to TanStack Query cache via Convex subscriptions — no manual invalidation needed."
+    },
+    {
+      "id": "US-006",
+      "title": "Migrate användare page to useSuspenseQuery",
+      "description": "As a developer, I need the users management page to use useSuspenseQuery with skeleton pendingComponent.",
+      "acceptanceCriteria": [
+        "Both useQuery calls (api.userAdmin.list, api.organizations.list) replaced with useSuspenseQuery + convexQuery",
+        "Existing skeleton loading state extracted to pendingComponent",
+        "Inline if (users === undefined || orgs === undefined) check removed",
+        "useAction calls (create, update, deactivate, activate, remove) remain on convex/react",
+        "User actions (create, edit, deactivate) update the table automatically",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "File: apps/admin/src/routes/_authenticated/admin.anvandare.tsx. Has debounced search — the debouncedSearch state drives the query args. useSuspenseQuery re-fetches when args change."
+    },
+    {
+      "id": "US-007",
+      "title": "Migrate referensdata page to useSuspenseQuery",
+      "description": "As a developer, I need the reference data page to use useSuspenseQuery with skeleton pendingComponent.",
+      "acceptanceCriteria": [
+        "useQuery replaced with useSuspenseQuery + convexQuery",
+        "Existing skeleton loading state extracted to pendingComponent",
+        "Inline if (values === undefined) check removed",
+        "useMutation calls (create, update, merge, deactivate, activate) remain on convex/react",
+        "Mutations update the table automatically",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "File: apps/admin/src/routes/_authenticated/admin.referensdata.tsx."
+    },
+    {
+      "id": "US-008",
+      "title": "Migrate organisationer detail page to useSuspenseQuery",
+      "description": "As a developer, I need the organization detail page to use useSuspenseQuery with a new skeleton pendingComponent.",
+      "acceptanceCriteria": [
+        "All useQuery calls (organizations.get, analytics.stats, analytics.chartData) replaced with useSuspenseQuery + convexQuery",
+        "New skeleton pendingComponent created matching the page layout (header, stats cards, chart area, tabs)",
+        "Inline loading checks removed",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "File: apps/admin/src/routes/_authenticated/admin.organisationer.$id.tsx. Has three tabs (Översikt, Hissar, Användare) — skeleton should match the tab layout."
+    },
+    {
+      "id": "US-009",
+      "title": "Migrate hiss detail page to useSuspenseQuery",
+      "description": "As a developer, I need the elevator detail page to use useSuspenseQuery with a new skeleton pendingComponent.",
+      "acceptanceCriteria": [
+        "useQuery calls (elevators.crud.get, organizations.get) replaced with useSuspenseQuery + convexQuery",
+        "New skeleton pendingComponent created matching the page layout",
+        "useMutation (archive) remains on convex/react",
+        "Inline loading checks removed",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "File: apps/admin/src/routes/_authenticated/hiss.$id.index.tsx."
+    },
+    {
+      "id": "US-010",
+      "title": "Migrate hiss edit page to useSuspenseQuery",
+      "description": "As a developer, I need the elevator edit page to use useSuspenseQuery with a new skeleton pendingComponent.",
+      "acceptanceCriteria": [
+        "useQuery calls (elevators.crud.get, organizations.list) replaced with useSuspenseQuery + convexQuery",
+        "New skeleton pendingComponent created matching the tabbed form layout",
+        "useMutation (update) remains on convex/react",
+        "Inline loading checks removed",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "File: apps/admin/src/routes/_authenticated/hiss.$id.redigera.tsx. Form is organized into 4 tabs (Grundinfo, Teknik, Underhåll & Modernisering, Övrigt) — skeleton should reflect the tabbed layout."
+    },
+    {
+      "id": "US-011",
+      "title": "Migrate register page to useSuspenseQuery",
+      "description": "As a developer, I need the elevator register page to use useSuspenseQuery with a new skeleton pendingComponent.",
+      "acceptanceCriteria": [
+        "useQuery calls (suggestedValues.list, elevators.listing.list, exportData) replaced with useSuspenseQuery + convexQuery",
+        "New skeleton pendingComponent created matching the page layout (filters + table)",
+        "Inline loading checks removed",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "File: apps/admin/src/routes/_authenticated/register.tsx. Has multiple queries — all should use useSuspenseQuery."
+    },
+    {
+      "id": "US-012",
+      "title": "Migrate modernisering page to useSuspenseQuery",
+      "description": "As a developer, I need the modernization page to use useSuspenseQuery with a new skeleton pendingComponent.",
+      "acceptanceCriteria": [
+        "All useQuery calls (timeline, budget, measures, priorityList) replaced with useSuspenseQuery + convexQuery",
+        "New skeleton pendingComponent created matching the page layout",
+        "Inline loading checks removed",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "File: apps/admin/src/routes/_authenticated/modernisering.tsx."
+    },
+    {
+      "id": "US-013",
+      "title": "Migrate underhåll page to useSuspenseQuery",
+      "description": "As a developer, I need the maintenance page to use useSuspenseQuery with a new skeleton pendingComponent.",
+      "acceptanceCriteria": [
+        "All useQuery calls (inspectionCalendar, companies, emergencyPhoneStatus, inspectionList) replaced with useSuspenseQuery + convexQuery",
+        "New skeleton pendingComponent created matching the page layout",
+        "Inline loading checks removed",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "File: apps/admin/src/routes/_authenticated/underhall.tsx."
+    },
+    {
+      "id": "US-014",
+      "title": "Migrate ny (create elevator) page to useSuspenseQuery",
+      "description": "As a developer, I need the create elevator page to use useSuspenseQuery with a new skeleton pendingComponent.",
+      "acceptanceCriteria": [
+        "useQuery (organizations.list) replaced with useSuspenseQuery + convexQuery",
+        "New skeleton pendingComponent created matching the form layout",
+        "useMutation (create) remains on convex/react",
+        "Inline loading checks removed",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "File: apps/admin/src/routes/_authenticated/ny.tsx."
+    },
+    {
+      "id": "US-015",
+      "title": "Migrate webbplats page to useSuspenseQuery",
+      "description": "As a developer, I need the website/CMS page to use useSuspenseQuery with a new skeleton pendingComponent.",
+      "acceptanceCriteria": [
+        "useQuery (cms.getPage) replaced with useSuspenseQuery + convexQuery",
+        "New skeleton pendingComponent created matching the page layout",
+        "useMutation calls (createPage, updatePage) remain on convex/react",
+        "Inline loading checks removed",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": "File: apps/admin/src/routes/_authenticated/admin.webbplats.tsx (or similar — check routing)."
+    },
+    {
+      "id": "US-016",
+      "title": "Migrate conditional query routes (sök, global search)",
+      "description": "As a developer, I need search pages to use TanStack Query's enabled pattern instead of Convex's 'skip' pattern for conditional queries.",
+      "acceptanceCriteria": [
+        "sok.tsx: useQuery(api.search.global, query ? {...} : 'skip') replaced with useQuery({ ...convexQuery(api.search.global, {...}), enabled: !!query }) from @tanstack/react-query",
+        "global-search.tsx: Same pattern with enabled: !!debouncedSearch",
+        "Loading/empty states use isPending or isFetching from query result (not data === undefined)",
+        "Search works: type query → results appear, clear query → results disappear",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": "These use useQuery (not useSuspenseQuery) because they are conditionally enabled. enabled: false returns { data: undefined, isPending: true }. Use isPending/isFetching for loading states."
+    },
+    {
+      "id": "US-017",
+      "title": "Migrate feature components with Suspense wrappers",
+      "description": "As a developer, I need org-scoped feature components to use useSuspenseQuery with parent Suspense boundaries.",
+      "acceptanceCriteria": [
+        "org-register-view.tsx: All useQuery calls replaced with useSuspenseQuery + convexQuery",
+        "org-modernization-view.tsx: All useQuery calls replaced with useSuspenseQuery + convexQuery",
+        "org-maintenance-view.tsx: All useQuery calls replaced with useSuspenseQuery + convexQuery",
+        "org-users-view.tsx: useQuery calls replaced; useAction calls remain on convex/react",
+        "Each component's parent wraps it in <Suspense fallback={<Skeleton />}> with an appropriate skeleton",
+        "Inline if (data === undefined) checks removed from each component",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": "Files: apps/admin/src/features/organization/components/org-*.tsx. Parent is admin.organisationer.$id.tsx — wrap each tab view in <Suspense>. The skeletons should match each view's layout."
+    },
+    {
+      "id": "US-018",
+      "title": "Migrate conditional feature hooks",
+      "description": "As a developer, I need conditional query hooks to use TanStack Query's enabled pattern.",
+      "acceptanceCriteria": [
+        "hissnummer-field.tsx: useQuery replaced with useQuery from @tanstack/react-query + convexQuery + enabled flag",
+        "use-suggestions.ts: useQuery replaced with useSuspenseQuery + convexQuery",
+        "use-import-machine.ts: useQuery calls replaced with useQuery from @tanstack/react-query + convexQuery + enabled flags; useAction remains on convex/react",
+        "State machine logic in use-import-machine.ts still functions correctly",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": "These are non-route hooks used inside feature components. Conditional queries use enabled flag (same pattern as US-016). use-import-machine.ts has complex state machine logic — be careful not to break the analyze-only-when-conditions-met behavior."
+    },
+    {
+      "id": "US-019",
+      "title": "Clean up deprecated code and unused exports",
+      "description": "As a developer, I need to remove code made obsolete by the migration.",
+      "acceptanceCriteria": [
+        "ConvexHttpClient and convex/browser imports fully removed from _authenticated.tsx",
+        "Module-level ConvexReactClient removed from __root.tsx",
+        "ConvexClerkProvider removed from packages/auth/src/provider.tsx if unused elsewhere",
+        "packages/auth/src/index.ts still exports ConvexProviderWithClerk (used in root route)",
+        "All 'as ... | undefined' type assertions that were Convex useQuery workarounds removed where no longer needed",
+        "No remaining imports of useQuery from convex/react in migrated files (except files that only use useMutation/useAction)",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": "Final cleanup pass. Grep for 'from \"convex/react\"' to find remaining useQuery imports. Grep for 'ConvexHttpClient' and 'convex/browser' to find leftover workaround code. Only remove code that is truly unused after the migration."
+    }
+  ]
+}

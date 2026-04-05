@@ -17,31 +17,42 @@ declare module "@convex/_generated/api" {
       create: FunctionReference<"action", "public">;
       update: FunctionReference<"action", "public">;
       deactivate: FunctionReference<"action", "public">;
+      activate: FunctionReference<"action", "public">;
       remove: FunctionReference<"action", "public">;
       list: FunctionReference<"query", "public">;
       get: FunctionReference<"query", "public">;
       listByOrganization: FunctionReference<"query", "public">;
     };
     elevators: {
-      list: FunctionReference<"query", "public">;
-      exportData: FunctionReference<"query", "public">;
-      stats: FunctionReference<"query", "public">;
-      chartData: FunctionReference<"query", "public">;
-      modernizationTimeline: FunctionReference<"query", "public">;
-      modernizationBudget: FunctionReference<"query", "public">;
-      modernizationPriorityList: FunctionReference<"query", "public">;
-      modernizationMeasures: FunctionReference<"query", "public">;
-      inspectionCalendar: FunctionReference<"query", "public">;
-      inspectionList: FunctionReference<"query", "public">;
-      maintenanceCompanies: FunctionReference<"query", "public">;
-      emergencyPhoneStatus: FunctionReference<"query", "public">;
-      todaysElevators: FunctionReference<"query", "public">;
-      get: FunctionReference<"query", "public">;
-      checkElevatorNumber: FunctionReference<"query", "public">;
-      search: FunctionReference<"query", "public">;
-      create: FunctionReference<"mutation", "public">;
-      update: FunctionReference<"mutation", "public">;
-      archive: FunctionReference<"mutation", "public">;
+      crud: {
+        get: FunctionReference<"query", "public">;
+        search: FunctionReference<"query", "public">;
+        checkElevatorNumber: FunctionReference<"query", "public">;
+        create: FunctionReference<"mutation", "public">;
+        update: FunctionReference<"mutation", "public">;
+        archive: FunctionReference<"mutation", "public">;
+      };
+      listing: {
+        list: FunctionReference<"query", "public">;
+        exportData: FunctionReference<"query", "public">;
+      };
+      analytics: {
+        stats: FunctionReference<"query", "public">;
+        chartData: FunctionReference<"query", "public">;
+      };
+      modernization: {
+        timeline: FunctionReference<"query", "public">;
+        budget: FunctionReference<"query", "public">;
+        priorityList: FunctionReference<"query", "public">;
+        measures: FunctionReference<"query", "public">;
+      };
+      maintenance: {
+        inspectionCalendar: FunctionReference<"query", "public">;
+        companies: FunctionReference<"query", "public">;
+        emergencyPhoneStatus: FunctionReference<"query", "public">;
+        inspectionList: FunctionReference<"query", "public">;
+        todaysElevators: FunctionReference<"query", "public">;
+      };
     };
     imports: {
       analyze: FunctionReference<"query", "public">;
@@ -53,6 +64,13 @@ declare module "@convex/_generated/api" {
       update: FunctionReference<"mutation", "public">;
       merge: FunctionReference<"mutation", "public">;
       deactivate: FunctionReference<"mutation", "public">;
+      activate: FunctionReference<"mutation", "public">;
+    };
+    search: {
+      global: FunctionReference<"query", "public">;
+    };
+    dashboard: {
+      overview: FunctionReference<"query", "public">;
     };
     cms: {
       getPage: FunctionReference<"query", "public">;
@@ -77,6 +95,7 @@ declare module "@convex/_generated/api" {
       insertUser: FunctionReference<"mutation", "internal">;
       updateUser: FunctionReference<"mutation", "internal">;
       deactivateUser: FunctionReference<"mutation", "internal">;
+      activateUser: FunctionReference<"mutation", "internal">;
       removeUser: FunctionReference<"mutation", "internal">;
       getInternal: FunctionReference<"query", "internal">;
     };

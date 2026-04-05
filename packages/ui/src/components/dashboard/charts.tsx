@@ -1,18 +1,14 @@
 "use client";
 import * as React from "react";
+import { Bar, Doughnut } from "react-chartjs-2";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from "recharts";
+  useChartColors,
+  sharedScaleOptions,
+  hoverColumnPlugin,
+  sharedTooltipOptions,
+  resolveToHex,
+  type ChartColors,
+} from "@elevatorbud/ui/lib/chart-helpers";
 import {
   Card,
   CardContent,
@@ -25,18 +21,20 @@ export type ChartDataPoint = {
   count: number;
 };
 
-const COLORS = [
-  "var(--color-chart-1, #2563eb)",
-  "var(--color-chart-2, #16a34a)",
-  "var(--color-chart-3, #d97706)",
-  "var(--color-chart-4, #dc2626)",
-  "var(--color-chart-5, #7c3aed)",
-  "var(--color-chart-6, #0891b2)",
-  "var(--color-chart-7, #be185d)",
-  "var(--color-chart-8, #4f46e5)",
-  "var(--color-chart-9, #059669)",
-  "var(--color-chart-10, #ca8a04)",
-];
+/**
+ * Build the 10-color palette: 5 theme colors from useChartColors(),
+ * then cycle those 5 to fill slots 6-10.
+ */
+function buildPalette(colors: ChartColors): string[] {
+  const base = [
+    colors.chart1,
+    colors.chart2,
+    colors.chart3,
+    colors.chart4,
+    colors.chart5,
+  ];
+  return [...base, ...base];
+}
 
 function ChartCard({
   title,
@@ -70,39 +68,51 @@ export function DashboardBarChart({
   color?: string;
   className?: string;
 }) {
+  const colors = useChartColors();
+  const palette = React.useMemo(() => buildPalette(colors), [colors]);
+
+  const chartData = React.useMemo(
+    () => ({
+      labels: data.map((d) => d.name),
+      datasets: [
+        {
+          label: "Antal",
+          data: data.map((d) => d.count),
+          backgroundColor: color ? resolveToHex(color) : palette[0],
+          borderRadius: 4,
+          borderSkipped: "bottom" as const,
+        },
+      ],
+    }),
+    [data, color, palette],
+  );
+
+  const options = React.useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: "index" as const,
+        intersect: false,
+      },
+      scales: sharedScaleOptions(colors),
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...sharedTooltipOptions,
+          callbacks: {
+            label: (ctx: { parsed: { y: number | null } }) =>
+              `Antal: ${ctx.parsed.y ?? 0}`,
+          },
+        },
+      },
+    }),
+    [colors],
+  );
+
   return (
     <ChartCard title={title} className={className}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={data}
-          margin={{ top: 5, right: 20, left: 0, bottom: 60 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-          <XAxis
-            dataKey="name"
-            tick={{ fontSize: 12 }}
-            angle={-45}
-            textAnchor="end"
-            interval={0}
-            height={60}
-          />
-          <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--popover))",
-              border: "1px solid hsl(var(--border))",
-              borderRadius: "6px",
-              color: "hsl(var(--popover-foreground))",
-            }}
-            formatter={(value) => [String(value), "Antal"]}
-          />
-          <Bar
-            dataKey="count"
-            fill={color || COLORS[0]}
-            radius={[4, 4, 0, 0]}
-          />
-        </BarChart>
-      </ResponsiveContainer>
+      <Bar data={chartData} options={options} plugins={[hoverColumnPlugin]} />
     </ChartCard>
   );
 }
@@ -118,50 +128,74 @@ export function DashboardPieChart({
   className?: string;
   innerRadius?: number;
 }) {
+  const colors = useChartColors();
+  const palette = React.useMemo(() => buildPalette(colors), [colors]);
+
+  const chartData = React.useMemo(
+    () => ({
+      labels: data.map((d) => d.name),
+      datasets: [
+        {
+          data: data.map((d) => d.count),
+          backgroundColor: data.map((_, i) => palette[i % palette.length]),
+          borderWidth: 0,
+          spacing: 2,
+        },
+      ],
+    }),
+    [data, palette],
+  );
+
+  /**
+   * Convert innerRadius (pixels in original Recharts API) to a cutout
+   * percentage relative to the default outer radius (~100px).
+   * When innerRadius is 0 or undefined, cutout is 0 → renders as a pie.
+   */
+  const cutout = React.useMemo(() => {
+    if (!innerRadius) return 0;
+    // outerRadius was 100 in the Recharts version; map linearly to percentage.
+    return `${Math.min(Math.round((innerRadius / 100) * 100), 99)}%`;
+  }, [innerRadius]);
+
+  const options = React.useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout,
+      plugins: {
+        legend: {
+          position: "bottom" as const,
+          labels: {
+            color: colors.label,
+            font: { size: 12, family: "Sora" },
+            padding: 12,
+          },
+        },
+        tooltip: {
+          ...sharedTooltipOptions,
+          callbacks: {
+            label: (ctx: {
+              label: string;
+              parsed: number;
+              dataset: { data: number[] };
+            }) => {
+              const total = ctx.dataset.data.reduce(
+                (sum: number, v: number) => sum + v,
+                0,
+              );
+              const pct = total > 0 ? Math.round((ctx.parsed / total) * 100) : 0;
+              return `${ctx.label}: ${ctx.parsed} (${pct}%)`;
+            },
+          },
+        },
+      },
+    }),
+    [colors, cutout],
+  );
+
   return (
     <ChartCard title={title} className={className}>
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={innerRadius ?? 0}
-            outerRadius={100}
-            paddingAngle={2}
-            dataKey="count"
-            nameKey="name"
-            label={({ name, percent }: { name?: string; percent?: number }) =>
-              (percent ?? 0) > 0.05
-                ? `${name} (${Math.round((percent ?? 0) * 100)}%)`
-                : ""
-            }
-            labelLine={false}
-          >
-            {data.map((_, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={COLORS[index % COLORS.length]}
-              />
-            ))}
-          </Pie>
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--popover))",
-              border: "1px solid hsl(var(--border))",
-              borderRadius: "6px",
-              color: "hsl(var(--popover-foreground))",
-            }}
-            formatter={(value) => [String(value), "Antal"]}
-          />
-          <Legend
-            wrapperStyle={{ fontSize: "12px" }}
-            formatter={(value: string) => (
-              <span className="text-foreground">{value}</span>
-            )}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+      <Doughnut data={chartData} options={options} />
     </ChartCard>
   );
 }
