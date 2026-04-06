@@ -1,7 +1,7 @@
 import {
   Card,
   CardContent,
-} from "@elevatorbud/ui/components/ui/card";
+} from "../ui/card";
 import type { TimelinePeriod } from "./urgency-helpers";
 
 type PeriodSummaryItem = TimelinePeriod & { count: number };

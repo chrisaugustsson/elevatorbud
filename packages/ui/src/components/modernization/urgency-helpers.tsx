@@ -1,4 +1,4 @@
-import { Badge } from "@elevatorbud/ui/components/ui/badge";
+import { Badge } from "../ui/badge";
 
 const currentYear = new Date().getFullYear();
 

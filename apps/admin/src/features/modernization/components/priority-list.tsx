@@ -16,8 +16,8 @@ import {
 } from "@elevatorbud/ui/components/ui/data-grid-table";
 import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { Building2, ChevronRight } from "lucide-react";
-import type { TimelinePeriod } from "./urgency-helpers";
-import { getUrgencyBadge } from "./urgency-helpers";
+import type { TimelinePeriod } from "@elevatorbud/ui/components/modernization/urgency-helpers";
+import { getUrgencyBadge } from "@elevatorbud/ui/components/modernization/urgency-helpers";
 
 type PriorityElevator = {
   id: string;

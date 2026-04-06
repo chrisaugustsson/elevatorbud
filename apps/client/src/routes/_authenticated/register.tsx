@@ -127,7 +127,7 @@ function RegisterPage() {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(filterDistrict.length > 0 ? { district: filterDistrict } : {}),
     ...(filterElevatorType.length > 0
-      ? { elevator_type: filterElevatorType }
+      ? { elevatorType: filterElevatorType }
       : {}),
     ...(filterManufacturer.length > 0
       ? { manufacturer: filterManufacturer }
@@ -139,15 +139,17 @@ function RegisterPage() {
       ? { buildYearMax: parseInt(buildYearMax) }
       : {}),
     organizationId: user!.organizationId ?? undefined,
-    ...(statusFilter !== "alla" ? { status: statusFilter } : {}),
+    ...(statusFilter !== "alla"
+      ? { status: statusFilter as "active" | "demolished" | "archived" | "all" }
+      : {}),
   };
 
   const queryArgs = {
     ...filterBaseArgs,
-    ...(sortField ? { sort: sortField } : {}),
-    ...(sortOrder ? { order: sortOrder } : {}),
+    ...(sortField ? { sortBy: sortField as "elevatorNumber" | "address" | "district" | "elevatorType" | "manufacturer" | "buildYear" | "maintenanceCompany" | "inspectionMonth" } : {}),
+    ...(sortOrder ? { sortOrder: sortOrder as "asc" | "desc" } : {}),
     page,
-    limit,
+    pageSize: limit,
   };
 
   const { data: result, isLoading } = useQuery({
