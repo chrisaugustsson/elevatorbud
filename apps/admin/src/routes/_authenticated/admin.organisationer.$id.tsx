@@ -3,6 +3,11 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { organizationOptions } from "~/server/organization";
 import { statsOptions, chartDataOptions } from "~/server/analytics";
+import { listElevatorsOptions } from "~/server/elevator";
+import { suggestedValuesOptions } from "~/server/suggested-values";
+import { timelineOptions, budgetOptions, priorityListOptions } from "~/server/modernization";
+import { inspectionCalendarOptions, maintenanceCompaniesOptions, emergencyPhoneStatusOptions } from "~/server/maintenance";
+import { listUsersOptions } from "~/server/user";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import {
@@ -46,9 +51,26 @@ export const Route = createFileRoute(
   "/_authenticated/admin/organisationer/$id",
 )({
   loader: ({ context, params }) => {
-    context.queryClient.prefetchQuery(organizationOptions(params.id));
-    context.queryClient.prefetchQuery(statsOptions(params.id));
-    context.queryClient.prefetchQuery(chartDataOptions(params.id));
+    const id = params.id;
+    // Översikt tab
+    context.queryClient.prefetchQuery(organizationOptions(id));
+    context.queryClient.prefetchQuery(statsOptions(id));
+    context.queryClient.prefetchQuery(chartDataOptions(id));
+    // Hissar tab
+    context.queryClient.prefetchQuery(listElevatorsOptions({ organizationId: id, page: 1, pageSize: 25, status: "active" } as never));
+    context.queryClient.prefetchQuery(suggestedValuesOptions("district"));
+    context.queryClient.prefetchQuery(suggestedValuesOptions("elevator_type"));
+    context.queryClient.prefetchQuery(suggestedValuesOptions("manufacturer"));
+    // Modernisering tab
+    context.queryClient.prefetchQuery(timelineOptions(id));
+    context.queryClient.prefetchQuery(budgetOptions(id));
+    context.queryClient.prefetchQuery(priorityListOptions({ organizationId: id, page: 1, pageSize: 50 }));
+    // Underhåll tab
+    context.queryClient.prefetchQuery(inspectionCalendarOptions(id));
+    context.queryClient.prefetchQuery(maintenanceCompaniesOptions(id));
+    context.queryClient.prefetchQuery(emergencyPhoneStatusOptions(id));
+    // Användare tab
+    context.queryClient.prefetchQuery(listUsersOptions({ organizationId: id }));
   },
   component: OrganisationDetail,
   pendingComponent: DetailSkeleton,

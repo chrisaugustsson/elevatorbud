@@ -2,9 +2,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
+import { createClerkClient } from "@clerk/backend";
 import { users } from "@elevatorbud/db/schema";
 import type { Database } from "@elevatorbud/db";
 import { adminMiddleware } from "./auth";
+
+function getClerkClient() {
+  return createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+}
 
 // ---------------------------------------------------------------------------
 // Zod schemas (inlined from packages/api/src/routers/user.ts)
@@ -88,15 +93,31 @@ async function createUserFn(
   db: Database,
   input: z.infer<typeof createUserSchema>,
 ) {
-  const clerkUserId = `pending_${crypto.randomUUID()}`;
+  const nameParts = input.name.trim().split(/\s+/);
+  const firstName = nameParts[0];
+  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : undefined;
+
+  const clerk = getClerkClient();
+  const clerkUser = await clerk.users.createUser({
+    emailAddress: [input.email],
+    firstName,
+    lastName,
+    skipPasswordRequirement: true,
+  });
+
   const [user] = await db
     .insert(users)
-    .values({ ...input, clerkUserId, active: true })
+    .values({ ...input, clerkUserId: clerkUser.id, active: true })
     .returning();
   return user;
 }
 
 async function deleteUserFn(db: Database, id: string) {
+  const dbUser = await db.query.users.findFirst({ where: eq(users.id, id) });
+  if (!dbUser) throw new Error("Användaren hittades inte");
+
+  const clerk = getClerkClient();
+  await clerk.users.deleteUser(dbUser.clerkUserId);
   await db.delete(users).where(eq(users.id, id));
   return { deleted: true };
 }
