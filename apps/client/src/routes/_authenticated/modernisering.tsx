@@ -1,8 +1,12 @@
 import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { meOptions } from "../../server/user";
+import {
+  timelineOptions,
+  budgetOptions,
+  priorityListOptions,
+} from "../../server/modernization";
 import {
   PERIODS,
   getUrgencyColor,
@@ -15,46 +19,35 @@ import { PriorityList } from "../../features/modernization/components/priority-l
 import { ModernizationSkeleton } from "../../features/modernization/components/modernization-skeleton";
 
 export const Route = createFileRoute("/_authenticated/modernisering")({
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery(meOptions());
+    context.queryClient.prefetchQuery(timelineOptions());
+    context.queryClient.prefetchQuery(budgetOptions());
+    context.queryClient.prefetchQuery(priorityListOptions());
+  },
   component: ModerniseringPage,
   pendingComponent: ModernizationSkeleton,
 });
 
 function ModerniseringPage() {
-  const userOpts = convexQuery(api.users.me, {});
-  const { data: user } = useSuspenseQuery({
-    queryKey: userOpts.queryKey,
-    staleTime: userOpts.staleTime,
-  });
-
   const [selectedPeriod, setSelectedPeriod] = useState<TimelinePeriod | null>(
     null,
   );
 
-  const orgArgs = { organization_id: user!.organization_id } as never;
+  const { data: tidslinje } = useSuspenseQuery(timelineOptions());
 
-  const tidslinjeOpts = convexQuery(api.elevators.modernization.timeline, orgArgs);
-  const { data: tidslinje } = useSuspenseQuery({
-    queryKey: tidslinjeOpts.queryKey,
-    staleTime: tidslinjeOpts.staleTime,
-  });
-
-  const budgetOpts = convexQuery(api.elevators.modernization.budget, orgArgs);
-  const { data: budget } = useSuspenseQuery({
-    queryKey: budgetOpts.queryKey,
-    staleTime: budgetOpts.staleTime,
-  });
+  const { data: budget } = useSuspenseQuery(budgetOptions());
 
   const prioritetslistaArgs = useMemo(() => {
-    const base = { organization_id: user!.organization_id } as Record<string, unknown>;
     if (selectedPeriod) {
-      return { ...base, yearFrom: selectedPeriod.yearFrom, yearTo: selectedPeriod.yearTo };
+      return { yearFrom: selectedPeriod.yearFrom, yearTo: selectedPeriod.yearTo };
     }
-    return base;
-  }, [user, selectedPeriod]);
+    return {};
+  }, [selectedPeriod]);
 
-  const { data: prioritetslista } = useSuspenseQuery({
-    ...convexQuery(api.elevators.modernization.priorityList, prioritetslistaArgs as never),
-  });
+  const { data: prioritetslista } = useSuspenseQuery(
+    priorityListOptions(prioritetslistaArgs),
+  );
 
   const tidslinjeData = tidslinje.map((t: { year: string; count: number }) => ({
     name: t.year,
@@ -72,12 +65,30 @@ function ModerniseringPage() {
     return { ...p, count };
   });
 
-  const budgetPerAr = budget.byYear.map(
-    (b: { year: string; amount: number }) => ({
-      name: b.year,
-      amount: Math.round(b.amount / 1000),
-    }),
-  );
+  // Group flat budget array by year
+  const byYearMap = new Map<string, number>();
+  const byDistrictMap = new Map<string, number>();
+  const byTypeMap = new Map<string, number>();
+  for (const b of budget) {
+    const yr = b.year as string;
+    const tb = b.totalBudget as number;
+    byYearMap.set(yr, (byYearMap.get(yr) ?? 0) + tb);
+    if (b.district) {
+      const d = b.district as string;
+      byDistrictMap.set(d, (byDistrictMap.get(d) ?? 0) + tb);
+    }
+    if (b.elevatorType) {
+      const t = b.elevatorType as string;
+      byTypeMap.set(t, (byTypeMap.get(t) ?? 0) + tb);
+    }
+  }
+
+  const budgetPerAr = Array.from(byYearMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([year, amount]) => ({
+      name: year,
+      amount: Math.round(amount / 1000),
+    }));
 
   let cumulative = 0;
   const budgetCumulative = budgetPerAr.map(
@@ -87,22 +98,22 @@ function ModerniseringPage() {
     },
   );
 
-  const budgetPerDistrikt = budget.byDistrict.map(
-    (b: { name: string; amount: number }) => ({
-      name: b.name,
-      amount: Math.round(b.amount / 1000),
-    }),
-  );
+  const budgetPerDistrikt = Array.from(byDistrictMap.entries())
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, amount]) => ({
+      name,
+      amount: Math.round(amount / 1000),
+    }));
 
-  const budgetPerTyp = budget.byType.map(
-    (b: { name: string; amount: number }) => ({
-      name: b.name,
-      amount: Math.round(b.amount / 1000),
-    }),
-  );
+  const budgetPerTyp = Array.from(byTypeMap.entries())
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, amount]) => ({
+      name,
+      amount: Math.round(amount / 1000),
+    }));
 
-  const totalBudget = budget.byYear.reduce(
-    (sum: number, b: { amount: number }) => sum + b.amount,
+  const totalBudget = Array.from(byYearMap.values()).reduce(
+    (sum, amount) => sum + amount,
     0,
   );
 
@@ -129,14 +140,14 @@ function ModerniseringPage() {
 
       <PriorityList
         elevators={
-          prioritetslista as {
-            _id: string;
-            elevator_number: string;
+          prioritetslista.items as {
+            id: string;
+            elevatorNumber: string;
             address?: string;
             district?: string;
-            recommended_modernization_year?: string;
-            budget_amount?: number;
-            modernization_measures?: string;
+            recommendedModernizationYear?: string;
+            budgetAmount?: number;
+            modernizationMeasures?: string;
           }[]
         }
         selectedPeriod={selectedPeriod}

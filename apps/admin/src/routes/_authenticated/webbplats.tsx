@@ -1,9 +1,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { useMutation } from "convex/react";
-import { api } from "@convex/_generated/api";
+import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { pageAdminOptions, createPage as createPageFn, updatePage as updatePageFn } from "~/server/cms";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import {
   Tabs,
@@ -76,13 +74,22 @@ function Webbplats() {
 }
 
 function PageTab({ slug, label }: { slug: string; label: string }) {
-  const opts = convexQuery(api.cms.getPage, { slug });
-  const { data: page } = useSuspenseQuery({
-    queryKey: opts.queryKey,
-    staleTime: opts.staleTime,
+  const queryClient = useQueryClient();
+  const { data: page } = useSuspenseQuery(pageAdminOptions(slug));
+  const createPageMutation = useMutation({
+    mutationFn: (input: { slug: string; title: string; sections: CmsSection[]; published: boolean }) =>
+      createPageFn({ data: input }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cms"] });
+    },
   });
-  const createPage = useMutation(api.cms.createPage);
-  const updatePage = useMutation(api.cms.updatePage);
+  const updatePageMutation = useMutation({
+    mutationFn: (input: { slug: string; title?: string; sections?: CmsSection[]; published?: boolean }) =>
+      updatePageFn({ data: input }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cms"] });
+    },
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [published, setPublished] = useState(false);
 
@@ -96,14 +103,14 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
     setIsSaving(true);
     try {
       if (page) {
-        await updatePage({
-          id: page._id,
+        await updatePageMutation.mutateAsync({
+          slug,
           title: label,
           sections,
           published,
         });
       } else {
-        await createPage({
+        await createPageMutation.mutateAsync({
           slug,
           title: label,
           sections,
@@ -123,13 +130,13 @@ function PageTab({ slug, label }: { slug: string; label: string }) {
   const formContent = (() => {
     switch (slug) {
       case "startsida":
-        return <StartsidaForm page={page} onSave={handleSave} isSaving={isSaving} />;
+        return <StartsidaForm page={page ?? null} onSave={handleSave} isSaving={isSaving} />;
       case "om-oss":
-        return <OmOssForm page={page} onSave={handleSave} isSaving={isSaving} />;
+        return <OmOssForm page={page ?? null} onSave={handleSave} isSaving={isSaving} />;
       case "tjanster":
-        return <TjansterForm page={page} onSave={handleSave} isSaving={isSaving} />;
+        return <TjansterForm page={page ?? null} onSave={handleSave} isSaving={isSaving} />;
       case "kontakt":
-        return <KontaktForm page={page} onSave={handleSave} isSaving={isSaving} />;
+        return <KontaktForm page={page ?? null} onSave={handleSave} isSaving={isSaving} />;
       default:
         return (
           <p className="text-muted-foreground">

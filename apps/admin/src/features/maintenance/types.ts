@@ -7,34 +7,25 @@ export type KalenderEntry = {
 };
 
 export type ForetagData = {
-  companies: {
-    name: string;
-    count: number;
-    byDistrict: { district: string; count: number }[];
-  }[];
-  districts: string[];
-};
+  company: string;
+  total: number;
+  districts: Record<string, number>;
+}[];
 
 export type NodData = {
-  withEmergencyPhone: number;
-  withoutEmergencyPhone: number;
+  total: number;
+  withPhone: number;
+  withoutPhone: number;
   needsUpgrade: number;
-  totalUpgradeCost: number;
-  byDistrict: {
-    district: string;
-    with: number;
-    without: number;
-    upgrade: number;
-    cost: number;
-  }[];
+  upgradeCost: number;
 };
 
 export type BesiktningsListaItem = {
-  _id: string;
-  elevator_number: string;
-  address?: string;
-  district?: string;
-  inspection_authority?: string;
-  organization_id: string;
-  organizationName: string;
+  id: string;
+  elevatorNumber: string;
+  address: string | null;
+  district: string | null;
+  inspectionAuthority: string | null;
+  maintenanceCompany: string | null;
+  organizationName: string | null;
 };

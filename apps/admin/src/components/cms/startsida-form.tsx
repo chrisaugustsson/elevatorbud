@@ -39,12 +39,12 @@ export type CmsSection = {
 };
 
 export type CmsPage = {
-  _id: string;
+  id: string;
   slug: string;
   title: string;
   sections: CmsSection[];
   published: boolean;
-  updatedAt?: number;
+  updatedAt?: Date | null;
 };
 
 const FEATURE_ICONS = [

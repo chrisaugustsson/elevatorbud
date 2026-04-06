@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useAction } from "convex/react";
-import { api } from "@convex/_generated/api";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { getPage, submitContact } from "~/server/api";
 import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { Mail, Phone, MapPin, Clock, ArrowRight, Check } from "lucide-react";
 
@@ -61,8 +61,14 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 function Kontakt() {
-  const page = useQuery(api.cms.getPage, { slug: "kontakt" });
-  const submitContact = useAction(api.contactSubmissions.submit);
+  const { data: page } = useQuery({
+    queryKey: ["cms", "getPage", "kontakt"],
+    queryFn: () => getPage({ data: { slug: "kontakt" } }),
+  });
+  const submitContactMutation = useMutation({
+    mutationFn: (input: { name: string; email: string; phone?: string; message: string; turnstileToken?: string }) =>
+      submitContact({ data: input }),
+  });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -189,12 +195,11 @@ function Kontakt() {
                 try {
                   const form = e.currentTarget;
                   const formData = new FormData(form);
-                  await submitContact({
+                  await submitContactMutation.mutateAsync({
                     name: formData.get("namn") as string,
                     email: formData.get("epost") as string,
                     phone: (formData.get("telefon") as string) || undefined,
                     message: formData.get("meddelande") as string,
-                    turnstileToken,
                   });
                   setSubmitted(true);
                 } catch {

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
+import { useQuery } from "@tanstack/react-query";
+import { getPage } from "~/server/api";
 import {
   ArrowRight,
   Phone,
@@ -150,7 +150,10 @@ const TARGET_AUDIENCES = [
 ];
 
 function Tjanster() {
-  const page = useQuery(api.cms.getPage, { slug: "tjanster" });
+  const { data: page } = useQuery({
+    queryKey: ["cms", "getPage", "tjanster"],
+    queryFn: () => getPage({ data: { slug: "tjanster" } }),
+  });
   const heroSection = page?.sections?.find((s: CmsSection) => s.type === "hero");
 
   return (

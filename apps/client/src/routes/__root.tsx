@@ -6,24 +6,11 @@ import {
   createRootRouteWithContext,
 } from "@tanstack/react-router";
 import * as React from "react";
-import { createServerFn } from "@tanstack/react-start";
-import { auth } from "@elevatorbud/auth/server";
-import {
-  ClerkProvider,
-  ConvexProviderWithClerk,
-  useAuth,
-  svSE,
-} from "@elevatorbud/auth";
+import { ClerkProvider, svSE } from "@elevatorbud/auth";
 import { Toaster } from "@elevatorbud/ui/components/ui/sonner";
 import { ThemeProvider } from "@elevatorbud/ui/hooks/use-theme";
 import type { RouterContext } from "../router";
 import appCss from "../styles/app.css?url";
-
-const getConvexToken = createServerFn().handler(async () => {
-  const { getToken } = await auth();
-  const token = await getToken({ template: "convex" });
-  return token;
-});
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
@@ -34,17 +21,6 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),
-  beforeLoad: async ({ context }) => {
-    try {
-      const token = await getConvexToken();
-      if (token) {
-        context.convexQueryClient.serverHttpClient?.setAuth(token);
-      }
-    } catch {
-      // Token fetch failed — SSR queries will be unauthenticated
-      // Client-side auth via ClerkProvider will still work
-    }
-  },
   shellComponent: RootDocument,
   component: RootLayout,
 });
@@ -66,14 +42,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootLayout() {
-  const { convexClient } = Route.useRouteContext();
-
   return (
     <ClerkProvider localization={svSE}>
-      <ConvexProviderWithClerk client={convexClient} useAuth={useAuth}>
-        <Outlet />
-        <Toaster />
-      </ConvexProviderWithClerk>
+      <Outlet />
+      <Toaster />
     </ClerkProvider>
   );
 }

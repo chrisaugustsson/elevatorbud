@@ -14,13 +14,13 @@ type ReviewSection = {
 interface StepReviewProps {
   form: HissForm;
   goToStep: (step: number) => void;
-  orgs: Array<{ _id: string; name: string }> | undefined;
+  orgs: Array<{ id: string; name: string }> | undefined;
 }
 
 export function StepReview({ form, goToStep, orgs }: StepReviewProps) {
   const values = form.state.values;
   const orgName =
-    orgs?.find((o) => o._id === values.organization_id)?.name ?? "";
+    orgs?.find((o) => o.id === values.organization_id)?.name ?? "";
 
   const sections: ReviewSection[] = [
     {

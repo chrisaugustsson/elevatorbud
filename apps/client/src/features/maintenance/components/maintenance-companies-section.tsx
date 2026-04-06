@@ -23,13 +23,10 @@ import { Wrench } from "lucide-react";
 import { useMemo } from "react";
 
 export type ForetagData = {
-  companies: {
-    name: string;
-    count: number;
-    byDistrict: { district: string; count: number }[];
-  }[];
-  districts: string[];
-};
+  company: string;
+  total: number;
+  districts: Record<string, number>;
+}[];
 
 interface MaintenanceCompaniesSectionProps {
   foretagData: ForetagData;
@@ -46,7 +43,7 @@ export function MaintenanceCompaniesSection({
       </h2>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <CompanyCountChart companies={foretagData.companies} />
+        <CompanyCountChart companies={foretagData} />
         <CompanyDistrictMatrix foretagData={foretagData} />
       </div>
     </div>
@@ -56,17 +53,17 @@ export function MaintenanceCompaniesSection({
 function CompanyCountChart({
   companies,
 }: {
-  companies: ForetagData["companies"];
+  companies: ForetagData;
 }) {
   const colors = useChartColors();
 
   const chartData = useMemo(
     () => ({
-      labels: companies.map((f) => f.name),
+      labels: companies.map((f) => f.company),
       datasets: [
         {
           label: "Antal hissar",
-          data: companies.map((f) => f.count),
+          data: companies.map((f) => f.total),
           backgroundColor: colors.chart1,
           borderRadius: 4,
           barPercentage: 0.7,
@@ -148,13 +145,17 @@ function CompanyDistrictMatrix({
 }: {
   foretagData: ForetagData;
 }) {
+  const allDistricts = [
+    ...new Set(foretagData.flatMap((f) => Object.keys(f.districts))),
+  ].sort((a, b) => a.localeCompare(b, "sv"));
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Företag per distrikt</CardTitle>
       </CardHeader>
       <CardContent>
-        {foretagData.companies.length === 0 ? (
+        {foretagData.length === 0 ? (
           <p className="py-8 text-center text-muted-foreground">
             Inga data tillgängliga.
           </p>
@@ -166,7 +167,7 @@ function CompanyDistrictMatrix({
                   <TableHead className="sticky left-0 bg-background">
                     Företag
                   </TableHead>
-                  {foretagData.districts.map((d) => (
+                  {allDistricts.map((d) => (
                     <TableHead key={d} className="text-center text-xs">
                       {d}
                     </TableHead>
@@ -177,21 +178,21 @@ function CompanyDistrictMatrix({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {foretagData.companies.map((f) => (
-                  <TableRow key={f.name}>
+                {foretagData.map((f) => (
+                  <TableRow key={f.company}>
                     <TableCell className="sticky left-0 bg-background font-medium text-sm">
-                      {f.name}
+                      {f.company}
                     </TableCell>
-                    {f.byDistrict.map((pd) => (
+                    {allDistricts.map((d) => (
                       <TableCell
-                        key={pd.district}
+                        key={d}
                         className="text-center text-sm"
                       >
-                        {pd.count || "–"}
+                        {f.districts[d] || "–"}
                       </TableCell>
                     ))}
                     <TableCell className="text-center font-bold text-sm">
-                      {f.count}
+                      {f.total}
                     </TableCell>
                   </TableRow>
                 ))}

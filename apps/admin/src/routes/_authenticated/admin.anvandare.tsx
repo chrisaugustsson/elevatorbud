@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import type { Id } from "@convex/_generated/dataModel";
-import { useAction } from "convex/react";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { listUsersOptions, createUser as createUserFn, updateUser as updateUserFn, deactivateUser as deactivateUserFn, activateUser as activateUserFn, deleteUser as deleteUserFn } from "~/server/user";
+import { listOrganizationsOptions } from "~/server/organization";
 import { useForm } from "@tanstack/react-form";
 import {
   useReactTable,
@@ -71,35 +69,36 @@ export const Route = createFileRoute("/_authenticated/admin/anvandare")({
     org: (search.org as string) || undefined,
     create: search.create === "true" || search.create === true,
   }),
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery(listOrganizationsOptions());
+  },
   component: Anvandare,
   pendingComponent: AnvandareSkeleton,
 });
 
 type Anvandare = {
-  _id: string;
-  clerk_user_id: string;
+  id: string;
+  clerkUserId: string;
   email: string;
   name: string;
   role: "admin" | "customer";
-  organization_id?: string;
+  organizationId: string | null;
   active: boolean;
-  created_at: string;
-  last_login?: string;
+  createdAt: Date;
+  lastLogin: Date | null;
+  organization: { id: string; name: string; organizationNumber: string | null; contactPerson: string | null; phoneNumber: string | null; email: string | null; createdAt: Date } | null;
 };
 
 type Organisation = {
-  _id: string;
+  id: string;
   name: string;
 };
 
 function Anvandare() {
   const { org: orgFromSearch, create: createFromSearch } = Route.useSearch();
   const navigate = useNavigate();
-  const orgsOpts = convexQuery(api.organizations.list, {});
-  const { data: orgs } = useSuspenseQuery({
-    queryKey: orgsOpts.queryKey,
-    staleTime: orgsOpts.staleTime,
-  }) as { data: Organisation[] };
+  const queryClient = useQueryClient();
+  const { data: orgs } = useSuspenseQuery(listOrganizationsOptions());
 
   const [rollFilter, setRollFilter] = useState<string>("alla");
   const [orgFilter, setOrgFilter] = useState<string>(orgFromSearch ?? "alla");
@@ -131,26 +130,40 @@ function Anvandare() {
     }
   }, [createFromSearch, navigate, orgFromSearch]);
 
-  const usersOpts = convexQuery(api.userAdmin.list, {
+  const userListArgs = {
     role:
       rollFilter === "alla"
         ? undefined
         : (rollFilter as "admin" | "customer"),
-    organization_id:
-      orgFilter === "alla" ? undefined : (orgFilter as never),
+    organizationId:
+      orgFilter === "alla" ? undefined : orgFilter,
     search: debouncedSearch || undefined,
-  });
-  const { data: users } = useSuspenseQuery({
-    queryKey: usersOpts.queryKey,
-    staleTime: usersOpts.staleTime,
-  }) as { data: Anvandare[] };
+  };
+  const { data: users } = useSuspenseQuery(listUsersOptions(userListArgs));
 
   const { user: currentClerkUser } = useUser();
-  const createUser = useAction(api.userAdmin.create);
-  const updateUser = useAction(api.userAdmin.update);
-  const deactivateUser = useAction(api.userAdmin.deactivate);
-  const activateUser = useAction(api.userAdmin.activate);
-  const removeUser = useAction(api.userAdmin.remove);
+  const createUser = useMutation({
+    mutationFn: (input: { name: string; email: string; role: "admin" | "customer"; organizationId?: string }) =>
+      createUserFn({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
+  });
+  const updateUser = useMutation({
+    mutationFn: (input: { id: string; name?: string; email?: string; role?: "admin" | "customer"; organizationId?: string }) =>
+      updateUserFn({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
+  });
+  const deactivateUser = useMutation({
+    mutationFn: (input: { id: string }) => deactivateUserFn({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
+  });
+  const activateUser = useMutation({
+    mutationFn: (input: { id: string }) => activateUserFn({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
+  });
+  const removeUser = useMutation({
+    mutationFn: (input: { id: string }) => deleteUserFn({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
+  });
   const [deactivatingUser, setDeactivatingUser] = useState<Anvandare | null>(
     null,
   );
@@ -159,7 +172,7 @@ function Anvandare() {
 
   const orgMap = new Map<string, string>();
   for (const org of orgs) {
-    orgMap.set(org._id, org.name);
+    orgMap.set(org.id, org.name);
   }
 
   const columnHelper = createColumnHelper<Anvandare>();
@@ -182,7 +195,7 @@ function Anvandare() {
         </Badge>
       ),
     }),
-    columnHelper.accessor("organization_id", {
+    columnHelper.accessor("organizationId", {
       header: ({ column }) => <DataGridColumnHeader title="Organisation" column={column} />,
       enableSorting: false,
       cell: (info) => {
@@ -199,7 +212,7 @@ function Anvandare() {
         </Badge>
       ),
     }),
-    columnHelper.accessor("last_login", {
+    columnHelper.accessor("lastLogin", {
       header: ({ column }) => <DataGridColumnHeader title="Senaste inloggning" column={column} />,
       enableSorting: false,
       cell: (info) => {
@@ -214,7 +227,7 @@ function Anvandare() {
       cell: (info) => {
         const row = info.row.original;
         const isSelf =
-          currentClerkUser?.id === row.clerk_user_id;
+          currentClerkUser?.id === row.clerkUserId;
         return (
           <div className="flex items-center justify-end gap-1">
             <Button
@@ -316,7 +329,7 @@ function Anvandare() {
           <SelectContent>
             <SelectItem value="alla">Alla organisationer</SelectItem>
             {orgs.map((org) => (
-              <SelectItem key={org._id} value={org._id}>
+              <SelectItem key={org.id} value={org.id}>
                 {org.name}
               </SelectItem>
             ))}
@@ -341,7 +354,7 @@ function Anvandare() {
         orgs={orgs}
         defaultOrgId={orgFromSearch}
         onSubmit={async (values) => {
-          await createUser(values);
+          await createUser.mutateAsync(values);
           setCreateOpen(false);
         }}
       />
@@ -353,7 +366,7 @@ function Anvandare() {
         }}
         orgs={orgs}
         onSubmit={async (values) => {
-          await updateUser(values);
+          await updateUser.mutateAsync(values);
           setEditingUser(null);
         }}
       />
@@ -394,12 +407,12 @@ function Anvandare() {
                 setActionLoading(true);
                 try {
                   if (deactivatingUser.active) {
-                    await deactivateUser({
-                      id: deactivatingUser._id as never,
+                    await deactivateUser.mutateAsync({
+                      id: deactivatingUser.id,
                     });
                   } else {
-                    await activateUser({
-                      id: deactivatingUser._id as never,
+                    await activateUser.mutateAsync({
+                      id: deactivatingUser.id,
                     });
                   }
                 } finally {
@@ -448,7 +461,7 @@ function Anvandare() {
                 if (!deletingUser) return;
                 setActionLoading(true);
                 try {
-                  await removeUser({ id: deletingUser._id as never });
+                  await removeUser.mutateAsync({ id: deletingUser.id });
                 } finally {
                   setActionLoading(false);
                   setDeletingUser(null);
@@ -479,7 +492,7 @@ function CreateUserDialog({
     name: string;
     email: string;
     role: "admin" | "customer";
-    organization_id?: Id<"organizations">;
+    organizationId?: string;
   }) => Promise<void>;
 }) {
   if (!open) return null;
@@ -508,7 +521,7 @@ function CreateUserDialogInner({
     name: string;
     email: string;
     role: "admin" | "customer";
-    organization_id?: Id<"organizations">;
+    organizationId?: string;
   }) => Promise<void>;
 }) {
   const form = useForm({
@@ -516,16 +529,14 @@ function CreateUserDialogInner({
       name: "",
       email: "",
       role: defaultOrgId ? "customer" : ("admin" as "admin" | "customer"),
-      organization_id: defaultOrgId ?? "",
+      organizationId: defaultOrgId ?? "",
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
         name: value.name,
         email: value.email,
         role: value.role,
-        organization_id: value.organization_id
-          ? (value.organization_id as never)
-          : undefined,
+        organizationId: value.organizationId || undefined,
       });
       form.reset();
     },
@@ -636,7 +647,7 @@ function CreateUserDialogInner({
                   onValueChange={(val) => {
                     field.handleChange(val as "admin" | "customer");
                     if (val === "admin") {
-                      form.setFieldValue("organization_id", "");
+                      form.setFieldValue("organizationId", "");
                     }
                   }}
                 >
@@ -656,7 +667,7 @@ function CreateUserDialogInner({
             {(role) =>
               role === "customer" ? (
                 <form.Field
-                  name="organization_id"
+                  name="organizationId"
                   validators={{
                     onChange: ({ value }) => {
                       const currentRole = form.getFieldValue("role");
@@ -681,7 +692,7 @@ function CreateUserDialogInner({
                         </SelectTrigger>
                         <SelectContent>
                           {orgs.map((org) => (
-                            <SelectItem key={org._id} value={org._id}>
+                            <SelectItem key={org.id} value={org.id}>
                               {org.name}
                             </SelectItem>
                           ))}
@@ -734,18 +745,18 @@ function EditUserDialog({
   onOpenChange: (open: boolean) => void;
   orgs: Organisation[];
   onSubmit: (values: {
-    id: Id<"users">;
+    id: string;
     name?: string;
     email?: string;
     role?: "admin" | "customer";
-    organization_id?: Id<"organizations">;
+    organizationId?: string;
   }) => Promise<void>;
 }) {
   if (!user) return null;
 
   return (
     <EditUserDialogInner
-      key={user._id}
+      key={user.id}
       user={user}
       orgs={orgs}
       onOpenChange={onOpenChange}
@@ -764,11 +775,11 @@ function EditUserDialogInner({
   orgs: Organisation[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
-    id: Id<"users">;
+    id: string;
     name?: string;
     email?: string;
     role?: "admin" | "customer";
-    organization_id?: Id<"organizations">;
+    organizationId?: string;
   }) => Promise<void>;
 }) {
   const form = useForm({
@@ -776,17 +787,15 @@ function EditUserDialogInner({
       name: user.name,
       email: user.email,
       role: user.role as "admin" | "customer",
-      organization_id: user.organization_id ?? "",
+      organizationId: user.organizationId ?? "",
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
-        id: user._id as never,
+        id: user.id,
         name: value.name,
         email: value.email,
         role: value.role,
-        organization_id: value.organization_id
-          ? (value.organization_id as never)
-          : undefined,
+        organizationId: value.organizationId || undefined,
       });
       form.reset();
     },
@@ -897,7 +906,7 @@ function EditUserDialogInner({
                   onValueChange={(val) => {
                     field.handleChange(val as "admin" | "customer");
                     if (val === "admin") {
-                      form.setFieldValue("organization_id", "");
+                      form.setFieldValue("organizationId", "");
                     }
                   }}
                 >
@@ -917,7 +926,7 @@ function EditUserDialogInner({
             {(role) =>
               role === "customer" ? (
                 <form.Field
-                  name="organization_id"
+                  name="organizationId"
                   validators={{
                     onChange: ({ value }) => {
                       const currentRole = form.getFieldValue("role");
@@ -942,7 +951,7 @@ function EditUserDialogInner({
                         </SelectTrigger>
                         <SelectContent>
                           {orgs.map((org) => (
-                            <SelectItem key={org._id} value={org._id}>
+                            <SelectItem key={org.id} value={org.id}>
                               {org.name}
                             </SelectItem>
                           ))}

@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation } from "convex/react";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createElevator } from "~/server/elevator";
+import { listOrganizationsOptions } from "~/server/organization";
 import { useForm } from "@tanstack/react-form";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
@@ -14,6 +13,9 @@ import { ElevatorWizard } from "../../features/elevator/components/elevator-wiza
 import { getDraftKey, clearDraft } from "../../shared/lib/form-persistence";
 
 export const Route = createFileRoute("/_authenticated/ny")({
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery(listOrganizationsOptions());
+  },
   component: NyHiss,
   pendingComponent: NyHissSkeleton,
 });
@@ -68,12 +70,13 @@ function NyHissSkeleton() {
 }
 
 function NyHiss() {
-  const orgsOpts = convexQuery(api.organizations.list, {});
-  const { data: orgs } = useSuspenseQuery({
-    queryKey: orgsOpts.queryKey,
-    staleTime: orgsOpts.staleTime,
+  const queryClient = useQueryClient();
+  const { data: orgs } = useSuspenseQuery(listOrganizationsOptions());
+  const createHiss = useMutation({
+    mutationFn: (input: ReturnType<typeof formValuesToUpdateArgs> & { organizationId: string; revisionYear: number }) =>
+      createElevator({ data: { ...input, elevatorNumber: input.elevatorNumber ?? "" } }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["elevator"] }); },
   });
-  const createHiss = useMutation(api.elevators.crud.create);
   const draftKey = getDraftKey();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,9 +93,10 @@ function NyHiss() {
           throw new Error("OFFLINE");
         }
         const args = formValuesToUpdateArgs(value);
-        await createHiss({
+        await createHiss.mutateAsync({
           ...args,
-          organization_id: value.organization_id as never,
+          organizationId: value.organization_id,
+          revisionYear: new Date().getFullYear(),
         });
         clearDraft(draftKey);
         setSubmitSuccess(true);
