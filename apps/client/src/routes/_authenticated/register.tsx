@@ -22,6 +22,7 @@ import { RegisterPagination } from "../../features/register/components/register-
 export const Route = createFileRoute("/_authenticated/register")({
   loader: ({ context }) => {
     context.queryClient.prefetchQuery(meOptions());
+    context.queryClient.prefetchQuery(elevatorListOptions({ page: 1, pageSize: 25, status: "active" }));
     context.queryClient.prefetchQuery(suggestedValuesOptions("district"));
     context.queryClient.prefetchQuery(suggestedValuesOptions("elevator_type"));
     context.queryClient.prefetchQuery(suggestedValuesOptions("manufacturer"));
@@ -148,7 +149,7 @@ function RegisterPage() {
     ...filterBaseArgs,
     ...(sortField ? { sortBy: sortField as "elevatorNumber" | "address" | "district" | "elevatorType" | "manufacturer" | "buildYear" | "maintenanceCompany" | "inspectionMonth" } : {}),
     ...(sortOrder ? { sortOrder: sortOrder as "asc" | "desc" } : {}),
-    page,
+    page: page + 1,
     pageSize: limit,
   };
 
