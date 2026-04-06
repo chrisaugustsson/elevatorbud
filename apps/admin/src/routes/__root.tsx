@@ -6,24 +6,11 @@ import {
   createRootRouteWithContext,
 } from "@tanstack/react-router";
 import * as React from "react";
-import { createServerFn } from "@tanstack/react-start";
-import { auth } from "@elevatorbud/auth/server";
-import {
-  ClerkProvider,
-  ConvexProviderWithClerk,
-  useAuth,
-  svSE,
-} from "@elevatorbud/auth";
+import { ClerkProvider, svSE } from "@elevatorbud/auth";
 import { Toaster } from "@elevatorbud/ui/components/ui/sonner";
 import { ThemeProvider } from "@elevatorbud/ui/hooks/use-theme";
 import type { RouterContext } from "../router";
 import appCss from "../styles/app.css?url";
-
-const getConvexToken = createServerFn().handler(async () => {
-  const { getToken } = await auth();
-  const token = await getToken({ template: "convex" });
-  return token;
-});
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
@@ -34,19 +21,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),
-  beforeLoad: async ({ context }) => {
-    try {
-      const token = await getConvexToken();
-      if (token) {
-        context.convexQueryClient.serverHttpClient?.setAuth(token);
-      }
-    } catch {
-      // Token fetch failed — SSR queries will be unauthenticated
-      // Client-side auth via ClerkProvider will still work
-    }
-  },
   shellComponent: RootDocument,
   component: RootLayout,
+  errorComponent: RootError,
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
@@ -66,14 +43,31 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootLayout() {
-  const { convexClient } = Route.useRouteContext();
-
   return (
     <ClerkProvider localization={svSE}>
-      <ConvexProviderWithClerk client={convexClient} useAuth={useAuth}>
-        <Outlet />
-        <Toaster />
-      </ConvexProviderWithClerk>
+      <Outlet />
+      <Toaster />
     </ClerkProvider>
+  );
+}
+
+function RootError({ error }: { error: Error }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-md rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+        <h1 className="mb-2 text-lg font-semibold text-red-800">
+          Något gick fel
+        </h1>
+        <p className="mb-4 text-sm text-red-600">
+          {error.message || "Ett oväntat fel inträffade."}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500"
+        >
+          Ladda om sidan
+        </button>
+      </div>
+    </div>
   );
 }

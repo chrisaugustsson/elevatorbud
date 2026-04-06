@@ -51,12 +51,13 @@ export type KalenderEntry = {
 };
 
 export type InspectionListItem = {
-  _id: string;
-  elevator_number: string;
-  address?: string;
-  district?: string;
-  inspection_authority?: string;
-  organizationName: string;
+  id: string;
+  elevatorNumber: string;
+  address: string | null;
+  district: string | null;
+  inspectionAuthority: string | null;
+  maintenanceCompany: string | null;
+  organizationName: string | null;
 };
 
 interface InspectionCalendarSectionProps {
@@ -307,9 +308,9 @@ function InspectionMonthList({
               </TableHeader>
               <TableBody>
                 {besiktningslista.map((h) => (
-                  <TableRow key={h._id}>
+                  <TableRow key={h.id}>
                     <TableCell className="font-medium">
-                      {h.elevator_number}
+                      {h.elevatorNumber}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       {h.address || "–"}
@@ -318,11 +319,11 @@ function InspectionMonthList({
                       {h.district || "–"}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
-                      {h.inspection_authority || "–"}
+                      {h.inspectionAuthority || "–"}
                     </TableCell>
                     <TableCell>
                       <a
-                        href={`/hiss/${h._id}`}
+                        href={`/hiss/${h.id}`}
                         className="inline-flex items-center text-muted-foreground hover:text-foreground"
                       >
                         <ChevronRight className="h-4 w-4" />

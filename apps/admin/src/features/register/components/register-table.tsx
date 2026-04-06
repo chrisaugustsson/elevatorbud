@@ -18,18 +18,18 @@ import {
 import { Building2, Pencil } from "lucide-react";
 
 type HissRow = {
-  _id: string;
-  elevator_number: string;
-  address?: string;
-  district?: string;
-  elevator_type?: string;
-  manufacturer?: string;
-  build_year?: number;
-  modernization_year?: string;
-  recommended_modernization_year?: string;
-  budget_amount?: number;
-  organization_id: string;
-  organizationName: string;
+  id: string;
+  elevatorNumber: string;
+  address?: string | null;
+  district?: string | null;
+  elevatorType?: string | null;
+  manufacturer?: string | null;
+  buildYear?: number | null;
+  modernizationYear?: string | null;
+  recommendedModernizationYear?: string | null;
+  budgetAmount?: number | null;
+  organizationId: string;
+  organizationName: string | null;
 };
 
 interface RegisterTableProps {
@@ -62,7 +62,7 @@ export function RegisterTable({
   const columnHelper = createColumnHelper<HissRow>();
   const columns = useMemo(
     () => [
-      columnHelper.accessor("elevator_number", {
+      columnHelper.accessor("elevatorNumber", {
         header: ({ column }) => (
           <DataGridColumnHeader title="Hissnummer" column={column} />
         ),
@@ -93,7 +93,7 @@ export function RegisterTable({
         cell: (info) => (
           <Link
             to="/admin/organisationer/$id"
-            params={{ id: info.row.original.organization_id }}
+            params={{ id: info.row.original.organizationId }}
             onClick={(e) => e.stopPropagation()}
             className="text-primary hover:underline"
           >
@@ -103,7 +103,7 @@ export function RegisterTable({
         enableSorting: false,
         size: 160,
       }),
-      columnHelper.accessor("elevator_type", {
+      columnHelper.accessor("elevatorType", {
         header: ({ column }) => (
           <DataGridColumnHeader title="Hisstyp" column={column} />
         ),
@@ -117,28 +117,28 @@ export function RegisterTable({
         cell: (info) => info.getValue() || "—",
         size: 120,
       }),
-      columnHelper.accessor("build_year", {
+      columnHelper.accessor("buildYear", {
         header: ({ column }) => (
           <DataGridColumnHeader title="Byggår" column={column} />
         ),
         cell: (info) => info.getValue() ?? "—",
         size: 100,
       }),
-      columnHelper.accessor("modernization_year", {
+      columnHelper.accessor("modernizationYear", {
         header: ({ column }) => (
           <DataGridColumnHeader title="Moderniserad" column={column} />
         ),
         cell: (info) => info.getValue() || "—",
         size: 130,
       }),
-      columnHelper.accessor("recommended_modernization_year", {
+      columnHelper.accessor("recommendedModernizationYear", {
         header: ({ column }) => (
           <DataGridColumnHeader title="Rek. modern." column={column} />
         ),
         cell: (info) => info.getValue() || "—",
         size: 130,
       }),
-      columnHelper.accessor("budget_amount", {
+      columnHelper.accessor("budgetAmount", {
         header: ({ column }) => (
           <DataGridColumnHeader title="Budget" column={column} />
         ),
@@ -155,7 +155,7 @@ export function RegisterTable({
         cell: (info) => (
           <Link
             to="/hiss/$id/redigera"
-            params={{ id: info.row.original._id }}
+            params={{ id: info.row.original.id }}
             onClick={(e) => e.stopPropagation()}
           >
             <Button variant="ghost" size="icon" className="size-8">
@@ -207,7 +207,7 @@ export function RegisterTable({
       table={table}
       recordCount={totalCount}
       isLoading={isLoading}
-      onRowClick={(row) => navigate({ to: "/hiss/$id", params: { id: row._id } })}
+      onRowClick={(row) => navigate({ to: "/hiss/$id", params: { id: row.id } })}
       emptyMessage={
         <div className="flex flex-col items-center gap-2 text-muted-foreground">
           <Building2 className="size-8" />

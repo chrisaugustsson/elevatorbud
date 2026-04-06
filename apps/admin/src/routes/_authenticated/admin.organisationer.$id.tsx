@@ -1,8 +1,8 @@
 import { useState, Suspense } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { organizationOptions } from "~/server/organization";
+import { statsOptions, chartDataOptions } from "~/server/analytics";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import {
@@ -39,12 +39,17 @@ import {
   OrgUsersView,
   OrgUsersSkeleton,
 } from "~/features/organization/components/org-users-view";
-import { ModernizationSkeleton } from "~/features/modernization/components/modernization-skeleton";
+import { ModernizationSkeleton } from "@elevatorbud/ui/components/modernization/modernization-skeleton";
 import { MaintenanceSkeleton } from "~/features/maintenance/components/maintenance-skeleton";
 
 export const Route = createFileRoute(
   "/_authenticated/admin/organisationer/$id",
 )({
+  loader: ({ context, params }) => {
+    context.queryClient.prefetchQuery(organizationOptions(params.id));
+    context.queryClient.prefetchQuery(statsOptions(params.id));
+    context.queryClient.prefetchQuery(chartDataOptions(params.id));
+  },
   component: OrganisationDetail,
   pendingComponent: DetailSkeleton,
 });
@@ -71,54 +76,11 @@ function OrganisationDetail() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabSlug>(getInitialTab);
 
-  const orgOpts = convexQuery(api.organizations.get, { id } as never);
-  const { data: org } = useSuspenseQuery({
-    queryKey: orgOpts.queryKey,
-    staleTime: orgOpts.staleTime,
-  }) as {
-    data: {
-      _id: string;
-      name: string;
-      organization_number?: string;
-      contact_person?: string;
-      phone_number?: string;
-      email?: string;
-    } | null;
-  };
+  const { data: org } = useSuspenseQuery(organizationOptions(id));
 
-  const statsOpts = convexQuery(api.elevators.analytics.stats, {
-    organization_id: id,
-  } as never);
-  const { data: stats } = useSuspenseQuery({
-    queryKey: statsOpts.queryKey,
-    staleTime: statsOpts.staleTime,
-  }) as {
-    data: {
-      totalCount: number;
-      averageAge: number;
-      modernizationWithin3Years: number;
-      totalBudgetCurrentYear: number;
-      withoutModernization: number;
-      lastInventory: number | null;
-    };
-  };
+  const { data: stats } = useSuspenseQuery(statsOptions(id));
 
-  const chartOpts = convexQuery(api.elevators.analytics.chartData, {
-    organization_id: id,
-  } as never);
-  const { data: chartData } = useSuspenseQuery({
-    queryKey: chartOpts.queryKey,
-    staleTime: chartOpts.staleTime,
-  }) as {
-    data: {
-      byDistrict: { name: string; count: number }[];
-      ageDistribution: { name: string; count: number }[];
-      byElevatorType: { name: string; count: number }[];
-      topManufacturers: { name: string; count: number }[];
-      modernizationTimeline: { name: string; count: number }[];
-      byMaintenanceCompany: { name: string; count: number }[];
-    };
-  };
+  const { data: chartData } = useSuspenseQuery(chartDataOptions(id));
 
   function handleTabChange(value: string) {
     const tab = value as TabSlug;
@@ -128,7 +90,7 @@ function OrganisationDetail() {
     window.history.replaceState({}, "", url.toString());
   }
 
-  if (org === null) {
+  if (!org) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Building2 className="size-12 text-muted-foreground" />
@@ -166,7 +128,7 @@ function OrganisationDetail() {
     },
     {
       title: "Budget innevarande år",
-      value: `${(stats.totalBudgetCurrentYear / 1000).toFixed(0)} tkr`,
+      value: `${(stats.budgetCurrentYear / 1000).toFixed(0)} tkr`,
       icon: <TrendingUp className="h-4 w-4" />,
     },
     {
@@ -201,10 +163,10 @@ function OrganisationDetail() {
             <h1 className="text-2xl font-bold">{org.name}</h1>
           </div>
           <div className="ml-10 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            {org.organization_number && <span>{org.organization_number}</span>}
-            {org.contact_person && <span>{org.contact_person}</span>}
+            {org.organizationNumber && <span>{org.organizationNumber}</span>}
+            {org.contactPerson && <span>{org.contactPerson}</span>}
             {org.email && <span>{org.email}</span>}
-            {org.phone_number && <span>{org.phone_number}</span>}
+            {org.phoneNumber && <span>{org.phoneNumber}</span>}
           </div>
         </div>
       </div>

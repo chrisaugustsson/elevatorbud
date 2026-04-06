@@ -30,6 +30,11 @@ export function MaintenanceCompanies({
   const colors = useChartColors();
   const scales = sharedScaleOptions(colors);
 
+  // Collect all unique district names across all companies
+  const allDistricts = [
+    ...new Set(foretagData.flatMap((f) => Object.keys(f.districts))),
+  ].sort((a, b) => a.localeCompare(b, "sv"));
+
   return (
     <div className="space-y-4">
       <h2 className="flex items-center gap-2 text-lg font-semibold">
@@ -44,7 +49,7 @@ export function MaintenanceCompanies({
             <CardTitle className="text-base">Antal hissar per företag</CardTitle>
           </CardHeader>
           <CardContent>
-            {foretagData.companies.length === 0 ? (
+            {foretagData.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">
                 Inga skötselföretag registrerade.
               </p>
@@ -52,11 +57,11 @@ export function MaintenanceCompanies({
               <div className="h-[300px] w-full">
                 <Bar
                   data={{
-                    labels: foretagData.companies.map((f) => f.name),
+                    labels: foretagData.map((f) => f.company),
                     datasets: [
                       {
                         label: "Antal hissar",
-                        data: foretagData.companies.map((f) => f.count),
+                        data: foretagData.map((f) => f.total),
                         backgroundColor: colors.chart1,
                         borderRadius: 4,
                         barPercentage: 0.7,
@@ -104,7 +109,7 @@ export function MaintenanceCompanies({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {foretagData.companies.length === 0 ? (
+            {foretagData.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">
                 Inga data tillgängliga.
               </p>
@@ -116,7 +121,7 @@ export function MaintenanceCompanies({
                       <TableHead className="sticky left-0 z-10 bg-background">
                         Företag
                       </TableHead>
-                      {foretagData.districts.map((d) => (
+                      {allDistricts.map((d) => (
                         <TableHead
                           key={d}
                           className="text-center text-xs"
@@ -130,21 +135,21 @@ export function MaintenanceCompanies({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {foretagData.companies.map((f) => (
-                      <TableRow key={f.name}>
+                    {foretagData.map((f) => (
+                      <TableRow key={f.company}>
                         <TableCell className="sticky left-0 z-10 bg-background font-medium text-sm">
-                          {f.name}
+                          {f.company}
                         </TableCell>
-                        {f.byDistrict.map((pd) => (
+                        {allDistricts.map((d) => (
                           <TableCell
-                            key={pd.district}
+                            key={d}
                             className="text-center text-sm"
                           >
-                            {pd.count || "–"}
+                            {f.districts[d] || "–"}
                           </TableCell>
                         ))}
                         <TableCell className="text-center font-bold text-sm">
-                          {f.count}
+                          {f.total}
                         </TableCell>
                       </TableRow>
                     ))}

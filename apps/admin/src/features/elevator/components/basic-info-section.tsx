@@ -20,7 +20,7 @@ interface BasicInfoSectionProps {
   form: HissForm;
   formValues: HissFormValues;
   originalValues: HissFormValues | null;
-  orgs: Array<{ _id: string; name: string }> | undefined;
+  orgs: Array<{ id: string; name: string }> | undefined;
   currentHissId: string;
 }
 
@@ -56,8 +56,8 @@ export function BasicInfoSection({
                 <SelectValue placeholder="Välj organisation..." />
               </SelectTrigger>
               <SelectContent>
-                {orgs?.map((org: { _id: string; name: string }) => (
-                  <SelectItem key={org._id} value={org._id}>
+                {orgs?.map((org: { id: string; name: string }) => (
+                  <SelectItem key={org.id} value={org.id}>
                     {org.name}
                   </SelectItem>
                 ))}

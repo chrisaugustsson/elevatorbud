@@ -1,7 +1,10 @@
-<!-- convex-ai-start -->
-This project uses [Convex](https://convex.dev) as its backend.
+This project uses Neon Postgres with Drizzle ORM and TanStack Start server functions.
 
-When working on Convex code, **always read `convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
-
-Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
-<!-- convex-ai-end -->
+- **Database:** `packages/db/` — Drizzle schema, connection (Neon HTTP), migrations
+- **Auth:** `packages/auth/` — Clerk auth (client exports, server middleware). Shared `adminMiddleware` and `authMiddleware` live here.
+- **Types:** `packages/types/` — Shared type definitions (User, etc.)
+- **Apps:** Each app has its own server functions at `src/server/*.ts` with query logic inlined directly
+  - **Admin app** — For Hisskompetens staff. Sees all data. No org-scoping (organizationId is an optional filter when viewing a specific org).
+  - **Client app** — For customer users. ALWAYS scoped to `context.user.organizationId`. Every query must filter by the user's org.
+  - **Landing app** — Public website. No auth.
+- **Local dev:** `docker compose up -d` starts Postgres 16, then `pnpm db:migrate` to run migrations

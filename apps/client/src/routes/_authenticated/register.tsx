@@ -5,8 +5,12 @@ import {
   useQuery,
   keepPreviousData,
 } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { meOptions } from "../../server/user";
+import {
+  elevatorListOptions,
+  exportElevatorDataOptions,
+} from "../../server/elevator";
+import { suggestedValuesOptions } from "../../server/suggested-values";
 import { downloadCSV, downloadExcel } from "@elevatorbud/utils/export";
 import type { SortingState } from "@tanstack/react-table";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
@@ -16,43 +20,41 @@ import { RegisterTable } from "../../features/register/components/register-table
 import { RegisterPagination } from "../../features/register/components/register-pagination";
 
 export const Route = createFileRoute("/_authenticated/register")({
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery(meOptions());
+    context.queryClient.prefetchQuery(suggestedValuesOptions("district"));
+    context.queryClient.prefetchQuery(suggestedValuesOptions("elevator_type"));
+    context.queryClient.prefetchQuery(suggestedValuesOptions("manufacturer"));
+  },
   component: RegisterPage,
   pendingComponent: RegisterSkeleton,
 });
 
 type ListResult = {
-  data: Array<{
-    _id: string;
-    elevator_number: string;
-    address?: string;
-    district?: string;
-    elevator_type?: string;
-    manufacturer?: string;
-    build_year?: number;
-    modernization_year?: string;
-    recommended_modernization_year?: string;
-    budget_amount?: number;
-    organizationName: string;
+  items: Array<{
+    id: string;
+    elevatorNumber: string;
+    address: string | null;
+    elevatorClassification: string | null;
+    district: string | null;
+    elevatorType: string | null;
+    manufacturer: string | null;
+    buildYear: number | null;
+    modernizationYear: string | null;
+    maintenanceCompany: string | null;
+    inspectionMonth: string | null;
+    inspectionAuthority: string | null;
+    status: string;
+    organizationId: string;
+    organizationName: string | null;
   }>;
-  totalCount: number;
+  total: number;
   page: number;
-  limit: number;
-  totalPages: number;
-};
-
-type SuggestedValueItem = {
-  _id: string;
-  category: string;
-  value: string;
-  active: boolean;
+  pageSize: number;
 };
 
 function RegisterPage() {
-  const userOpts = convexQuery(api.users.me, {});
-  const { data: user } = useSuspenseQuery({
-    queryKey: userOpts.queryKey,
-    staleTime: userOpts.staleTime,
-  });
+  const { data: user } = useSuspenseQuery(meOptions());
 
   // Search state
   const [search, setSearch] = useState("");
@@ -96,27 +98,27 @@ function RegisterPage() {
     statusFilter,
   ]);
 
-  // Get filter options from suggestedValues
-  const suggestionsOpts = convexQuery(api.suggestedValues.list, {});
-  const { data: allSuggestions } = useSuspenseQuery({
-    queryKey: suggestionsOpts.queryKey,
-    staleTime: suggestionsOpts.staleTime,
-  }) as { data: SuggestedValueItem[] };
+  // Get filter options from suggestedValues (one query per category)
+  const { data: districtSuggestions } = useSuspenseQuery(
+    suggestedValuesOptions("district"),
+  );
+  const { data: elevatorTypeSuggestions } = useSuspenseQuery(
+    suggestedValuesOptions("elevator_type"),
+  );
+  const { data: manufacturerSuggestions } = useSuspenseQuery(
+    suggestedValuesOptions("manufacturer"),
+  );
   const filterOptions = useMemo(() => {
-    const active = allSuggestions.filter((s) => s.active);
-    const byCategory = (cat: string) =>
-      active
-        .filter((s) => s.category === cat)
-        .map((s) => s.value)
-        .sort((a, b) => a.localeCompare(b, "sv"));
+    const toSorted = (items: { value: string }[]) =>
+      items.map((s) => s.value).sort((a, b) => a.localeCompare(b, "sv"));
     return {
-      district: byCategory("district"),
-      elevator_type: byCategory("elevator_type"),
-      manufacturer: byCategory("manufacturer"),
+      district: toSorted(districtSuggestions),
+      elevator_type: toSorted(elevatorTypeSuggestions),
+      manufacturer: toSorted(manufacturerSuggestions),
     };
-  }, [allSuggestions]);
+  }, [districtSuggestions, elevatorTypeSuggestions, manufacturerSuggestions]);
 
-  // Build query args — tenant isolation via user's organization_id
+  // Build query args — tenant isolation via user's organizationId
   const sortField = sorting.length > 0 ? sorting[0].id : undefined;
   const sortOrder =
     sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : undefined;
@@ -125,7 +127,7 @@ function RegisterPage() {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(filterDistrict.length > 0 ? { district: filterDistrict } : {}),
     ...(filterElevatorType.length > 0
-      ? { elevator_type: filterElevatorType }
+      ? { elevatorType: filterElevatorType }
       : {}),
     ...(filterManufacturer.length > 0
       ? { manufacturer: filterManufacturer }
@@ -136,32 +138,33 @@ function RegisterPage() {
     ...(buildYearMax && !isNaN(parseInt(buildYearMax))
       ? { buildYearMax: parseInt(buildYearMax) }
       : {}),
-    organization_id: user!.organization_id,
-    ...(statusFilter !== "alla" ? { status: statusFilter } : {}),
+    organizationId: user!.organizationId ?? undefined,
+    ...(statusFilter !== "alla"
+      ? { status: statusFilter as "active" | "demolished" | "archived" | "all" }
+      : {}),
   };
 
   const queryArgs = {
     ...filterBaseArgs,
-    ...(sortField ? { sort: sortField } : {}),
-    ...(sortOrder ? { order: sortOrder } : {}),
+    ...(sortField ? { sortBy: sortField as "elevatorNumber" | "address" | "district" | "elevatorType" | "manufacturer" | "buildYear" | "maintenanceCompany" | "inspectionMonth" } : {}),
+    ...(sortOrder ? { sortOrder: sortOrder as "asc" | "desc" } : {}),
     page,
-    limit,
-  } as never;
+    pageSize: limit,
+  };
 
-  const listOpts = convexQuery(api.elevators.listing.list, queryArgs);
   const { data: result, isLoading } = useQuery({
-    ...listOpts,
+    ...elevatorListOptions(queryArgs),
     placeholderData: keepPreviousData,
-  }) as { data: ListResult | undefined; isLoading: boolean };
+  });
 
   // Export data query — fetches all matching records (no pagination)
   const [exportRequested, setExportRequested] = useState<
     "csv" | "xlsx" | null
   >(null);
   const { data: exportData } = useQuery({
-    ...convexQuery(api.elevators.listing.exportData, filterBaseArgs as never),
+    ...exportElevatorDataOptions(filterBaseArgs),
     enabled: !!exportRequested,
-  }) as { data: Record<string, unknown>[] | undefined };
+  });
 
   const handleExport = useCallback((format: "csv" | "xlsx") => {
     setExportRequested(format);
@@ -196,8 +199,9 @@ function RegisterPage() {
     setStatusFilter("active");
   }
 
-  const totalCount = result?.totalCount ?? 0;
-  const totalPages = result?.totalPages ?? 0;
+  const totalCount = result?.total ?? 0;
+  const pageSize = result?.pageSize ?? limit;
+  const totalPages = pageSize > 0 ? Math.ceil(totalCount / pageSize) : 0;
 
   return (
     <div className="space-y-4">
@@ -226,7 +230,7 @@ function RegisterPage() {
         onClearAllFilters={clearAllFilters}
       />
       <RegisterTable
-        data={result?.data ?? []}
+        data={result?.items ?? []}
         sorting={sorting}
         onSortingChange={setSorting}
         totalPages={totalPages}

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
+import { useQuery } from "@tanstack/react-query";
+import { getPage } from "~/server/api";
 import {
   ArrowRight,
   Search,
@@ -601,7 +601,10 @@ function CtaSection({
 // Main page component
 // ---------------------------------------------------------------------------
 function Startsida() {
-  const page = useQuery(api.cms.getPage, { slug: "startsida" });
+  const { data: page } = useQuery({
+    queryKey: ["cms", "getPage", "startsida"],
+    queryFn: () => getPage({ data: { slug: "startsida" } }),
+  });
 
   const heroSection = page?.sections?.find((s: CmsSection) => s.type === "hero");
   const featuresSection = page?.sections?.find((s: CmsSection) => s.type === "features");

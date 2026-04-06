@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSuspenseQuery, useQuery, keepPreviousData } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { listElevatorsOptions, exportElevatorDataOptions } from "~/server/elevator";
+import { suggestedValuesOptions } from "~/server/suggested-values";
 import { downloadCSV, downloadExcel } from "@elevatorbud/utils/export";
 import type { SortingState } from "@tanstack/react-table";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
@@ -10,28 +10,30 @@ import { RegisterFilters } from "~/features/register/components/register-filters
 import { RegisterTable } from "~/features/register/components/register-table";
 
 type ListResult = {
-  data: Array<{
-    _id: string;
-    elevator_number: string;
-    address?: string;
-    district?: string;
-    elevator_type?: string;
-    manufacturer?: string;
-    build_year?: number;
-    modernization_year?: string;
-    recommended_modernization_year?: string;
-    budget_amount?: number;
-    organization_id: string;
-    organizationName: string;
+  items: Array<{
+    id: string;
+    elevatorNumber: string;
+    address: string | null;
+    elevatorClassification: string | null;
+    district: string | null;
+    elevatorType: string | null;
+    manufacturer: string | null;
+    buildYear: number | null;
+    modernizationYear: string | null;
+    maintenanceCompany: string | null;
+    inspectionMonth: string | null;
+    inspectionAuthority: string | null;
+    status: string;
+    organizationId: string;
+    organizationName: string | null;
   }>;
-  totalCount: number;
+  total: number;
   page: number;
-  limit: number;
-  totalPages: number;
+  pageSize: number;
 };
 
 type SuggestedValueItem = {
-  _id: string;
+  id: string;
   category: string;
   value: string;
   active: boolean;
@@ -75,36 +77,33 @@ export function OrgRegisterView({
     statusFilter,
   ]);
 
-  const suggestionsOpts = convexQuery(api.suggestedValues.list, {});
-  const { data: allSuggestions } = useSuspenseQuery({
-    queryKey: suggestionsOpts.queryKey,
-    staleTime: suggestionsOpts.staleTime,
-  }) as { data: SuggestedValueItem[] };
+  const { data: districtSuggestions } = useSuspenseQuery(suggestedValuesOptions("district"));
+  const { data: elevatorTypeSuggestions } = useSuspenseQuery(suggestedValuesOptions("elevator_type"));
+  const { data: manufacturerSuggestions } = useSuspenseQuery(suggestedValuesOptions("manufacturer"));
 
   const filterOptions = useMemo(() => {
-    const active = allSuggestions.filter((s) => s.active);
-    const byCategory = (cat: string) =>
-      active
-        .filter((s) => s.category === cat)
+    const toSorted = (items: SuggestedValueItem[]) =>
+      items
+        .filter((s) => s.active)
         .map((s) => s.value)
         .sort((a, b) => a.localeCompare(b, "sv"));
     return {
-      district: byCategory("district"),
-      elevator_type: byCategory("elevator_type"),
-      manufacturer: byCategory("manufacturer"),
+      district: toSorted(districtSuggestions),
+      elevator_type: toSorted(elevatorTypeSuggestions),
+      manufacturer: toSorted(manufacturerSuggestions),
     };
-  }, [allSuggestions]);
+  }, [districtSuggestions, elevatorTypeSuggestions, manufacturerSuggestions]);
 
   const sortField = sorting.length > 0 ? sorting[0].id : undefined;
   const sortOrder =
     sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : undefined;
 
   const filterBaseArgs = {
-    organization_id: organizationId,
+    organizationId,
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(filterDistrict.length > 0 ? { district: filterDistrict } : {}),
     ...(filterElevatorType.length > 0
-      ? { elevator_type: filterElevatorType }
+      ? { elevatorType: filterElevatorType }
       : {}),
     ...(filterManufacturer.length > 0
       ? { manufacturer: filterManufacturer }
@@ -126,19 +125,18 @@ export function OrgRegisterView({
     limit,
   } as never;
 
-  const listOpts = convexQuery(api.elevators.listing.list, queryArgs);
   const { data: result, isLoading } = useQuery({
-    ...listOpts,
+    ...listElevatorsOptions(queryArgs),
     placeholderData: keepPreviousData,
-  }) as { data: ListResult | undefined; isLoading: boolean };
+  });
 
   const [exportRequested, setExportRequested] = useState<
     "csv" | "xlsx" | null
   >(null);
   const { data: exportData } = useQuery({
-    ...convexQuery(api.elevators.listing.exportData, filterBaseArgs as never),
+    ...exportElevatorDataOptions(filterBaseArgs as never),
     enabled: !!exportRequested,
-  }) as { data: Record<string, unknown>[] | undefined };
+  });
 
   const handleExport = useCallback((format: "csv" | "xlsx") => {
     setExportRequested(format);
@@ -172,8 +170,9 @@ export function OrgRegisterView({
     setStatusFilter("active");
   }
 
-  const totalCount = result?.totalCount ?? 0;
-  const totalPages = result?.totalPages ?? 0;
+  const totalCount = result?.total ?? 0;
+  const pageSize = result?.pageSize ?? limit;
+  const totalPages = pageSize > 0 ? Math.ceil(totalCount / pageSize) : 0;
 
   return (
     <div className="space-y-4">
@@ -202,7 +201,7 @@ export function OrgRegisterView({
         onClearAllFilters={clearAllFilters}
       />
       <RegisterTable
-        data={result?.data ?? []}
+        data={result?.items ?? []}
         sorting={sorting}
         onSortingChange={setSorting}
         totalCount={totalCount}

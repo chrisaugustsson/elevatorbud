@@ -17,8 +17,8 @@ import {
 } from "@elevatorbud/ui/components/ui/card";
 
 export type ChartDataPoint = {
-  name: string;
-  count: number;
+  label: string;
+  value: number;
 };
 
 /**
@@ -73,11 +73,11 @@ export function DashboardBarChart({
 
   const chartData = React.useMemo(
     () => ({
-      labels: data.map((d) => d.name),
+      labels: data.map((d) => d.label),
       datasets: [
         {
           label: "Antal",
-          data: data.map((d) => d.count),
+          data: data.map((d) => d.value),
           backgroundColor: color ? resolveToHex(color) : palette[0],
           borderRadius: 4,
           borderSkipped: "bottom" as const,
@@ -133,10 +133,10 @@ export function DashboardPieChart({
 
   const chartData = React.useMemo(
     () => ({
-      labels: data.map((d) => d.name),
+      labels: data.map((d) => d.label),
       datasets: [
         {
-          data: data.map((d) => d.count),
+          data: data.map((d) => d.value),
           backgroundColor: data.map((_, i) => palette[i % palette.length]),
           borderWidth: 0,
           spacing: 2,

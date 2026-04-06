@@ -6,15 +6,18 @@
   "exports": {
     ".": "./src/index.ts",
     "./*": "./src/*.ts",
-    "./provider": "./src/provider.tsx",
-    "./server": "./src/server.ts"
+    "./server": "./src/server.ts",
+    "./middleware": "./src/middleware.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@clerk/tanstack-react-start": "^1.0.8",
-    "convex": "^1.34.1"
+    "@elevatorbud/db": "workspace:*",
+    "@elevatorbud/types": "workspace:*",
+    "@tanstack/react-start": "^1.112.7",
+    "drizzle-orm": "0.44.7"
   },
   "peerDependencies": {
     "react": "^19.0.0",

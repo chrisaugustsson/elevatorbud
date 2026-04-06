@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { dashboardOverviewOptions } from "~/server/dashboard";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import {
   Card,
@@ -28,31 +27,29 @@ type DashboardData = {
   upcomingInspections: number;
   modernizationSoon: number;
   topOrganizations: {
-    _id: string;
+    id: string;
     name: string;
     elevatorCount: number;
   }[];
   recentActivity: {
-    _id: string;
-    elevator_number: string;
-    address?: string;
-    organizationName: string;
-    organization_id: string;
-    last_updated_at: number;
+    id: string;
+    elevatorNumber: string;
+    address: string | null;
+    lastUpdatedAt: Date | null;
+    organizationName: string | null;
   }[];
 };
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery(dashboardOverviewOptions());
+  },
   component: Dashboard,
   pendingComponent: DashboardSkeleton,
 });
 
 function Dashboard() {
-  const opts = convexQuery(api.dashboard.overview, {});
-  const { data } = useSuspenseQuery({
-    queryKey: opts.queryKey,
-    staleTime: opts.staleTime,
-  }) as { data: DashboardData };
+  const { data } = useSuspenseQuery(dashboardOverviewOptions());
 
   return (
     <div className="space-y-8">
@@ -106,9 +103,9 @@ function Dashboard() {
               ) : (
                 data.topOrganizations.map((org) => (
                   <Link
-                    key={org._id}
+                    key={org.id}
                     to={
-                      `/admin/organisationer/${org._id}` as string
+                      `/admin/organisationer/${org.id}` as string
                     }
                     className="flex items-center justify-between rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent"
                   >
@@ -184,15 +181,15 @@ function Dashboard() {
               <div className="space-y-1">
                 {data.recentActivity.map((item) => (
                   <Link
-                    key={item._id}
+                    key={item.id}
                     to="/hiss/$id"
-                    params={{ id: item._id }}
+                    params={{ id: item.id }}
                     className="flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-accent group"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm">
-                          {item.elevator_number}
+                          {item.elevatorNumber}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {item.organizationName}
@@ -208,7 +205,7 @@ function Dashboard() {
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
-                        {formatRelativeTime(item.last_updated_at)}
+                        {formatRelativeTime(item.lastUpdatedAt)}
                       </span>
                       <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
@@ -245,8 +242,9 @@ function StatCard({
   );
 }
 
-function formatRelativeTime(timestamp: number): string {
-  const diff = Date.now() - timestamp;
+function formatRelativeTime(timestamp: Date | null): string {
+  if (!timestamp) return "–";
+  const diff = Date.now() - timestamp.getTime();
   const minutes = Math.floor(diff / 60_000);
   if (minutes < 1) return "just nu";
   if (minutes < 60) return `${minutes} min sedan`;
@@ -255,7 +253,7 @@ function formatRelativeTime(timestamp: number): string {
   const days = Math.floor(hours / 24);
   if (days === 1) return "igår";
   if (days < 7) return `${days} dagar sedan`;
-  return new Date(timestamp).toLocaleDateString("sv-SE");
+  return timestamp.toLocaleDateString("sv-SE");
 }
 
 function DashboardSkeleton() {

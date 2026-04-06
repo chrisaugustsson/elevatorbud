@@ -2,3 +2,12 @@ name = 'elevatorbud-client-prod'
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 main = "@tanstack/react-start/server-entry"
+workers_dev = true
+
+[secrets]
+required = ["DATABASE_URL", "CLERK_SECRET_KEY"]
+
+[env.dev]
+name = "elevatorbud-client-dev"
+workers_dev = true
+routes = []

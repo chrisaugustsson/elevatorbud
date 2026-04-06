@@ -1,9 +1,13 @@
 import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation } from "convex/react";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  suggestedValuesOptions,
+  createSuggestedValue,
+  updateSuggestedValue,
+  mergeSuggestedValues,
+  toggleSuggestedValueActive,
+} from "~/server/suggested-values";
 import { useForm } from "@tanstack/react-form";
 import {
   useReactTable,
@@ -63,6 +67,9 @@ import { DataGrid, DataGridContainer, DataGridTable, DataGridColumnHeader } from
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 
 export const Route = createFileRoute("/_authenticated/admin/referensdata")({
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery(suggestedValuesOptions("elevator_type"));
+  },
   component: Referensdata,
   pendingComponent: ReferensdataSkeleton,
 });
@@ -98,11 +105,11 @@ const CATEGORY_LABELS: Record<Category, string> = {
 };
 
 type SuggestedValue = {
-  _id: string;
+  id: string;
   category: string;
   value: string;
   active: boolean;
-  created_at: number;
+  createdAt: Date;
 };
 
 function ReferensdataSkeleton() {
@@ -159,18 +166,24 @@ function Referensdata() {
   const [renameItem, setRenameItem] = useState<SuggestedValue | null>(null);
   const [mergeItem, setMergeItem] = useState<SuggestedValue | null>(null);
 
-  const opts = convexQuery(api.suggestedValues.list, {
-    category: selectedCategory,
+  const queryClient = useQueryClient();
+  const { data: values } = useSuspenseQuery(suggestedValuesOptions(selectedCategory));
+  const createValue = useMutation({
+    mutationFn: (input: { category: string; value: string }) => createSuggestedValue({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suggestedValues"] }); },
   });
-  const { data: values } = useSuspenseQuery({
-    queryKey: opts.queryKey,
-    staleTime: opts.staleTime,
-  }) as { data: SuggestedValue[] };
-  const createValue = useMutation(api.suggestedValues.create);
-  const updateValue = useMutation(api.suggestedValues.update);
-  const mergeValue = useMutation(api.suggestedValues.merge);
-  const deactivateValue = useMutation(api.suggestedValues.deactivate);
-  const activateValue = useMutation(api.suggestedValues.activate);
+  const updateValue = useMutation({
+    mutationFn: (input: { id: string; value: string }) => updateSuggestedValue({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suggestedValues"] }); },
+  });
+  const mergeValue = useMutation({
+    mutationFn: (input: { sourceId: string; targetId: string }) => mergeSuggestedValues({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suggestedValues"] }); },
+  });
+  const toggleActive = useMutation({
+    mutationFn: (input: { id: string; active: boolean }) => toggleSuggestedValueActive({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["suggestedValues"] }); },
+  });
 
   const filteredValues = useMemo(
     () => values.filter(
@@ -228,7 +241,7 @@ function Referensdata() {
                   {row.active ? (
                     <DropdownMenuItem
                       onClick={async () => {
-                        await deactivateValue({ id: row._id as never });
+                        await toggleActive.mutateAsync({ id: row.id, active: false });
                       }}
                     >
                       <Ban className="mr-2 size-4" />
@@ -237,7 +250,7 @@ function Referensdata() {
                   ) : (
                     <DropdownMenuItem
                       onClick={async () => {
-                        await activateValue({ id: row._id as never });
+                        await toggleActive.mutateAsync({ id: row.id, active: true });
                       }}
                     >
                       <CheckCircle className="mr-2 size-4" />
@@ -332,7 +345,7 @@ function Referensdata() {
         onOpenChange={setCreateOpen}
         category={selectedCategory}
         onSubmit={async (val) => {
-          await createValue({ category: selectedCategory, value: val });
+          await createValue.mutateAsync({ category: selectedCategory, value: val });
           setCreateOpen(false);
         }}
       />
@@ -344,7 +357,7 @@ function Referensdata() {
         }}
         onSubmit={async (newVarde) => {
           if (!renameItem) return;
-          await updateValue({ id: renameItem._id as never, value: newVarde });
+          await updateValue.mutateAsync({ id: renameItem.id, value: newVarde });
           setRenameItem(null);
         }}
       />
@@ -357,9 +370,9 @@ function Referensdata() {
         }}
         onSubmit={async (targetId) => {
           if (!mergeItem) return;
-          await mergeValue({
-            sourceId: mergeItem._id as never,
-            targetId: targetId as never,
+          await mergeValue.mutateAsync({
+            sourceId: mergeItem.id,
+            targetId: targetId,
           });
           setMergeItem(null);
         }}
@@ -481,7 +494,7 @@ function RenameDialog({
 
   return (
     <RenameDialogInner
-      key={item._id}
+      key={item.id}
       item={item}
       onOpenChange={onOpenChange}
       onSubmit={onSubmit}
@@ -598,7 +611,7 @@ function MergeDialog({
 
   return (
     <MergeDialogInner
-      key={item._id}
+      key={item.id}
       item={item}
       allValues={allValues}
       onOpenChange={onOpenChange}
@@ -621,8 +634,8 @@ function MergeDialogInner({
   const [targetId, setTargetId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const targets = allValues.filter((v) => v._id !== item._id);
-  const targetItem = targets.find((v) => v._id === targetId);
+  const targets = allValues.filter((v) => v.id !== item.id);
+  const targetItem = targets.find((v) => v.id === targetId);
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
@@ -645,7 +658,7 @@ function MergeDialogInner({
               </SelectTrigger>
               <SelectContent>
                 {targets.map((t) => (
-                  <SelectItem key={t._id} value={t._id}>
+                  <SelectItem key={t.id} value={t.id}>
                     {t.value}
                   </SelectItem>
                 ))}

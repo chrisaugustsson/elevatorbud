@@ -15,22 +15,22 @@ import {
   DataGridColumnHeader,
 } from "@elevatorbud/ui/components/ui/data-grid-table";
 import { Badge } from "@elevatorbud/ui/components/ui/badge";
-import { Link } from "@tanstack/react-router";
 import { Building2, ChevronRight } from "lucide-react";
-import type { TimelinePeriod } from "./urgency-helpers";
-import { getUrgencyBadge } from "./urgency-helpers";
+import type { TimelinePeriod } from "@elevatorbud/ui/components/modernization/urgency-helpers";
+import { getUrgencyBadge } from "@elevatorbud/ui/components/modernization/urgency-helpers";
 
 type PriorityElevator = {
-  _id: string;
-  elevator_number: string;
-  address?: string;
-  district?: string;
-  elevator_type?: string;
-  recommended_modernization_year?: string;
-  budget_amount?: number;
-  modernization_measures?: string;
-  organization_id: string;
-  organizationName: string;
+  id: string;
+  elevatorNumber: string;
+  address: string | null;
+  district: string | null;
+  elevatorType: string | null;
+  manufacturer: string | null;
+  buildYear: number | null;
+  organizationName: string | null;
+  recommendedModernizationYear: string | null;
+  budgetAmount: number | null;
+  measures: string | null;
 };
 
 type PriorityListProps = {
@@ -47,12 +47,12 @@ export function PriorityList({
   onClearPeriod,
 }: PriorityListProps) {
   const [sorting, setSorting] = useState<SortingState>([
-    { id: "recommended_modernization_year", desc: false },
+    { id: "recommendedModernizationYear", desc: false },
   ]);
 
   const columns = useMemo(
     () => [
-      columnHelper.accessor("elevator_number", {
+      columnHelper.accessor("elevatorNumber", {
         header: ({ column }) => (
           <DataGridColumnHeader title="Hissnummer" column={column} />
         ),
@@ -79,19 +79,10 @@ export function PriorityList({
           <DataGridColumnHeader title="Organisation" column={column} />
         ),
         enableSorting: false,
-        cell: (info) => (
-          <Link
-            to="/admin/organisationer/$id"
-            params={{ id: info.row.original.organization_id }}
-            onClick={(e) => e.stopPropagation()}
-            className="text-primary hover:underline"
-          >
-            {info.getValue()}
-          </Link>
-        ),
+        cell: (info) => info.getValue() || "–",
         meta: { className: "hidden sm:table-cell" },
       }),
-      columnHelper.accessor("recommended_modernization_year", {
+      columnHelper.accessor("recommendedModernizationYear", {
         header: ({ column }) => (
           <DataGridColumnHeader title="Rek. år" column={column} />
         ),
@@ -105,13 +96,13 @@ export function PriorityList({
         enableSorting: false,
         cell: (info) => {
           const year = parseInt(
-            info.row.original.recommended_modernization_year || "0",
+            info.row.original.recommendedModernizationYear || "0",
             10,
           );
           return getUrgencyBadge(year);
         },
       }),
-      columnHelper.accessor("budget_amount", {
+      columnHelper.accessor("budgetAmount", {
         header: ({ column }) => (
           <DataGridColumnHeader title="Budget" column={column} />
         ),
@@ -121,7 +112,7 @@ export function PriorityList({
         },
         meta: { className: "hidden sm:table-cell" },
       }),
-      columnHelper.accessor("modernization_measures", {
+      columnHelper.accessor("measures", {
         header: ({ column }) => (
           <DataGridColumnHeader title="Åtgärd" column={column} />
         ),
@@ -133,7 +124,7 @@ export function PriorityList({
         id: "actions",
         cell: (info) => (
           <a
-            href={`/hiss/${info.row.original._id}`}
+            href={`/hiss/${info.row.original.id}`}
             className="inline-flex items-center text-muted-foreground hover:text-foreground"
           >
             <ChevronRight className="h-4 w-4" />
