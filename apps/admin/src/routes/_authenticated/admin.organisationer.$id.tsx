@@ -39,7 +39,7 @@ import {
   OrgUsersView,
   OrgUsersSkeleton,
 } from "~/features/organization/components/org-users-view";
-import { ModernizationSkeleton } from "~/features/modernization/components/modernization-skeleton";
+import { ModernizationSkeleton } from "@elevatorbud/ui/components/modernization/modernization-skeleton";
 import { MaintenanceSkeleton } from "~/features/maintenance/components/maintenance-skeleton";
 
 export const Route = createFileRoute(

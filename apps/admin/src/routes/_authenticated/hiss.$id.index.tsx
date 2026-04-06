@@ -280,7 +280,7 @@ function HissDetail() {
           label="Budget"
           value={
             budget?.budgetAmount != null
-              ? `${budget.budgetAmount.toLocaleString("sv-SE")} kr`
+              ? `${Number(budget.budgetAmount).toLocaleString("sv-SE")} kr`
               : undefined
           }
         />
@@ -306,7 +306,7 @@ function HissDetail() {
           label="Pris"
           value={
             details?.emergencyPhonePrice != null
-              ? `${details.emergencyPhonePrice.toLocaleString("sv-SE")} kr`
+              ? `${Number(details.emergencyPhonePrice).toLocaleString("sv-SE")} kr`
               : undefined
           }
         />

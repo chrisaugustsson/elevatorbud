@@ -8,9 +8,10 @@ import {
   index,
   unique,
   jsonb,
-  real,
+  numeric,
+  check,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // ─── Organizations ───────────────────────────────────────────────────────────
 
@@ -52,8 +53,10 @@ export const users = pgTable(
   },
   (t) => [
     unique("users_clerk_user_id_unique").on(t.clerkUserId),
+    unique("users_email_unique").on(t.email),
     index("users_organization_id_idx").on(t.organizationId),
     index("users_role_idx").on(t.role),
+    check("users_role_check", sql`${t.role} IN ('admin', 'customer')`),
   ],
 );
 
@@ -119,6 +122,8 @@ export const elevators = pgTable(
     index("elevators_district_idx").on(t.district),
     index("elevators_manufacturer_idx").on(t.manufacturer),
     index("elevators_elevator_type_idx").on(t.elevatorType),
+    check("elevators_status_check", sql`${t.status} IN ('active', 'demolished', 'archived')`),
+    check("elevators_build_year_check", sql`${t.buildYear} IS NULL OR (${t.buildYear} >= 1800 AND ${t.buildYear} <= 2100)`),
   ],
 );
 
@@ -181,7 +186,7 @@ export const elevatorDetails = pgTable(
     // Emergency phone details
     emergencyPhoneModel: text("emergency_phone_model"),
     emergencyPhoneType: text("emergency_phone_type"),
-    emergencyPhonePrice: real("emergency_phone_price"),
+    emergencyPhonePrice: numeric("emergency_phone_price", { precision: 10, scale: 2 }),
 
     // Comments
     comments: text("comments"),
@@ -210,7 +215,7 @@ export const elevatorBudgets = pgTable(
       .references(() => elevators.id, { onDelete: "cascade" }),
     revisionYear: integer("revision_year").notNull(),
     recommendedModernizationYear: text("recommended_modernization_year"),
-    budgetAmount: real("budget_amount"),
+    budgetAmount: numeric("budget_amount", { precision: 12, scale: 2 }),
     measures: text("measures"),
     warranty: boolean("warranty"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -277,7 +282,10 @@ export const contactSubmissions = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("contact_submissions_status_idx").on(t.status)],
+  (t) => [
+    index("contact_submissions_status_idx").on(t.status),
+    check("contact_submissions_status_check", sql`${t.status} IN ('new', 'read', 'archived')`),
+  ],
 );
 
 // ─── Pages (CMS) ────────────────────────────────────────────────────────────

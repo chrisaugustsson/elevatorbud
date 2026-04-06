@@ -9,6 +9,9 @@ workers_dev = true
 #   { pattern = "admin.hisskompetens.se", custom_domain = true },
 # ]
 
+[secrets]
+required = ["DATABASE_URL", "CLERK_SECRET_KEY", "CLERK_WEBHOOK_SECRET"]
+
 [env.dev]
 name = "elevatorbud-admin-dev"
 workers_dev = true

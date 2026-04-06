@@ -35,9 +35,6 @@ importers:
 
   apps/admin:
     dependencies:
-      '@elevatorbud/api':
-        specifier: workspace:*
-        version: link:../../packages/api
       '@elevatorbud/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -123,9 +120,6 @@ importers:
 
   apps/client:
     dependencies:
-      '@elevatorbud/api':
-        specifier: workspace:*
-        version: link:../../packages/api
       '@elevatorbud/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -180,6 +174,9 @@ importers:
       tailwindcss:
         specifier: ^4.2.2
         version: 4.2.2
+      zod:
+        specifier: ^3.25.23
+        version: 3.25.76
     devDependencies:
       '@cloudflare/vite-plugin':
         specifier: ^1.31.0
@@ -205,9 +202,6 @@ importers:
 
   apps/landing:
     dependencies:
-      '@elevatorbud/api':
-        specifier: workspace:*
-        version: link:../../packages/api
       '@elevatorbud/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -276,27 +270,23 @@ importers:
         specifier: ^4.80.0
         version: 4.80.0
 
-  packages/api:
-    dependencies:
-      '@elevatorbud/db':
-        specifier: workspace:*
-        version: link:../db
-      drizzle-orm:
-        specifier: 0.44.7
-        version: 0.44.7(@neondatabase/serverless@1.0.2)(@types/pg@8.20.0)(pg@8.20.0)
-      zod:
-        specifier: ^3.25.17
-        version: 3.25.76
-    devDependencies:
-      typescript:
-        specifier: ^6.0.2
-        version: 6.0.2
-
   packages/auth:
     dependencies:
       '@clerk/tanstack-react-start':
         specifier: ^1.0.8
         version: 1.0.8(@tanstack/react-router@1.168.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@tanstack/react-start@1.167.16(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.5.0)(esbuild@0.27.5)(jiti@2.6.1)(tsx@4.21.0)))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@elevatorbud/db':
+        specifier: workspace:*
+        version: link:../db
+      '@elevatorbud/types':
+        specifier: workspace:*
+        version: link:../types
+      '@tanstack/react-start':
+        specifier: ^1.112.7
+        version: 1.167.16(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.5.0)(esbuild@0.27.5)(jiti@2.6.1)(tsx@4.21.0))
+      drizzle-orm:
+        specifier: 0.44.7
+        version: 0.44.7(@neondatabase/serverless@1.0.2)(@types/pg@8.20.0)(pg@8.20.0)
       react:
         specifier: ^19.0.0
         version: 19.2.4

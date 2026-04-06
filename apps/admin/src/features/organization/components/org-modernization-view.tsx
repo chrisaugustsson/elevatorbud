@@ -5,8 +5,8 @@ import {
   PERIODS,
   getUrgencyColor,
   type TimelinePeriod,
-} from "../../modernization/components/urgency-helpers";
-import { PeriodSummaryCards } from "../../modernization/components/period-summary-cards";
+} from "@elevatorbud/ui/components/modernization/urgency-helpers";
+import { PeriodSummaryCards } from "@elevatorbud/ui/components/modernization/period-summary-cards";
 import { TimelineChart } from "../../modernization/components/timeline-chart";
 import { BudgetOverview } from "../../modernization/components/budget-overview";
 import { PriorityList } from "../../modernization/components/priority-list";

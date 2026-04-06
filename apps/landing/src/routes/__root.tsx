@@ -15,6 +15,7 @@ const queryClient = new QueryClient({
 });
 
 export const Route = createRootRoute({
+  errorComponent: RootError,
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -71,6 +72,29 @@ const navLinks = [
   { to: "/om-oss" as const, label: "Om oss" },
   { to: "/kontakt" as const, label: "Kontakt" },
 ];
+
+function RootError({ error }: { error: Error }) {
+  return (
+    <RootDocument>
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+          <h1 className="mb-2 text-lg font-semibold text-red-800">
+            Något gick fel
+          </h1>
+          <p className="mb-4 text-sm text-red-600">
+            {error.message || "Ett oväntat fel inträffade."}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 cursor-pointer"
+          >
+            Ladda om sidan
+          </button>
+        </div>
+      </div>
+    </RootDocument>
+  );
+}
 
 function SiteHeader() {
   const [menuOpen, setMenuOpen] = React.useState(false);

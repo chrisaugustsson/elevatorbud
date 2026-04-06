@@ -8,7 +8,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@elevatorbud/api": "workspace:*",
     "@elevatorbud/db": "workspace:*",
     "@elevatorbud/ui": "workspace:*",
     "@marsidev/react-turnstile": "^1.5.0",

@@ -6,12 +6,12 @@ import {
   PERIODS,
   getUrgencyColor,
   type TimelinePeriod,
-} from "../../features/modernization/components/urgency-helpers";
-import { PeriodSummaryCards } from "../../features/modernization/components/period-summary-cards";
+} from "@elevatorbud/ui/components/modernization/urgency-helpers";
+import { PeriodSummaryCards } from "@elevatorbud/ui/components/modernization/period-summary-cards";
 import { TimelineChart } from "../../features/modernization/components/timeline-chart";
 import { BudgetOverview } from "../../features/modernization/components/budget-overview";
 import { PriorityList } from "../../features/modernization/components/priority-list";
-import { ModernizationSkeleton } from "../../features/modernization/components/modernization-skeleton";
+import { ModernizationSkeleton } from "@elevatorbud/ui/components/modernization/modernization-skeleton";
 
 export const Route = createFileRoute("/_authenticated/modernisering")({
   loader: ({ context }) => {

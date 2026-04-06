@@ -8,7 +8,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@elevatorbud/api": "workspace:*",
     "@elevatorbud/auth": "workspace:*",
     "@elevatorbud/db": "workspace:*",
     "@elevatorbud/ui": "workspace:*",

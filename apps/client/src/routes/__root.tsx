@@ -23,6 +23,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   }),
   shellComponent: RootDocument,
   component: RootLayout,
+  errorComponent: RootError,
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
@@ -47,5 +48,26 @@ function RootLayout() {
       <Outlet />
       <Toaster />
     </ClerkProvider>
+  );
+}
+
+function RootError({ error }: { error: Error }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-md rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+        <h1 className="mb-2 text-lg font-semibold text-red-800">
+          Något gick fel
+        </h1>
+        <p className="mb-4 text-sm text-red-600">
+          {error.message || "Ett oväntat fel inträffade."}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500"
+        >
+          Ladda om sidan
+        </button>
+      </div>
+    </div>
   );
 }
