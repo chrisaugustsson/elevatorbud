@@ -119,10 +119,10 @@ export function OrgRegisterView({
 
   const queryArgs = {
     ...filterBaseArgs,
-    ...(sortField ? { sort: sortField } : {}),
-    ...(sortOrder ? { order: sortOrder } : {}),
-    page,
-    limit,
+    ...(sortField ? { sortBy: sortField } : {}),
+    ...(sortOrder ? { sortOrder } : {}),
+    page: page + 1,
+    pageSize: limit,
   } as never;
 
   const { data: result, isLoading } = useQuery({
