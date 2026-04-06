@@ -51,7 +51,7 @@ const STEPS = [
 export interface ElevatorWizardProps {
   form: HissForm;
   formValues: HissFormValues;
-  orgs: Array<{ _id: string; name: string }> | undefined;
+  orgs: Array<{ id: string; name: string }> | undefined;
   draftKey: string;
   submitSuccess: boolean;
   onSubmit: () => void;
@@ -269,8 +269,8 @@ export function ElevatorWizard({
                     <SelectValue placeholder="Välj organisation..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {orgs?.map((org: { _id: string; name: string }) => (
-                      <SelectItem key={org._id} value={org._id}>
+                    {orgs?.map((org: { id: string; name: string }) => (
+                      <SelectItem key={org.id} value={org.id}>
                         {org.name}
                       </SelectItem>
                     ))}

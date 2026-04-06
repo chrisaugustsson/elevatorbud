@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { searchElevatorsOptions } from "../../server/elevator";
 import { useNavigate } from "@tanstack/react-router";
 import {
   BarChart3,
@@ -21,14 +20,12 @@ import {
   CommandGroup,
   CommandItem,
   CommandSeparator,
-  CommandShortcut,
 } from "@elevatorbud/ui/components/ui/command";
 
 interface ElevatorResult {
-  _id: string;
-  elevator_number: string;
+  id: string;
+  elevatorNumber: string;
   address: string | null;
-  district: string | null;
   organizationName: string | null;
 }
 
@@ -107,12 +104,9 @@ export function GlobalSearch() {
   }, []);
 
   const { data: results, isFetching } = useQuery({
-    ...convexQuery(api.search.global, { search: debouncedSearch! }),
+    ...searchElevatorsOptions(debouncedSearch),
     enabled: !!debouncedSearch,
-  }) as {
-    data: { elevators: ElevatorResult[] } | undefined;
-    isFetching: boolean;
-  };
+  });
 
   const handleSelect = useCallback(
     (id: string) => {
@@ -154,7 +148,7 @@ export function GlobalSearch() {
     [],
   );
 
-  const hasElevators = results && results.elevators.length > 0;
+  const hasElevators = results && results.length > 0;
   const isSearching = debouncedSearch.length > 0;
   const showDefaultState = !isSearching;
 
@@ -204,19 +198,19 @@ export function GlobalSearch() {
 
           {hasElevators && (
             <CommandGroup heading="Hissar">
-              {results.elevators.map((elevator) => (
+              {results.map((elevator) => (
                 <CommandItem
-                  key={elevator._id}
-                  value={`elevator-${elevator._id}-${elevator.elevator_number}`}
-                  onSelect={() => handleSelect(elevator._id)}
+                  key={elevator.id}
+                  value={`elevator-${elevator.id}-${elevator.elevatorNumber}`}
+                  onSelect={() => handleSelect(elevator.id)}
                 >
                   <ArrowUpDown className="size-4 text-muted-foreground" />
                   <div className="flex min-w-0 flex-col">
                     <span className="truncate font-medium">
-                      {elevator.elevator_number}
+                      {elevator.elevatorNumber}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
-                      {[elevator.address, elevator.district]
+                      {[elevator.address, elevator.organizationName]
                         .filter(Boolean)
                         .join(" · ")}
                     </span>

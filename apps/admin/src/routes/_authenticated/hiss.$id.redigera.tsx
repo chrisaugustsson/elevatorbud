@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useMutation } from "convex/react";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { elevatorOptions, updateElevator } from "~/server/elevator";
+import { listOrganizationsOptions } from "~/server/organization";
 import { useForm } from "@tanstack/react-form";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import {
@@ -54,6 +53,10 @@ function getInitialTab(): TabSlug {
 }
 
 export const Route = createFileRoute("/_authenticated/hiss/$id/redigera")({
+  loader: ({ context, params }) => {
+    context.queryClient.prefetchQuery(elevatorOptions(params.id));
+    context.queryClient.prefetchQuery(listOrganizationsOptions());
+  },
   component: RedigeraHiss,
   pendingComponent: RedigeraSkeleton,
 });
@@ -118,17 +121,14 @@ function RedigeraHiss() {
   const { id } = Route.useParams();
   const [activeTab, setActiveTab] = useState<TabSlug>(getInitialTab);
   const router = useRouter();
-  const hissOpts = convexQuery(api.elevators.crud.get, { id: id as never });
-  const { data: hiss } = useSuspenseQuery({
-    queryKey: hissOpts.queryKey,
-    staleTime: hissOpts.staleTime,
+  const queryClient = useQueryClient();
+  const { data: hiss } = useSuspenseQuery(elevatorOptions(id));
+  const { data: orgs } = useSuspenseQuery(listOrganizationsOptions());
+  const updateHiss = useMutation({
+    mutationFn: (input: { id: string; organizationId?: string } & ReturnType<typeof formValuesToUpdateArgs>) =>
+      updateElevator({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["elevator"] }); },
   });
-  const orgsOpts = convexQuery(api.organizations.list, {});
-  const { data: orgs } = useSuspenseQuery({
-    queryKey: orgsOpts.queryKey,
-    staleTime: orgsOpts.staleTime,
-  });
-  const updateHiss = useMutation(api.elevators.crud.update);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -149,10 +149,10 @@ function RedigeraHiss() {
         if (!navigator.onLine) {
           throw new Error("OFFLINE");
         }
-        await updateHiss({
-          id: id as never,
+        await updateHiss.mutateAsync({
+          id,
           ...formValuesToUpdateArgs(value),
-          organization_id: value.organization_id as never,
+          organizationId: value.organization_id,
         });
         clearDraft(draftKey);
         setSubmitSuccess(true);
@@ -235,7 +235,7 @@ function RedigeraHiss() {
           </div>
           <h2 className="text-xl font-semibold">Ändringar sparade!</h2>
           <p className="text-muted-foreground">
-            Hiss {(hiss as { elevator_number: string }).elevator_number} har uppdaterats.
+            Hiss {(hiss as { elevatorNumber: string }).elevatorNumber} har uppdaterats.
           </p>
           <div className="mt-4 flex gap-3">
             <Link to="/hiss/$id" params={{ id }}>
@@ -295,7 +295,7 @@ function RedigeraHiss() {
             <div>
               <h1 className="text-lg font-semibold">Redigera hiss</h1>
               <p className="text-sm text-muted-foreground">
-                {(hiss as { elevator_number: string }).elevator_number}
+                {(hiss as { elevatorNumber: string }).elevatorNumber}
               </p>
             </div>
           </div>

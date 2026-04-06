@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import {
+  inspectionCalendarOptions,
+  maintenanceCompaniesOptions,
+  emergencyPhoneStatusOptions,
+  inspectionListOptions,
+} from "~/server/maintenance";
 import { InspectionCalendar } from "../../maintenance/components/inspection-calendar";
 import { MaintenanceCompanies } from "../../maintenance/components/maintenance-companies";
 import { EmergencyPhoneStatus } from "../../maintenance/components/emergency-phone-status";
@@ -34,44 +38,18 @@ export function OrgMaintenanceView({
 }: {
   organizationId: string;
 }) {
-  const orgFilter = { organization_id: organizationId } as never;
-
   const [selectedManad, setSelectedManad] = useState<string | null>(null);
 
-  const kalenderOpts = convexQuery(
-    api.elevators.maintenance.inspectionCalendar,
-    orgFilter,
-  );
-  const { data: kalender } = useSuspenseQuery({
-    queryKey: kalenderOpts.queryKey,
-    staleTime: kalenderOpts.staleTime,
-  }) as { data: { month: string; count: number }[] };
+  const { data: kalender } = useSuspenseQuery(inspectionCalendarOptions(organizationId));
 
-  const foretagOpts = convexQuery(
-    api.elevators.maintenance.companies,
-    orgFilter,
-  );
-  const { data: foretagData } = useSuspenseQuery({
-    queryKey: foretagOpts.queryKey,
-    staleTime: foretagOpts.staleTime,
-  }) as { data: ForetagData };
+  const { data: foretagData } = useSuspenseQuery(maintenanceCompaniesOptions(organizationId));
 
-  const nodOpts = convexQuery(
-    api.elevators.maintenance.emergencyPhoneStatus,
-    orgFilter,
-  );
-  const { data: nodData } = useSuspenseQuery({
-    queryKey: nodOpts.queryKey,
-    staleTime: nodOpts.staleTime,
-  }) as { data: NodData };
+  const { data: nodData } = useSuspenseQuery(emergencyPhoneStatusOptions(organizationId));
 
   const { data: besiktningslista } = useQuery({
-    ...convexQuery(api.elevators.maintenance.inspectionList, {
-      organization_id: organizationId as never,
-      month: selectedManad!,
-    }),
+    ...inspectionListOptions(selectedManad!, organizationId),
     enabled: !!selectedManad,
-  }) as { data: BesiktningsListaItem[] | undefined };
+  });
 
   const kalenderData = kalender.map((k) => ({
     name: k.month.substring(0, 3),

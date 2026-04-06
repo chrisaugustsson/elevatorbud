@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
+import { useQuery } from "@tanstack/react-query";
+import { getPage } from "~/server/api";
 import { Target, Eye, Users, Award } from "lucide-react";
 
 type CmsSection = {
@@ -82,7 +82,10 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 function OmOss() {
-  const page = useQuery(api.cms.getPage, { slug: "om-oss" });
+  const { data: page } = useQuery({
+    queryKey: ["cms", "getPage", "om-oss"],
+    queryFn: () => getPage({ data: { slug: "om-oss" } }),
+  });
 
   const heroSection = page?.sections?.find((s: CmsSection) => s.type === "hero");
   const missionSection = page?.sections?.find((s: CmsSection) => s.type === "mission");

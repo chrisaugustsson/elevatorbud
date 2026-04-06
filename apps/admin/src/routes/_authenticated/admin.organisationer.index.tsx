@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation } from "convex/react";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { listOrganizationsOptions, createOrganization, updateOrganization } from "~/server/organization";
 import { useForm } from "@tanstack/react-form";
 import {
   useReactTable,
@@ -45,18 +43,21 @@ import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 export const Route = createFileRoute(
   "/_authenticated/admin/organisationer/",
 )({
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery(listOrganizationsOptions());
+  },
   component: Organisationer,
   pendingComponent: OrganisationerSkeleton,
 });
 
 type Organisation = {
-  _id: string;
+  id: string;
   name: string;
-  organization_number?: string;
-  contact_person?: string;
-  phone_number?: string;
-  email?: string;
-  elevatorCount: number;
+  organizationNumber: string | null;
+  contactPerson: string | null;
+  phoneNumber: string | null;
+  email: string | null;
+  createdAt: Date;
 };
 
 const columnHelper = createColumnHelper<Organisation>();
@@ -70,14 +71,14 @@ const columns = [
       <span className="font-medium">{info.getValue()}</span>
     ),
   }),
-  columnHelper.accessor("organization_number", {
+  columnHelper.accessor("organizationNumber", {
     header: ({ column }) => (
       <DataGridColumnHeader title="Org.nummer" column={column} />
     ),
     enableSorting: false,
     cell: (info) => info.getValue() || "—",
   }),
-  columnHelper.accessor("contact_person", {
+  columnHelper.accessor("contactPerson", {
     header: ({ column }) => (
       <DataGridColumnHeader title="Kontaktperson" column={column} />
     ),
@@ -91,12 +92,6 @@ const columns = [
     enableSorting: false,
     cell: (info) => info.getValue() || "—",
   }),
-  columnHelper.accessor("elevatorCount", {
-    header: ({ column }) => (
-      <DataGridColumnHeader title="Antal hissar" column={column} />
-    ),
-    cell: (info) => info.getValue(),
-  }),
 ];
 
 function validateOrganisationsnummer(value: string): string | undefined {
@@ -108,13 +103,18 @@ function validateOrganisationsnummer(value: string): string | undefined {
 }
 
 function Organisationer() {
-  const opts = convexQuery(api.organizations.list, {});
-  const { data: orgs } = useSuspenseQuery({
-    queryKey: opts.queryKey,
-    staleTime: opts.staleTime,
-  }) as { data: Organisation[] };
-  const createOrg = useMutation(api.organizations.create);
-  const updateOrg = useMutation(api.organizations.update);
+  const queryClient = useQueryClient();
+  const { data: orgs } = useSuspenseQuery(listOrganizationsOptions());
+  const createOrg = useMutation({
+    mutationFn: (input: { name: string; organizationNumber?: string; contactPerson?: string; phoneNumber?: string; email?: string }) =>
+      createOrganization({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["organization"] }); },
+  });
+  const updateOrg = useMutation({
+    mutationFn: (input: { id: string; name?: string; organizationNumber?: string; contactPerson?: string; phoneNumber?: string; email?: string }) =>
+      updateOrganization({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["organization"] }); },
+  });
   const navigate = useNavigate();
 
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -166,7 +166,7 @@ function Organisationer() {
         onRowClick={(row) =>
           navigate({
             to: "/admin/organisationer/$id" as string,
-            params: { id: row._id },
+            params: { id: row.id },
           })
         }
         emptyMessage={
@@ -187,7 +187,7 @@ function Organisationer() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSubmit={async (values) => {
-          await createOrg(values);
+          await createOrg.mutateAsync(values);
           setCreateOpen(false);
         }}
       />
@@ -199,7 +199,7 @@ function Organisationer() {
         }}
         onSubmit={async (values) => {
           if (!editOrg) return;
-          await updateOrg({ id: editOrg._id as never, ...values });
+          await updateOrg.mutateAsync({ id: editOrg.id, ...values });
           setEditOrg(null);
         }}
       />
@@ -216,26 +216,26 @@ function CreateOrgDialog({
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
     name: string;
-    organization_number?: string;
-    contact_person?: string;
-    phone_number?: string;
+    organizationNumber?: string;
+    contactPerson?: string;
+    phoneNumber?: string;
     email?: string;
   }) => Promise<void>;
 }) {
   const form = useForm({
     defaultValues: {
       name: "",
-      organization_number: "",
-      contact_person: "",
-      phone_number: "",
+      organizationNumber: "",
+      contactPerson: "",
+      phoneNumber: "",
       email: "",
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
         name: value.name,
-        organization_number: value.organization_number || undefined,
-        contact_person: value.contact_person || undefined,
-        phone_number: value.phone_number || undefined,
+        organizationNumber: value.organizationNumber || undefined,
+        contactPerson: value.contactPerson || undefined,
+        phoneNumber: value.phoneNumber || undefined,
         email: value.email || undefined,
       });
       form.reset();
@@ -299,7 +299,7 @@ function CreateOrgDialog({
           </form.Field>
 
           <form.Field
-            name="organization_number"
+            name="organizationNumber"
             validators={{
               onChange: ({ value }) => validateOrganisationsnummer(value),
             }}
@@ -328,7 +328,7 @@ function CreateOrgDialog({
             )}
           </form.Field>
 
-          <form.Field name="contact_person">
+          <form.Field name="contactPerson">
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Kontaktperson</Label>
@@ -342,7 +342,7 @@ function CreateOrgDialog({
             )}
           </form.Field>
 
-          <form.Field name="phone_number">
+          <form.Field name="phoneNumber">
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Telefonnummer</Label>
@@ -404,9 +404,9 @@ function EditOrgDialog({
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
     name?: string;
-    organization_number?: string;
-    contact_person?: string;
-    phone_number?: string;
+    organizationNumber?: string;
+    contactPerson?: string;
+    phoneNumber?: string;
     email?: string;
   }) => Promise<void>;
 }) {
@@ -414,7 +414,7 @@ function EditOrgDialog({
 
   return (
     <EditOrgDialogInner
-      key={org._id}
+      key={org.id}
       org={org}
       onOpenChange={onOpenChange}
       onSubmit={onSubmit}
@@ -431,26 +431,26 @@ function EditOrgDialogInner({
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
     name?: string;
-    organization_number?: string;
-    contact_person?: string;
-    phone_number?: string;
+    organizationNumber?: string;
+    contactPerson?: string;
+    phoneNumber?: string;
     email?: string;
   }) => Promise<void>;
 }) {
   const form = useForm({
     defaultValues: {
       name: org.name,
-      organization_number: org.organization_number ?? "",
-      contact_person: org.contact_person ?? "",
-      phone_number: org.phone_number ?? "",
+      organizationNumber: org.organizationNumber ?? "",
+      contactPerson: org.contactPerson ?? "",
+      phoneNumber: org.phoneNumber ?? "",
       email: org.email ?? "",
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
         name: value.name,
-        organization_number: value.organization_number || undefined,
-        contact_person: value.contact_person || undefined,
-        phone_number: value.phone_number || undefined,
+        organizationNumber: value.organizationNumber || undefined,
+        contactPerson: value.contactPerson || undefined,
+        phoneNumber: value.phoneNumber || undefined,
         email: value.email || undefined,
       });
     },
@@ -468,7 +468,7 @@ function EditOrgDialogInner({
         <div>
           <Link
             to="/admin/anvandare"
-            search={{ org: org._id, create: true }}
+            search={{ org: org.id, create: true }}
           >
             <Button variant="outline" size="sm" className="w-full">
               <UserPlus className="mr-1 size-4" />
@@ -517,7 +517,7 @@ function EditOrgDialogInner({
           </form.Field>
 
           <form.Field
-            name="organization_number"
+            name="organizationNumber"
             validators={{
               onChange: ({ value }) => validateOrganisationsnummer(value),
             }}
@@ -546,7 +546,7 @@ function EditOrgDialogInner({
             )}
           </form.Field>
 
-          <form.Field name="contact_person">
+          <form.Field name="contactPerson">
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Kontaktperson</Label>
@@ -559,7 +559,7 @@ function EditOrgDialogInner({
             )}
           </form.Field>
 
-          <form.Field name="phone_number">
+          <form.Field name="phoneNumber">
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Telefonnummer</Label>

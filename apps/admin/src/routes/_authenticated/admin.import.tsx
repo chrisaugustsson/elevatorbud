@@ -17,6 +17,7 @@ export const Route = createFileRoute("/_authenticated/admin/import")({
 function ImportPage() {
   const {
     status,
+    importProgress,
     parseResult,
     fileName,
     parseError,
@@ -101,9 +102,28 @@ function ImportPage() {
 
       {status === "importing" && (
         <Card>
-          <CardContent className="flex items-center justify-center py-12">
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            <span>Importerar hissar...</span>
+          <CardContent className="py-12">
+            <div className="mx-auto max-w-md space-y-4">
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="font-medium">Importerar hissar...</span>
+              </div>
+              <div className="space-y-2">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-300"
+                    style={{
+                      width: importProgress.total > 0
+                        ? `${Math.round((importProgress.current / importProgress.total) * 100)}%`
+                        : "0%",
+                    }}
+                  />
+                </div>
+                <p className="text-center text-sm text-muted-foreground">
+                  {importProgress.current} av {importProgress.total} hissar
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

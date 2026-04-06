@@ -1,10 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { useMutation } from "convex/react";
-import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
+import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { listContactsOptions, updateContactStatus } from "~/server/contact";
 import {
   useReactTable,
   getCoreRowModel,
@@ -46,35 +43,41 @@ import {
 import { Mail, Eye, Archive, RotateCcw } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/meddelanden")({
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery(listContactsOptions());
+  },
   component: Meddelanden,
   pendingComponent: MeddelandenSkeleton,
 });
 
 type Submission = {
-  _id: Id<"contactSubmissions">;
-  _creationTime: number;
+  id: string;
   name: string;
   email: string;
-  phone?: string;
+  phone: string | null;
   message: string;
   status: "new" | "read" | "archived";
-  createdAt: number;
+  createdAt: Date;
 };
 
 function Meddelanden() {
   const [statusFilter, setStatusFilter] = useState<string>("alla");
   const [selected, setSelected] = useState<Submission | null>(null);
-  const updateStatus = useMutation(api.contactSubmissions.updateStatus);
+  const queryClient = useQueryClient();
 
   const queryArgs =
     statusFilter === "alla"
-      ? {}
+      ? undefined
       : { status: statusFilter as "new" | "read" | "archived" };
-  const opts = convexQuery(api.contactSubmissions.list, queryArgs);
-  const { data: submissions } = useSuspenseQuery({
-    queryKey: opts.queryKey,
-    staleTime: opts.staleTime,
-  }) as { data: Submission[] };
+  const { data: submissions } = useSuspenseQuery(listContactsOptions(queryArgs));
+
+  const updateStatusMutation = useMutation({
+    mutationFn: (input: { id: string; status: "new" | "read" | "archived" }) =>
+      updateContactStatus({ data: input }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contact"] });
+    },
+  });
 
   const columnHelper = createColumnHelper<Submission>();
 
@@ -155,7 +158,7 @@ function Meddelanden() {
               onClick={() => {
                 setSelected(row);
                 if (row.status === "new") {
-                  updateStatus({ id: row._id, status: "read" });
+                  updateStatusMutation.mutate({ id: row.id, status: "read" });
                 }
               }}
               title="Visa meddelande"
@@ -252,7 +255,7 @@ function Meddelanden() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    updateStatus({ id: selected._id, status: "archived" });
+                    updateStatusMutation.mutate({ id: selected.id, status: "archived" });
                     setSelected(null);
                   }}
                 >
@@ -264,7 +267,7 @@ function Meddelanden() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    updateStatus({ id: selected._id, status: "read" });
+                    updateStatusMutation.mutate({ id: selected.id, status: "read" });
                     setSelected(null);
                   }}
                 >

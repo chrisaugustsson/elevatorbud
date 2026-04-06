@@ -1,17 +1,10 @@
 import { useState, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { searchElevatorsOptions } from "~/server/elevator";
 import { Input } from "@elevatorbud/ui/components/ui/input";
 import { Search, MapPin, Building2, ArrowRight } from "lucide-react";
 
-type SearchResult = {
-  _id: string;
-  elevator_number: string;
-  address?: string;
-  organizationName?: string;
-};
 
 export const Route = createFileRoute("/_authenticated/sok")({
   component: SokHiss,
@@ -29,12 +22,11 @@ function SokHiss() {
     return () => clearTimeout(timer);
   }, [input]);
 
+  const searchTerm = debouncedSearch.trim();
   const { data: results, isFetching } = useQuery({
-    ...convexQuery(api.elevators.crud.search, {
-      search: debouncedSearch.trim(),
-    }),
-    enabled: !!debouncedSearch.trim(),
-  }) as { data: SearchResult[] | undefined; isFetching: boolean };
+    ...searchElevatorsOptions(searchTerm),
+    enabled: !!searchTerm,
+  });
 
   return (
     <div className="space-y-6">
@@ -75,13 +67,13 @@ function SokHiss() {
           <div className="divide-y rounded-md border">
             {results.map((hiss) => (
               <Link
-                key={hiss._id}
+                key={hiss.id}
                 to="/hiss/$id/redigera"
-                params={{ id: hiss._id }}
+                params={{ id: hiss.id }}
                 className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/50 active:bg-muted"
               >
                 <div className="min-w-0 flex-1 space-y-1">
-                  <p className="font-medium">{hiss.elevator_number}</p>
+                  <p className="font-medium">{hiss.elevatorNumber}</p>
                   {hiss.address && (
                     <p className="flex items-center gap-1 text-sm text-muted-foreground">
                       <MapPin className="size-3 shrink-0" />

@@ -4,6 +4,8 @@ dist
 .vinxi
 .output
 .wrangler
+.env
 .env.local
+.dev.vars
 *.tsbuildinfo
 routeTree.gen.ts

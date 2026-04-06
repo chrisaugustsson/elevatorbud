@@ -6,8 +6,6 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 import { auth } from "@elevatorbud/auth/server";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
 import {
   SidebarProvider,
   SidebarInset,
@@ -16,6 +14,7 @@ import {
 import { Separator } from "@elevatorbud/ui/components/ui/separator";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { useClerk } from "@elevatorbud/auth";
+import { meOptions } from "../server/user";
 import { AppSidebar } from "../shared/components/app-sidebar";
 import { OrgDisplay } from "../shared/components/org-display";
 import { GlobalSearch } from "../shared/components/global-search";
@@ -30,19 +29,15 @@ const authGuard = createServerFn().handler(async () => {
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: () => authGuard(),
-  loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(convexQuery(api.users.me, {}));
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery(meOptions());
   },
   component: AuthenticatedLayout,
 });
 
 function AuthenticatedLayout() {
   const { signOut } = useClerk();
-  const userQuery = convexQuery(api.users.me, {});
-  const { data: user } = useSuspenseQuery({
-    queryKey: userQuery.queryKey,
-    staleTime: userQuery.staleTime,
-  });
+  const { data: user } = useSuspenseQuery(meOptions());
 
   if (user === null) {
     return (
@@ -88,8 +83,8 @@ function AuthenticatedLayout() {
             orientation="vertical"
             className="mr-2 data-[orientation=vertical]:h-4"
           />
-          {user.organization_id && (
-            <OrgDisplay organisationId={user.organization_id} />
+          {user.organizationId && (
+            <OrgDisplay organisationId={user.organizationId} />
           )}
           <div className="ml-auto">
             <GlobalSearch />

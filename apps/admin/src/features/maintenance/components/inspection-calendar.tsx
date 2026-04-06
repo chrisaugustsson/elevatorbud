@@ -21,7 +21,6 @@ import {
   hoverColumnPlugin,
 } from "@elevatorbud/ui/lib/chart-helpers";
 import { Bar } from "react-chartjs-2";
-import { Link } from "@tanstack/react-router";
 import { CalendarDays, ChevronRight } from "lucide-react";
 import type { KalenderEntry, BesiktningsListaItem } from "../types";
 
@@ -215,9 +214,9 @@ export function InspectionCalendar({
                   </TableHeader>
                   <TableBody>
                     {besiktningslista.map((h) => (
-                      <TableRow key={h._id}>
+                      <TableRow key={h.id}>
                         <TableCell className="font-medium">
-                          {h.elevator_number}
+                          {h.elevatorNumber}
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
                           {h.address || "–"}
@@ -226,20 +225,14 @@ export function InspectionCalendar({
                           {h.district || "–"}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
-                          {h.inspection_authority || "–"}
+                          {h.inspectionAuthority || "–"}
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
-                          <Link
-                            to="/admin/organisationer/$id"
-                            params={{ id: h.organization_id }}
-                            className="text-primary hover:underline"
-                          >
-                            {h.organizationName}
-                          </Link>
+                          {h.organizationName || "–"}
                         </TableCell>
                         <TableCell>
                           <a
-                            href={`/hiss/${h._id}`}
+                            href={`/hiss/${h.id}`}
                             className="inline-flex items-center text-muted-foreground hover:text-foreground"
                           >
                             <ChevronRight className="h-4 w-4" />

@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { timelineOptions, budgetOptions, priorityListOptions } from "~/server/modernization";
 import {
   PERIODS,
   getUrgencyColor,
@@ -17,38 +16,16 @@ export function OrgModernizationView({
 }: {
   organizationId: string;
 }) {
-  const orgFilter = { organization_id: organizationId } as never;
-
   const [selectedPeriod, setSelectedPeriod] = useState<TimelinePeriod | null>(
     null,
   );
 
-  const tidslinjeOpts = convexQuery(
-    api.elevators.modernization.timeline,
-    orgFilter,
-  );
-  const { data: tidslinje } = useSuspenseQuery({
-    queryKey: tidslinjeOpts.queryKey,
-    staleTime: tidslinjeOpts.staleTime,
-  }) as { data: { year: string; count: number }[] };
+  const { data: tidslinje } = useSuspenseQuery(timelineOptions(organizationId));
 
-  const budgetOpts = convexQuery(
-    api.elevators.modernization.budget,
-    orgFilter,
-  );
-  const { data: budget } = useSuspenseQuery({
-    queryKey: budgetOpts.queryKey,
-    staleTime: budgetOpts.staleTime,
-  }) as {
-    data: {
-      byYear: { year: string; amount: number }[];
-      byDistrict: { name: string; amount: number }[];
-      byType: { name: string; amount: number }[];
-    };
-  };
+  const { data: budget } = useSuspenseQuery(budgetOptions(organizationId));
 
   const prioritetslistaArgs = useMemo(() => {
-    const base = { organization_id: organizationId as never };
+    const base = { organizationId, page: 1, pageSize: 50 };
     if (selectedPeriod) {
       return {
         ...base,
@@ -59,27 +36,9 @@ export function OrgModernizationView({
     return base;
   }, [organizationId, selectedPeriod]);
 
-  const prioritetslistaOpts = convexQuery(
-    api.elevators.modernization.priorityList,
-    prioritetslistaArgs as never,
-  );
-  const { data: prioritetslista } = useSuspenseQuery({
-    queryKey: prioritetslistaOpts.queryKey,
-    staleTime: prioritetslistaOpts.staleTime,
-  }) as {
-    data: {
-      _id: string;
-      elevator_number: string;
-      address?: string;
-      district?: string;
-      elevator_type?: string;
-      recommended_modernization_year?: string;
-      budget_amount?: number;
-      modernization_measures?: string;
-      organization_id: string;
-      organizationName: string;
-    }[];
-  };
+  const { data: prioritetslistaResult } = useSuspenseQuery(priorityListOptions(prioritetslistaArgs));
+
+  const prioritetslista = prioritetslistaResult.items;
 
   const tidslinjeData = tidslinje.map((t) => ({
     name: t.year,
@@ -97,10 +56,26 @@ export function OrgModernizationView({
     return { ...p, count };
   });
 
-  const budgetPerAr = budget.byYear.map((b) => ({
-    name: b.year,
-    belopp: Math.round(b.amount / 1000),
-  }));
+  // Group flat budget array by year, district, and type
+  const byYearMap = new Map<string, number>();
+  const byDistrictMap = new Map<string, number>();
+  const byTypeMap = new Map<string, number>();
+  for (const b of budget) {
+    byYearMap.set(b.year, (byYearMap.get(b.year) ?? 0) + b.totalBudget);
+    if (b.district) {
+      byDistrictMap.set(b.district, (byDistrictMap.get(b.district) ?? 0) + b.totalBudget);
+    }
+    if (b.elevatorType) {
+      byTypeMap.set(b.elevatorType, (byTypeMap.get(b.elevatorType) ?? 0) + b.totalBudget);
+    }
+  }
+
+  const budgetPerAr = Array.from(byYearMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([year, amount]) => ({
+      name: year,
+      belopp: Math.round(amount / 1000),
+    }));
 
   let cumulative = 0;
   const budgetCumulative = budgetPerAr.map((b) => {
@@ -108,17 +83,24 @@ export function OrgModernizationView({
     return { ...b, kumulativt: cumulative };
   });
 
-  const budgetPerDistrikt = budget.byDistrict.map((b) => ({
-    name: b.name,
-    belopp: Math.round(b.amount / 1000),
-  }));
+  const budgetPerDistrikt = Array.from(byDistrictMap.entries())
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, amount]) => ({
+      name,
+      belopp: Math.round(amount / 1000),
+    }));
 
-  const budgetPerTyp = budget.byType.map((b) => ({
-    name: b.name,
-    belopp: Math.round(b.amount / 1000),
-  }));
+  const budgetPerTyp = Array.from(byTypeMap.entries())
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, amount]) => ({
+      name,
+      belopp: Math.round(amount / 1000),
+    }));
 
-  const totalBudget = budget.byYear.reduce((sum, b) => sum + b.amount, 0);
+  const totalBudget = Array.from(byYearMap.values()).reduce(
+    (sum, amount) => sum + amount,
+    0,
+  );
 
   return (
     <div className="space-y-6 overflow-x-hidden">

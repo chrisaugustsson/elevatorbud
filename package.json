@@ -4,19 +4,21 @@
   "packageManager": "pnpm@10.30.3",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev dev:convex --concurrency 20",
-    "dev:admin": "concurrently \"npx convex dev\" \"pnpm --filter @elevatorbud/admin dev\"",
-    "dev:client": "concurrently \"npx convex dev\" \"pnpm --filter @elevatorbud/client dev\"",
-    "dev:landing": "concurrently \"npx convex dev\" \"pnpm --filter @elevatorbud/landing dev\"",
-    "dev:convex": "npx convex dev",
+    "dev": "turbo run dev --concurrency 20",
+    "dev:admin": "pnpm --filter @elevatorbud/admin dev",
+    "dev:client": "pnpm --filter @elevatorbud/client dev",
+    "dev:landing": "pnpm --filter @elevatorbud/landing dev",
+    "dev:db": "docker compose up -d",
+    "db:generate": "pnpm --filter @elevatorbud/db db:generate",
+    "db:migrate": "pnpm --filter @elevatorbud/db db:migrate",
+    "db:studio": "pnpm --filter @elevatorbud/db db:studio",
     "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck && tsc --noEmit -p convex/tsconfig.json"
+    "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
     "@clerk/backend": "^3.2.4",
     "@types/node": "^25.5.0",
     "concurrently": "^9.2.1",
-    "convex": "^1.34.1",
     "resend": "^6.10.0",
     "svix": "^1.89.0",
     "turbo": "^2.9.3",
@@ -27,6 +29,9 @@
       "esbuild",
       "sharp",
       "workerd"
-    ]
+    ],
+    "overrides": {
+      "drizzle-orm": "0.44.7"
+    }
   }
 }

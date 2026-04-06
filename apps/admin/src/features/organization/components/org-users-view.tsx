@@ -1,9 +1,7 @@
 import { useState } from "react";
-import type { Id } from "@convex/_generated/dataModel";
-import { useAction } from "convex/react";
-import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { useSuspenseQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { listUsersOptions, updateUser as updateUserFn, deactivateUser as deactivateUserFn, activateUser as activateUserFn, deleteUser as deleteUserFn } from "~/server/user";
+import { listOrganizationsOptions } from "~/server/organization";
 import { useForm } from "@tanstack/react-form";
 import {
   useReactTable,
@@ -56,18 +54,19 @@ import {
 import { useUser } from "@elevatorbud/auth";
 
 type UserRecord = {
-  _id: string;
-  clerk_user_id: string;
+  id: string;
+  clerkUserId: string;
   email: string;
   name: string;
   role: "admin" | "customer";
-  organization_id?: string;
+  organizationId: string | null;
   active: boolean;
-  created_at: string;
-  last_login?: string;
+  createdAt: Date;
+  lastLogin: Date | null;
+  organization: { id: string; name: string; organizationNumber: string | null; contactPerson: string | null; phoneNumber: string | null; email: string | null; createdAt: Date } | null;
 };
 
-type Organisation = { _id: string; name: string };
+type Organisation = { id: string; name: string };
 
 export function OrgUsersView({
   organizationId,
@@ -84,20 +83,31 @@ export function OrgUsersView({
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const { user: currentClerkUser } = useUser();
+  const queryClient = useQueryClient();
 
-  const usersOpts = convexQuery(api.userAdmin.list, {
-    organization_id: organizationId as never,
+  const userListArgs = {
+    organizationId,
     search: searchText || undefined,
-  });
-  const { data: users } = useSuspenseQuery({
-    queryKey: usersOpts.queryKey,
-    staleTime: usersOpts.staleTime,
-  }) as { data: UserRecord[] };
+  };
+  const { data: users } = useSuspenseQuery(listUsersOptions(userListArgs));
 
-  const updateUser = useAction(api.userAdmin.update);
-  const deactivateUser = useAction(api.userAdmin.deactivate);
-  const activateUser = useAction(api.userAdmin.activate);
-  const removeUser = useAction(api.userAdmin.remove);
+  const updateUser = useMutation({
+    mutationFn: (input: { id: string; name?: string; email?: string; role?: "admin" | "customer"; organizationId?: string }) =>
+      updateUserFn({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
+  });
+  const deactivateUser = useMutation({
+    mutationFn: (input: { id: string }) => deactivateUserFn({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
+  });
+  const activateUser = useMutation({
+    mutationFn: (input: { id: string }) => activateUserFn({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
+  });
+  const removeUser = useMutation({
+    mutationFn: (input: { id: string }) => deleteUserFn({ data: input }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
+  });
 
   const columnHelper = createColumnHelper<UserRecord>();
 
@@ -136,7 +146,7 @@ export function OrgUsersView({
         </Badge>
       ),
     }),
-    columnHelper.accessor("last_login", {
+    columnHelper.accessor("lastLogin", {
       header: ({ column }) => (
         <DataGridColumnHeader title="Senaste inloggning" column={column} />
       ),
@@ -152,7 +162,7 @@ export function OrgUsersView({
       header: "",
       cell: (info) => {
         const row = info.row.original;
-        const isSelf = currentClerkUser?.id === row.clerk_user_id;
+        const isSelf = currentClerkUser?.id === row.clerkUserId;
         return (
           <div className="flex items-center justify-end gap-1">
             <Button
@@ -245,13 +255,13 @@ export function OrgUsersView({
       {/* Edit dialog */}
       {editingUser && (
         <EditUserDialogInner
-          key={editingUser._id}
+          key={editingUser.id}
           user={editingUser}
           onOpenChange={(open) => {
             if (!open) setEditingUser(null);
           }}
           onSubmit={async (values) => {
-            await updateUser(values);
+            await updateUser.mutateAsync(values);
             setEditingUser(null);
           }}
         />
@@ -293,12 +303,12 @@ export function OrgUsersView({
                 setActionLoading(true);
                 try {
                   if (deactivatingUser.active) {
-                    await deactivateUser({
-                      id: deactivatingUser._id as never,
+                    await deactivateUser.mutateAsync({
+                      id: deactivatingUser.id,
                     });
                   } else {
-                    await activateUser({
-                      id: deactivatingUser._id as never,
+                    await activateUser.mutateAsync({
+                      id: deactivatingUser.id,
                     });
                   }
                 } finally {
@@ -347,7 +357,7 @@ export function OrgUsersView({
                 if (!deletingUser) return;
                 setActionLoading(true);
                 try {
-                  await removeUser({ id: deletingUser._id as never });
+                  await removeUser.mutateAsync({ id: deletingUser.id });
                 } finally {
                   setActionLoading(false);
                   setDeletingUser(null);
@@ -371,33 +381,29 @@ function EditUserDialogInner({
   user: UserRecord;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
-    id: Id<"users">;
+    id: string;
     name?: string;
     email?: string;
     role?: "admin" | "customer";
-    organization_id?: Id<"organizations">;
+    organizationId?: string;
   }) => Promise<void>;
 }) {
-  const { data: orgs } = useQuery({
-    ...convexQuery(api.organizations.list, {}),
-  }) as { data: Organisation[] | undefined };
+  const { data: orgs } = useQuery(listOrganizationsOptions());
 
   const form = useForm({
     defaultValues: {
       name: user.name,
       email: user.email,
       role: user.role as "admin" | "customer",
-      organization_id: user.organization_id ?? "",
+      organizationId: user.organizationId ?? "",
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
-        id: user._id as never,
+        id: user.id,
         name: value.name,
         email: value.email,
         role: value.role,
-        organization_id: value.organization_id
-          ? (value.organization_id as never)
-          : undefined,
+        organizationId: value.organizationId || undefined,
       });
       form.reset();
     },
@@ -508,7 +514,7 @@ function EditUserDialogInner({
                   onValueChange={(val) => {
                     field.handleChange(val as "admin" | "customer");
                     if (val === "admin") {
-                      form.setFieldValue("organization_id", "");
+                      form.setFieldValue("organizationId", "");
                     }
                   }}
                 >
@@ -528,7 +534,7 @@ function EditUserDialogInner({
             {(role) =>
               role === "customer" ? (
                 <form.Field
-                  name="organization_id"
+                  name="organizationId"
                   validators={{
                     onChange: ({ value }) => {
                       const currentRole = form.getFieldValue("role");
@@ -553,7 +559,7 @@ function EditUserDialogInner({
                         </SelectTrigger>
                         <SelectContent>
                           {orgs?.map((org) => (
-                            <SelectItem key={org._id} value={org._id}>
+                            <SelectItem key={org.id} value={org.id}>
                               {org.name}
                             </SelectItem>
                           ))}

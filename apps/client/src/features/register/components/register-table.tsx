@@ -18,17 +18,22 @@ import { SortHeader } from "@elevatorbud/ui/components/ui/sort-header";
 import { Building2 } from "lucide-react";
 
 type HissRow = {
-  _id: string;
-  elevator_number: string;
-  address?: string;
-  district?: string;
-  elevator_type?: string;
-  manufacturer?: string;
-  build_year?: number;
-  modernization_year?: string;
-  recommended_modernization_year?: string;
-  budget_amount?: number;
-  organizationName: string;
+  id: string;
+  elevatorNumber: string;
+  address: string | null;
+  elevatorClassification: string | null;
+  district: string | null;
+  elevatorType: string | null;
+  manufacturer: string | null;
+  buildYear: number | null;
+  modernizationYear: string | null;
+  maintenanceCompany: string | null;
+  inspectionMonth: string | null;
+  hasEmergencyPhone: boolean | null;
+  needsUpgrade: boolean | null;
+  status: string;
+  organizationId: string;
+  organizationName: string | null;
 };
 
 function getSortDirection(
@@ -70,12 +75,12 @@ export function RegisterTable({
   const columnHelper = createColumnHelper<HissRow>();
   const columns = useMemo(
     () => [
-      columnHelper.accessor("elevator_number", {
+      columnHelper.accessor("elevatorNumber", {
         header: () => (
           <SortHeader
             label="Hissnummer"
-            sortDirection={getSortDirection(sorting, "elevator_number")}
-            onSort={() => handleSort("elevator_number")}
+            sortDirection={getSortDirection(sorting, "elevatorNumber")}
+            onSort={() => handleSort("elevatorNumber")}
           />
         ),
         cell: (info) => (
@@ -102,12 +107,12 @@ export function RegisterTable({
         ),
         cell: (info) => info.getValue() || "—",
       }),
-      columnHelper.accessor("elevator_type", {
+      columnHelper.accessor("elevatorType", {
         header: () => (
           <SortHeader
             label="Hisstyp"
-            sortDirection={getSortDirection(sorting, "elevator_type")}
-            onSort={() => handleSort("elevator_type")}
+            sortDirection={getSortDirection(sorting, "elevatorType")}
+            onSort={() => handleSort("elevatorType")}
           />
         ),
         cell: (info) => info.getValue() || "—",
@@ -122,53 +127,25 @@ export function RegisterTable({
         ),
         cell: (info) => info.getValue() || "—",
       }),
-      columnHelper.accessor("build_year", {
+      columnHelper.accessor("buildYear", {
         header: () => (
           <SortHeader
             label="Byggår"
-            sortDirection={getSortDirection(sorting, "build_year")}
-            onSort={() => handleSort("build_year")}
+            sortDirection={getSortDirection(sorting, "buildYear")}
+            onSort={() => handleSort("buildYear")}
           />
         ),
         cell: (info) => info.getValue() ?? "—",
       }),
-      columnHelper.accessor("modernization_year", {
+      columnHelper.accessor("modernizationYear", {
         header: () => (
           <SortHeader
             label="Moderniserad"
-            sortDirection={getSortDirection(sorting, "modernization_year")}
-            onSort={() => handleSort("modernization_year")}
+            sortDirection={getSortDirection(sorting, "modernizationYear")}
+            onSort={() => handleSort("modernizationYear")}
           />
         ),
         cell: (info) => info.getValue() || "—",
-      }),
-      columnHelper.accessor("recommended_modernization_year", {
-        header: () => (
-          <SortHeader
-            label="Rek. modern."
-            sortDirection={getSortDirection(
-              sorting,
-              "recommended_modernization_year",
-            )}
-            onSort={() => handleSort("recommended_modernization_year")}
-          />
-        ),
-        cell: (info) => info.getValue() || "—",
-      }),
-      columnHelper.accessor("budget_amount", {
-        header: () => (
-          <SortHeader
-            label="Budget"
-            sortDirection={getSortDirection(sorting, "budget_amount")}
-            onSort={() => handleSort("budget_amount")}
-          />
-        ),
-        cell: (info) => {
-          const v = info.getValue();
-          return v !== undefined && v !== null
-            ? `${(v / 1000).toFixed(0)} tkr`
-            : "—";
-        },
       }),
     ],
     [sorting],
@@ -220,7 +197,7 @@ export function RegisterTable({
                 key={row.id}
                 className="cursor-pointer"
                 onClick={() => {
-                  window.location.href = `/hiss/${row.original._id}`;
+                  window.location.href = `/hiss/${row.original.id}`;
                 }}
               >
                 {row.getVisibleCells().map((cell) => (

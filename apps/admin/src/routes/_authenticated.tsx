@@ -7,8 +7,8 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 import { auth } from "@elevatorbud/auth/server";
 import { useSuspenseQuery, useQuery as useTanstackQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { getMeOptions } from "../server/user";
+import { unreadCountOptions } from "../server/contact";
 import {
   SidebarProvider,
   SidebarInset,
@@ -31,19 +31,16 @@ const authGuard = createServerFn().handler(async () => {
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: () => authGuard(),
-  loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(convexQuery(api.users.me, {}));
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery(getMeOptions());
+    context.queryClient.prefetchQuery(unreadCountOptions());
   },
   component: AuthenticatedLayout,
 });
 
 function AuthenticatedLayout() {
   const { signOut } = useClerk();
-  const userQuery = convexQuery(api.users.me, {});
-  const { data: user } = useSuspenseQuery({
-    queryKey: userQuery.queryKey,
-    staleTime: userQuery.staleTime,
-  });
+  const { data: user } = useSuspenseQuery(getMeOptions());
 
   if (user === null) {
     return (
@@ -103,11 +100,7 @@ function AuthenticatedLayout() {
 }
 
 function NotificationBell() {
-  const opts = convexQuery(api.contactSubmissions.unreadCount, {});
-  const { data: count } = useTanstackQuery({
-    queryKey: opts.queryKey,
-    staleTime: opts.staleTime,
-  });
+  const { data: count } = useTanstackQuery(unreadCountOptions());
 
   const unread = typeof count === "number" ? count : 0;
 

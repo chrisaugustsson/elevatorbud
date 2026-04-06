@@ -1,8 +1,4 @@
 export {
-  ConvexProviderWithClerk,
-  ConvexReactClient,
-} from "./provider";
-export {
   ClerkProvider,
   SignIn,
   SignUp,

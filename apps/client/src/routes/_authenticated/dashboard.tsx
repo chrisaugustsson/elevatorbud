@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { convexQuery } from "@convex-dev/react-query";
-import { api } from "@convex/_generated/api";
+import { meOptions } from "../../server/user";
+import { statsOptions, chartDataOptions } from "../../server/analytics";
 import { KpiCards } from "@elevatorbud/ui/components/dashboard/kpi-cards";
 import type { KpiItem } from "@elevatorbud/ui/components/dashboard/kpi-cards";
 import {
@@ -19,32 +19,19 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery(meOptions());
+    context.queryClient.prefetchQuery(statsOptions());
+    context.queryClient.prefetchQuery(chartDataOptions());
+  },
   component: DashboardPage,
   pendingComponent: DashboardSkeleton,
 });
 
 function DashboardPage() {
-  const userOpts = convexQuery(api.users.me, {});
-  const { data: user } = useSuspenseQuery({
-    queryKey: userOpts.queryKey,
-    staleTime: userOpts.staleTime,
-  });
+  const { data: stats } = useSuspenseQuery(statsOptions());
 
-  const statsOpts = convexQuery(api.elevators.analytics.stats, {
-    organization_id: user!.organization_id,
-  } as never);
-  const { data: stats } = useSuspenseQuery({
-    queryKey: statsOpts.queryKey,
-    staleTime: statsOpts.staleTime,
-  });
-
-  const chartOpts = convexQuery(api.elevators.analytics.chartData, {
-    organization_id: user!.organization_id,
-  } as never);
-  const { data: chartData } = useSuspenseQuery({
-    queryKey: chartOpts.queryKey,
-    staleTime: chartOpts.staleTime,
-  });
+  const { data: chartData } = useSuspenseQuery(chartDataOptions());
 
   const kpiItems: KpiItem[] = [
     {
@@ -59,13 +46,13 @@ function DashboardPage() {
     },
     {
       title: "Modernisering inom 3 år",
-      value: stats.modernizationWithin3Years,
+      value: stats.modernizationWithin3Years as number,
       description: "Rekommenderad modernisering",
       icon: <Hammer className="h-4 w-4" />,
     },
     {
       title: "Budget innevarande år",
-      value: `${(stats.totalBudgetCurrentYear / 1000).toFixed(0)} tkr`,
+      value: `${((stats.budgetCurrentYear as number) / 1000).toFixed(0)} tkr`,
       icon: <TrendingUp className="h-4 w-4" />,
     },
     {
