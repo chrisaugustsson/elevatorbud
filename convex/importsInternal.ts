@@ -20,6 +20,58 @@ export const createOrg = internalMutation({
   },
 });
 
+// Fields that belong to elevator_details
+const DETAIL_FIELDS = new Set([
+  "speed",
+  "lift_height",
+  "load_capacity",
+  "floor_count",
+  "door_count",
+  "door_type",
+  "passthrough",
+  "dispatch_mode",
+  "cab_size",
+  "door_opening",
+  "door_carrier",
+  "door_machine",
+  "drive_system",
+  "suspension",
+  "machine_placement",
+  "machine_type",
+  "control_system_type",
+  "shaft_lighting",
+  "emergency_phone_model",
+  "emergency_phone_type",
+  "emergency_phone_price",
+  "comments",
+]);
+
+// Fields that belong to elevator_budgets
+const BUDGET_FIELDS = new Set([
+  "recommended_modernization_year",
+  "budget_amount",
+  "measures",
+  "warranty",
+]);
+
+function splitImportFields(fields: Record<string, unknown>) {
+  const core: Record<string, unknown> = {};
+  const details: Record<string, unknown> = {};
+  const budget: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (DETAIL_FIELDS.has(key)) {
+      details[key] = value;
+    } else if (BUDGET_FIELDS.has(key)) {
+      budget[key] = value;
+    } else {
+      core[key] = value;
+    }
+  }
+
+  return { core, details, budget };
+}
+
 export const importBatch = internalMutation({
   args: {
     elevators: v.array(v.record(v.string(), v.any())),
@@ -68,6 +120,8 @@ export const importBatch = internalMutation({
           }
         }
 
+        const { core, details, budget } = splitImportFields(fields);
+
         // Check if elevator_number exists
         const existing = await ctx.db
           .query("elevators")
@@ -77,26 +131,62 @@ export const importBatch = internalMutation({
           .unique();
 
         if (existing) {
-          // Update existing elevator
-          const { elevator_number, ...updateFields } = fields;
+          // Update existing elevator (core fields only)
+          const { elevator_number, ...coreUpdate } = core;
           await ctx.db.patch(existing._id, {
-            ...updateFields,
+            ...coreUpdate,
             organization_id: orgId as Id<"organizations">,
             ...(importStatus
-              ? { status: importStatus as "active" | "demolished" | "archived" }
+              ? {
+                  status: importStatus as
+                    | "active"
+                    | "demolished"
+                    | "archived",
+                }
               : {}),
             last_updated_by: args.adminId,
             last_updated_at: Date.now(),
           });
+
+          // Upsert details
+          if (Object.keys(details).length > 0) {
+            const existingDetails = await ctx.db
+              .query("elevator_details")
+              .withIndex("by_elevator_id", (q) =>
+                q.eq("elevator_id", existing._id),
+              )
+              .unique();
+
+            if (existingDetails) {
+              await ctx.db.patch(existingDetails._id, details);
+            } else {
+              await ctx.db.insert("elevator_details", {
+                elevator_id: existing._id,
+                ...details,
+              });
+            }
+          }
+
+          // Insert new budget entry if budget data present
+          if (budget.recommended_modernization_year || budget.budget_amount) {
+            await ctx.db.insert("elevator_budgets", {
+              elevator_id: existing._id,
+              revision_year: new Date().getFullYear(),
+              ...budget,
+              created_at: Date.now(),
+              created_by: args.adminId,
+            });
+          }
+
           updated++;
         } else {
           // Auto-add new suggested values
-          await autoAddSuggestedValues(ctx, fields);
+          await autoAddSuggestedValues(ctx, { ...core, ...details, ...budget });
 
           // Create new elevator
-          await ctx.db.insert("elevators", {
-            elevator_number: fields.elevator_number as string,
-            ...fields,
+          const elevatorId = await ctx.db.insert("elevators", {
+            elevator_number: core.elevator_number as string,
+            ...core,
             organization_id: orgId as Id<"organizations">,
             status: ((importStatus as string) || "active") as
               | "active"
@@ -105,6 +195,24 @@ export const importBatch = internalMutation({
             created_by: args.adminId,
             created_at: Date.now(),
           });
+
+          // Create details
+          await ctx.db.insert("elevator_details", {
+            elevator_id: elevatorId,
+            ...details,
+          });
+
+          // Create budget entry if data present
+          if (budget.recommended_modernization_year || budget.budget_amount) {
+            await ctx.db.insert("elevator_budgets", {
+              elevator_id: elevatorId,
+              revision_year: new Date().getFullYear(),
+              ...budget,
+              created_at: Date.now(),
+              created_by: args.adminId,
+            });
+          }
+
           created++;
         }
       } catch (e) {

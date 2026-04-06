@@ -15,32 +15,30 @@ export const inspectionCalendar = query({
     const user = await requireAuth(ctx);
     const orgId = getOrgScope(user, organization_id);
 
-    if (orgId) {
-      const counts = await byInspectionMonth.countBatch(
-        ctx,
+    const orgIds = orgId
+      ? [orgId]
+      : (await ctx.db.query("organizations").collect()).map(
+          (o) => o._id,
+        );
+
+    const counts = await byInspectionMonth.countBatch(
+      ctx,
+      orgIds.flatMap((id) =>
         MONTHS.map((m) => ({
-          namespace: orgId,
+          namespace: id,
           bounds: { prefix: ["active", m] as [string, string] },
         })),
-      );
-      return MONTHS.map((month, i) => ({ month, count: counts[i] }));
-    }
+      ),
+    );
 
-    // Admin without org scope: fall back to .collect()
-    const allElevators = await ctx.db.query("elevators").collect();
-    const active = allElevators.filter((h) => h.status === "active");
-
-    const byMonth: Record<string, number> = {};
-    for (const m of MONTHS) {
-      byMonth[m] = 0;
-    }
-    for (const h of active) {
-      if (!h.inspection_month) continue;
-      if (h.inspection_month in byMonth) {
-        byMonth[h.inspection_month] += 1;
+    // Merge across orgs
+    const merged = new Array(MONTHS.length).fill(0);
+    for (let orgIdx = 0; orgIdx < orgIds.length; orgIdx++) {
+      for (let mIdx = 0; mIdx < MONTHS.length; mIdx++) {
+        merged[mIdx] += counts[orgIdx * MONTHS.length + mIdx];
       }
     }
-    return MONTHS.map((month) => ({ month, count: byMonth[month] }));
+    return MONTHS.map((month, i) => ({ month, count: merged[i] }));
   },
 });
 
@@ -94,7 +92,10 @@ export const emergencyPhoneStatus = query({
     let withoutEmergencyPhone = 0;
     let needsUpgrade = 0;
     let totalUpgradeCost = 0;
-    const byDistrict: Record<string, { with: number; without: number; upgrade: number; cost: number }> = {};
+    const byDistrict: Record<
+      string,
+      { with: number; without: number; upgrade: number; cost: number }
+    > = {};
 
     for (const h of active) {
       const dist = h.district || "Okänt";
@@ -109,9 +110,15 @@ export const emergencyPhoneStatus = query({
         if (h.needs_upgrade) {
           needsUpgrade++;
           byDistrict[dist].upgrade++;
-          if (h.emergency_phone_price) {
-            totalUpgradeCost += h.emergency_phone_price;
-            byDistrict[dist].cost += h.emergency_phone_price;
+
+          // Get price from elevator_details
+          const details = await ctx.db
+            .query("elevator_details")
+            .withIndex("by_elevator_id", (q) => q.eq("elevator_id", h._id))
+            .unique();
+          if (details?.emergency_phone_price) {
+            totalUpgradeCost += details.emergency_phone_price;
+            byDistrict[dist].cost += details.emergency_phone_price;
           }
         }
       } else {
@@ -140,9 +147,11 @@ export const emergencyPhoneStatus = query({
 export const inspectionList = query({
   args: {
     organization_id: v.optional(v.id("organizations")),
-    month: v.string(),
+    month: v.optional(v.string()),
   },
   handler: async (ctx, { organization_id, month }) => {
+    if (!month) return [];
+
     const elevators = await queryElevators(ctx, organization_id);
 
     const active = elevators.filter(
@@ -176,13 +185,17 @@ export const todaysElevators = query({
     const allElevators = orgId
       ? await ctx.db
           .query("elevators")
-          .withIndex("by_organization_id", (q) => q.eq("organization_id", orgId))
+          .withIndex("by_organization_id", (q) =>
+            q.eq("organization_id", orgId),
+          )
           .collect()
       : await ctx.db.query("elevators").collect();
 
     const today = allElevators.filter((h) => {
       const createdToday =
-        h.created_by === user._id && h.created_at >= todayStart && h.created_at < todayEnd;
+        h.created_by === user._id &&
+        h.created_at >= todayStart &&
+        h.created_at < todayEnd;
       const updatedToday =
         h.last_updated_by === user._id &&
         h.last_updated_at !== undefined &&

@@ -75,7 +75,7 @@ export function OrgModernizationView({
       elevator_type?: string;
       recommended_modernization_year?: string;
       budget_amount?: number;
-      modernization_measures?: string;
+      measures?: string;
       organization_id: string;
       organizationName: string;
     }[];

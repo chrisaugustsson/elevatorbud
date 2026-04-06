@@ -66,9 +66,9 @@ function parseElevatorRow(
         if (parsed.cab_size !== undefined) result.cab_size = parsed.cab_size;
         break;
       }
-      case "compound_daylight_opening": {
+      case "compound_door_opening": {
         const parsed = parseDaylightOpening(raw);
-        if (parsed.daylight_opening !== undefined) result.daylight_opening = parsed.daylight_opening;
+        if (parsed.door_opening !== undefined) result.door_opening = parsed.door_opening;
         break;
       }
       case "compound_emergency_phone": {
@@ -280,9 +280,9 @@ function parseRowWithMapping(
         if (parsed.cab_size !== undefined) result.cab_size = parsed.cab_size;
         break;
       }
-      case "compound_daylight_opening": {
+      case "compound_door_opening": {
         const parsed = parseDaylightOpening(raw);
-        if (parsed.daylight_opening !== undefined) result.daylight_opening = parsed.daylight_opening;
+        if (parsed.door_opening !== undefined) result.door_opening = parsed.door_opening;
         break;
       }
       case "compound_emergency_phone": {

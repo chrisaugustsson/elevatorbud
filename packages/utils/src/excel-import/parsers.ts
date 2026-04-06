@@ -43,13 +43,13 @@ export function parseCabSize(raw: string): { cab_size?: string } {
 }
 
 /**
- * Parses daylight_opening compound format: '900*2000' (bredd*hojd)
+ * Parses door_opening compound format: '900*2000' (bredd*hojd)
  * Stored as-is since schema field is string.
  */
-export function parseDaylightOpening(raw: string): { daylight_opening?: string } {
+export function parseDaylightOpening(raw: string): { door_opening?: string } {
   const trimmed = raw.trim();
   if (!trimmed) return {};
-  return { daylight_opening: trimmed };
+  return { door_opening: trimmed };
 }
 
 /**

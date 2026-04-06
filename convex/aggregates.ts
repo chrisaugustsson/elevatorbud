@@ -1,6 +1,7 @@
 import { TableAggregate } from "@convex-dev/aggregate";
 import { components } from "./_generated/api";
 import { DataModel } from "./_generated/dataModel";
+import { v } from "convex/values";
 import { Triggers } from "convex-helpers/server/triggers";
 import {
   customCtx,
@@ -12,7 +13,7 @@ import {
 } from "./_generated/server";
 
 // ---------------------------------------------------------------------------
-// Aggregate definitions
+// Aggregate definitions (core elevator fields only)
 // ---------------------------------------------------------------------------
 
 /** Listing pagination: O(log n) count + offset-based page access */
@@ -81,18 +82,6 @@ export const byInspectionMonth = new TableAggregate<{
   sortKey: (doc) => [doc.status, doc.inspection_month ?? ""],
 });
 
-/** Count + budget sum by recommended modernization year */
-export const byModernizationYear = new TableAggregate<{
-  Namespace: string;
-  Key: [string, string];
-  DataModel: DataModel;
-  TableName: "elevators";
-}>(components.byModernizationYear, {
-  namespace: (doc) => doc.organization_id,
-  sortKey: (doc) => [doc.status, doc.recommended_modernization_year ?? ""],
-  sumValue: (doc) => doc.budget_amount ?? 0,
-});
-
 /** Count + build_year sum for average age calculation */
 export const byBuildYear = new TableAggregate<{
   Namespace: string;
@@ -116,7 +105,6 @@ triggers.register("elevators", byElevatorType.trigger());
 triggers.register("elevators", byManufacturer.trigger());
 triggers.register("elevators", byMaintenanceCompany.trigger());
 triggers.register("elevators", byInspectionMonth.trigger());
-triggers.register("elevators", byModernizationYear.trigger());
 triggers.register("elevators", byBuildYear.trigger());
 
 // Custom mutations that auto-update all aggregates via triggers
@@ -127,7 +115,7 @@ export const internalMutation = customMutation(
 );
 
 // ---------------------------------------------------------------------------
-// Backfill: one-time migration for existing data
+// Backfill: one-time population for existing data
 // ---------------------------------------------------------------------------
 
 const ALL_AGGREGATES = [
@@ -137,21 +125,36 @@ const ALL_AGGREGATES = [
   byManufacturer,
   byMaintenanceCompany,
   byInspectionMonth,
-  byModernizationYear,
   byBuildYear,
 ];
 
 export const backfill = rawInternalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const elevators = await ctx.db.query("elevators").collect();
+  args: {
+    cursor: v.optional(v.string()),
+    batchSize: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const batchSize = args.batchSize ?? 50;
+    const result = await ctx.db
+      .query("elevators")
+      .paginate({ cursor: args.cursor ?? null, numItems: batchSize });
+
     let count = 0;
-    for (const doc of elevators) {
+    for (const doc of result.page) {
       for (const agg of ALL_AGGREGATES) {
         await agg.insertIfDoesNotExist(ctx, doc);
       }
       count++;
     }
-    console.log(`Backfilled ${count} elevators into ${ALL_AGGREGATES.length} aggregates`);
+
+    console.log(
+      `Backfilled batch of ${count} elevators. Done: ${result.isDone}`,
+    );
+
+    return {
+      count,
+      isDone: result.isDone,
+      continueCursor: result.isDone ? null : result.continueCursor,
+    };
   },
 });

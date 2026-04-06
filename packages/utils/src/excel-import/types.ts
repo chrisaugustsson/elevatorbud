@@ -4,7 +4,7 @@ export type ParsedElevator = {
   // Identifiering
   elevator_number: string;
   address?: string;
-  elevator_designation?: string;
+  elevator_classification?: string;
   district?: string;
 
   // Teknisk specifikation
@@ -20,10 +20,10 @@ export type ParsedElevator = {
   // Dorrar och korg
   door_type?: string;
   passthrough?: boolean;
-  collective?: string;
+  dispatch_mode?: string;
   cab_size?: string;
-  daylight_opening?: string;
-  grab_rail?: string;
+  door_opening?: string;
+  door_carrier?: string;
   door_machine?: string;
 
   // Maskineri
@@ -44,7 +44,7 @@ export type ParsedElevator = {
   warranty?: boolean;
   recommended_modernization_year?: string;
   budget_amount?: number;
-  modernization_measures?: string;
+  measures?: string;
 
   // Nodtelefon
   has_emergency_phone?: boolean;
@@ -83,7 +83,7 @@ export type ColumnDef = {
   letter: string; // Excel column letter (for error messages)
   field: string; // Target field name or special parser key
   mandatory?: boolean;
-  parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_daylight_opening" | "compound_emergency_phone" | "build_year" | "modernization_year" | "boolean" | "number" | "budget";
+  parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_door_opening" | "compound_emergency_phone" | "build_year" | "modernization_year" | "boolean" | "number" | "budget";
 };
 
 export type EmergencyPhoneEntry = {

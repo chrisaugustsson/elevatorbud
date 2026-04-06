@@ -41,9 +41,9 @@ export function StepIdentification({ form }: StepIdentificationProps) {
       {/* Hissbeteckning (combobox) */}
       <ComboboxField
         form={form}
-        name="elevator_designation"
+        name="elevator_classification"
         label="Hissbeteckning"
-        category="elevator_designation"
+        category="elevator_classification"
         placeholder="Välj eller ange beteckning..."
         changed={false}
       />

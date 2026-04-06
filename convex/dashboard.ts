@@ -27,7 +27,8 @@ export const overview = query({
     ].map((m) => m.charAt(0).toUpperCase() + m.slice(1));
 
     const upcomingInspections = active.filter(
-      (h) => h.inspection_month && currentMonthNames.includes(h.inspection_month),
+      (h) =>
+        h.inspection_month && currentMonthNames.includes(h.inspection_month),
     ).length;
 
     // Top organizations by elevator count
@@ -62,12 +63,27 @@ export const overview = query({
       last_updated_at: h.last_updated_at!,
     }));
 
-    // Modernization within 3 years
+    // Modernization within 3 years — batch load all budgets
     const currentYear = new Date().getFullYear();
-    const modernizationSoon = active.filter((h) => {
-      const year = parseModernizationYear(h.recommended_modernization_year);
-      return year !== null && year >= currentYear && year <= currentYear + 3;
-    }).length;
+    const allBudgets = await ctx.db.query("elevator_budgets").collect();
+    const latestBudgets = new Map<string, (typeof allBudgets)[0]>();
+    for (const b of allBudgets) {
+      const existing = latestBudgets.get(b.elevator_id as string);
+      if (!existing || b._creationTime > existing._creationTime) {
+        latestBudgets.set(b.elevator_id as string, b);
+      }
+    }
+    let modernizationSoon = 0;
+    for (const h of active) {
+      const budget = latestBudgets.get(h._id as string);
+      if (!budget) continue;
+      const year = parseModernizationYear(
+        budget.recommended_modernization_year,
+      );
+      if (year !== null && year >= currentYear && year <= currentYear + 3) {
+        modernizationSoon++;
+      }
+    }
 
     return {
       totalElevators,

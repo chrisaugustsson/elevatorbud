@@ -23,7 +23,7 @@ type HissDoc = {
   _id: string;
   elevator_number: string;
   address?: string;
-  elevator_designation?: string;
+  elevator_classification?: string;
   district?: string;
   elevator_type?: string;
   manufacturer?: string;
@@ -35,10 +35,10 @@ type HissDoc = {
   door_count?: number;
   door_type?: string;
   passthrough?: boolean;
-  collective?: string;
+  dispatch_mode?: string;
   cab_size?: string;
-  daylight_opening?: string;
-  grab_rail?: string;
+  door_opening?: string;
+  door_carrier?: string;
   door_machine?: string;
   drive_system?: string;
   suspension?: string;
@@ -53,7 +53,7 @@ type HissDoc = {
   warranty?: boolean;
   recommended_modernization_year?: string;
   budget_amount?: number;
-  modernization_measures?: string;
+  measures?: string;
   has_emergency_phone?: boolean;
   emergency_phone_model?: string;
   emergency_phone_type?: string;
@@ -166,7 +166,7 @@ function HissDetail() {
       <DetailSection title="Identifiering">
         <DetailField label="Hissnummer" value={hiss.elevator_number} />
         <DetailField label="Adress" value={hiss.address} />
-        <DetailField label="Hissbeteckning" value={hiss.elevator_designation} />
+        <DetailField label="Hissbeteckning" value={hiss.elevator_classification} />
         <DetailField label="Distrikt" value={hiss.district} />
       </DetailSection>
 
@@ -186,10 +186,10 @@ function HissDetail() {
       <DetailSection title="Dörrar och korg">
         <DetailField label="Typ dörrar" value={hiss.door_type} />
         <DetailField label="Genomgång" value={hiss.passthrough} />
-        <DetailField label="Kollektiv" value={hiss.collective} />
+        <DetailField label="Kollektiv" value={hiss.dispatch_mode} />
         <DetailField label="Korgstorlek" value={hiss.cab_size} />
-        <DetailField label="Dagöppning" value={hiss.daylight_opening} />
-        <DetailField label="Bärbeslag" value={hiss.grab_rail} />
+        <DetailField label="Dagöppning" value={hiss.door_opening} />
+        <DetailField label="Bärbeslag" value={hiss.door_carrier} />
         <DetailField label="Dörrmaskin" value={hiss.door_machine} />
       </DetailSection>
 
@@ -228,7 +228,7 @@ function HissDetail() {
         />
         <DetailField
           label="Åtgärder vid modernisering"
-          value={hiss.modernization_measures}
+          value={hiss.measures}
         />
       </DetailSection>
 

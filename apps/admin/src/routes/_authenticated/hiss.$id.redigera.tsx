@@ -123,6 +123,20 @@ function RedigeraHiss() {
     queryKey: hissOpts.queryKey,
     staleTime: hissOpts.staleTime,
   });
+  const detailsOpts = convexQuery(api.elevators.crud.getDetails, {
+    elevator_id: id,
+  } as never);
+  const { data: details } = useSuspenseQuery({
+    queryKey: detailsOpts.queryKey,
+    staleTime: detailsOpts.staleTime,
+  });
+  const budgetOpts = convexQuery(api.elevators.crud.getLatestBudget, {
+    elevator_id: id,
+  } as never);
+  const { data: latestBudget } = useSuspenseQuery({
+    queryKey: budgetOpts.queryKey,
+    staleTime: budgetOpts.staleTime,
+  });
   const orgsOpts = convexQuery(api.organizations.list, {});
   const { data: orgs } = useSuspenseQuery({
     queryKey: orgsOpts.queryKey,
@@ -177,18 +191,32 @@ function RedigeraHiss() {
     },
   });
 
-  // Initialize form from server data
+  // Initialize form from server data (merged from core + details + budget)
   useEffect(() => {
     if (!hiss || initialized) return;
 
-    const serverVals = serverToFormValues(hiss as Record<string, unknown>);
+    const merged = {
+      ...(hiss as Record<string, unknown>),
+      ...(details as Record<string, unknown> | null),
+      // Map budget fields to form field names
+      recommended_modernization_year:
+        (latestBudget as Record<string, unknown> | null)
+          ?.recommended_modernization_year,
+      budget_amount:
+        (latestBudget as Record<string, unknown> | null)?.budget_amount,
+      measures:
+        (latestBudget as Record<string, unknown> | null)?.measures,
+      warranty:
+        (latestBudget as Record<string, unknown> | null)?.warranty,
+    };
+    const serverVals = serverToFormValues(merged);
     setOriginalValues(serverVals);
 
     for (const [key, value] of Object.entries(serverVals)) {
       form.setFieldValue(key as keyof HissFormValues, value as never);
     }
     setInitialized(true);
-  }, [hiss, initialized, form]);
+  }, [hiss, details, latestBudget, initialized, form]);
 
   // Not found
   if (hiss === null) {

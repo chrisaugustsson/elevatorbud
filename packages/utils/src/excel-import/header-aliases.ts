@@ -13,14 +13,18 @@ export const HEADER_ALIASES: HeaderAlias[] = [
   { header: "organisation", field: "_organisation_namn" },
   { header: "organisationsnamn", field: "_organisation_namn" },
 
+  // --- Inventering ---
+  { header: "inventerings datum", field: "inventory_date" },
+  { header: "inventeringsdatum", field: "inventory_date" },
+
   // --- Identifiering ---
   { header: "hissnummer", field: "elevator_number", mandatory: true },
   { header: "hiss nummer", field: "elevator_number", mandatory: true },
   { header: "hissadress", field: "address" },
   { header: "hiss adress", field: "address" },
   { header: "adress", field: "address" },
-  { header: "hissbeteckning", field: "elevator_designation" },
-  { header: "hiss beteckning", field: "elevator_designation" },
+  { header: "hissbeteckning", field: "elevator_classification" },
+  { header: "hiss beteckning", field: "elevator_classification" },
   { header: "distrikt", field: "district" },
   { header: "distrikt/ort", field: "district" },
   { header: "distrikt/ ort", field: "district" },
@@ -71,7 +75,7 @@ export const HEADER_ALIASES: HeaderAlias[] = [
   { header: "typ av dörrar", field: "door_type" },
   { header: "dörrtyp", field: "door_type" },
   { header: "genomgång", field: "passthrough", parser: "boolean" },
-  { header: "kollektiv", field: "collective" },
+  { header: "kollektiv", field: "dispatch_mode" },
   {
     header: "korgstorlek bxdjxh i mm",
     field: "cab_size",
@@ -80,15 +84,15 @@ export const HEADER_ALIASES: HeaderAlias[] = [
   { header: "korgstorlek", field: "cab_size", parser: "compound_cab_size" },
   {
     header: "dagöppning dörrar bxh",
-    field: "daylight_opening",
-    parser: "compound_daylight_opening",
+    field: "door_opening",
+    parser: "compound_door_opening",
   },
-  { header: "dagöppning", field: "daylight_opening", parser: "compound_daylight_opening" },
+  { header: "dagöppning", field: "door_opening", parser: "compound_door_opening" },
   {
     header: "bärbeslag automatdörrar typ och år",
-    field: "grab_rail",
+    field: "door_carrier",
   },
-  { header: "bärbeslag", field: "grab_rail" },
+  { header: "bärbeslag", field: "door_carrier" },
   {
     header: "dörrmaskin / korgdörr typ och år",
     field: "door_machine",
@@ -131,8 +135,8 @@ export const HEADER_ALIASES: HeaderAlias[] = [
   },
   { header: "uppdaterat budgetbelopp", field: "budget_amount", parser: "budget" },
   { header: "budgetbelopp", field: "budget_amount", parser: "budget" },
-  { header: "åtgärder vid modernisering", field: "modernization_measures" },
-  { header: "moderniseringsåtgärder", field: "modernization_measures" },
+  { header: "åtgärder vid modernisering", field: "measures" },
+  { header: "moderniseringsåtgärder", field: "measures" },
 
   // --- Nödtelefon ---
   {
@@ -151,9 +155,10 @@ export const HEADER_ALIASES: HeaderAlias[] = [
 export const TARGET_FIELDS: { field: string; label: string; parser?: HeaderAlias["parser"]; mandatory?: boolean }[] = [
   { field: "_skip", label: "— Hoppa över —" },
   { field: "_organisation_namn", label: "Organisation (namn)" },
+  { field: "inventory_date", label: "Inventeringsdatum" },
   { field: "elevator_number", label: "Hissnummer", mandatory: true },
   { field: "address", label: "Hissadress" },
-  { field: "elevator_designation", label: "Hissbeteckning" },
+  { field: "elevator_classification", label: "Hissbeteckning" },
   { field: "district", label: "Distrikt / Ort" },
   { field: "elevator_type", label: "Hisstyp" },
   { field: "manufacturer", label: "Fabrikat" },
@@ -164,10 +169,10 @@ export const TARGET_FIELDS: { field: string; label: string; parser?: HeaderAlias
   { field: "floors_doors", label: "Plan / Dörrar", parser: "compound_floors_doors", mandatory: true },
   { field: "door_type", label: "Typ av dörrar" },
   { field: "passthrough", label: "Genomgång", parser: "boolean" },
-  { field: "collective", label: "Kollektiv" },
+  { field: "dispatch_mode", label: "Kollektiv" },
   { field: "cab_size", label: "Korgstorlek", parser: "compound_cab_size" },
-  { field: "daylight_opening", label: "Dagöppning dörrar", parser: "compound_daylight_opening" },
-  { field: "grab_rail", label: "Bärbeslag" },
+  { field: "door_opening", label: "Dagöppning dörrar", parser: "compound_door_opening" },
+  { field: "door_carrier", label: "Bärbeslag" },
   { field: "door_machine", label: "Dörrmaskin" },
   { field: "drive_system", label: "Drivsystem" },
   { field: "suspension", label: "Upphängning" },
@@ -182,7 +187,7 @@ export const TARGET_FIELDS: { field: string; label: string; parser?: HeaderAlias
   { field: "warranty", label: "Garanti", parser: "boolean" },
   { field: "recommended_modernization_year", label: "Rekommenderat moderniseringsår" },
   { field: "budget_amount", label: "Budgetbelopp", parser: "budget" },
-  { field: "modernization_measures", label: "Moderniseringsåtgärder" },
+  { field: "measures", label: "Moderniseringsåtgärder" },
   { field: "emergency_phone", label: "Nödtelefon", parser: "compound_emergency_phone" },
   { field: "comments", label: "Kommentarer" },
 ];

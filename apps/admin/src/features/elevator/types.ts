@@ -4,7 +4,7 @@ export type HissFormValues = {
   organization_id: string;
   elevator_number: string;
   address: string;
-  elevator_designation: string;
+  elevator_classification: string;
   district: string;
   elevator_type: string;
   manufacturer: string;
@@ -16,10 +16,10 @@ export type HissFormValues = {
   door_count: string;
   door_type: string;
   passthrough: boolean;
-  collective: string;
+  dispatch_mode: string;
   cab_size: string;
-  daylight_opening: string;
-  grab_rail: string;
+  door_opening: string;
+  door_carrier: string;
   door_machine: string;
   drive_system: string;
   suspension: string;
@@ -34,7 +34,7 @@ export type HissFormValues = {
   warranty: boolean;
   recommended_modernization_year: string;
   budget_amount: string;
-  modernization_measures: string;
+  measures: string;
   has_emergency_phone: boolean;
   emergency_phone_model: string;
   emergency_phone_type: string;
@@ -47,7 +47,7 @@ export const emptyValues: HissFormValues = {
   organization_id: "",
   elevator_number: "",
   address: "",
-  elevator_designation: "",
+  elevator_classification: "",
   district: "",
   elevator_type: "",
   manufacturer: "",
@@ -59,10 +59,10 @@ export const emptyValues: HissFormValues = {
   door_count: "",
   door_type: "",
   passthrough: false,
-  collective: "",
+  dispatch_mode: "",
   cab_size: "",
-  daylight_opening: "",
-  grab_rail: "",
+  door_opening: "",
+  door_carrier: "",
   door_machine: "",
   drive_system: "",
   suspension: "",
@@ -77,7 +77,7 @@ export const emptyValues: HissFormValues = {
   warranty: false,
   recommended_modernization_year: "",
   budget_amount: "",
-  modernization_measures: "",
+  measures: "",
   has_emergency_phone: false,
   emergency_phone_model: "",
   emergency_phone_type: "",

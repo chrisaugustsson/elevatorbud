@@ -12,7 +12,6 @@ app.use(aggregate, { name: "byElevatorType" });
 app.use(aggregate, { name: "byManufacturer" });
 app.use(aggregate, { name: "byMaintenanceCompany" });
 app.use(aggregate, { name: "byInspectionMonth" });
-app.use(aggregate, { name: "byModernizationYear" }); // also tracks budget sums
 app.use(aggregate, { name: "byBuildYear" }); // also tracks build_year sums for avg age
 
 export default app;

@@ -136,7 +136,7 @@ function ModerniseringPage() {
             district?: string;
             recommended_modernization_year?: string;
             budget_amount?: number;
-            modernization_measures?: string;
+            measures?: string;
           }[]
         }
         selectedPeriod={selectedPeriod}

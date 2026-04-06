@@ -6,57 +6,26 @@ export default defineSchema({
     // Identification
     elevator_number: v.string(),
     address: v.optional(v.string()),
-    elevator_designation: v.optional(v.string()),
+    elevator_classification: v.optional(v.string()),
     district: v.optional(v.string()),
+    inventory_date: v.optional(v.string()),
 
-    // Technical specification
+    // Core technical (used in charts/filtering)
     elevator_type: v.optional(v.string()),
     manufacturer: v.optional(v.string()),
     build_year: v.optional(v.number()),
-    speed: v.optional(v.string()),
-    lift_height: v.optional(v.string()),
-    load_capacity: v.optional(v.string()),
-    floor_count: v.optional(v.number()),
-    door_count: v.optional(v.number()),
-
-    // Doors and cab
-    door_type: v.optional(v.string()),
-    passthrough: v.optional(v.boolean()),
-    collective: v.optional(v.string()),
-    cab_size: v.optional(v.string()),
-    daylight_opening: v.optional(v.string()),
-    grab_rail: v.optional(v.string()),
-    door_machine: v.optional(v.string()),
-
-    // Machinery
-    drive_system: v.optional(v.string()),
-    suspension: v.optional(v.string()),
-    machine_placement: v.optional(v.string()),
-    machine_type: v.optional(v.string()),
-    control_system_type: v.optional(v.string()),
 
     // Inspection and maintenance
     inspection_authority: v.optional(v.string()),
     inspection_month: v.optional(v.string()),
     maintenance_company: v.optional(v.string()),
-    shaft_lighting: v.optional(v.string()),
 
-    // Modernization
+    // Modernization (historical — when it WAS modernized)
     modernization_year: v.optional(v.string()),
-    warranty: v.optional(v.boolean()),
-    recommended_modernization_year: v.optional(v.string()),
-    budget_amount: v.optional(v.number()),
-    modernization_measures: v.optional(v.string()),
 
-    // Emergency phone
+    // Emergency phone (summary flags for charts)
     has_emergency_phone: v.optional(v.boolean()),
-    emergency_phone_model: v.optional(v.string()),
-    emergency_phone_type: v.optional(v.string()),
     needs_upgrade: v.optional(v.boolean()),
-    emergency_phone_price: v.optional(v.number()),
-
-    // Comments
-    comments: v.optional(v.string()),
 
     // Metadata
     organization_id: v.id("organizations"),
@@ -75,6 +44,60 @@ export default defineSchema({
     .index("by_organization_id_and_elevator_number", [
       "organization_id",
       "elevator_number",
+    ]),
+
+  elevator_details: defineTable({
+    elevator_id: v.id("elevators"),
+
+    // Technical specification
+    speed: v.optional(v.string()),
+    lift_height: v.optional(v.string()),
+    load_capacity: v.optional(v.string()),
+    floor_count: v.optional(v.number()),
+    door_count: v.optional(v.number()),
+
+    // Doors and cab
+    door_type: v.optional(v.string()),
+    passthrough: v.optional(v.boolean()),
+    dispatch_mode: v.optional(v.string()),
+    cab_size: v.optional(v.string()),
+    door_opening: v.optional(v.string()),
+    door_carrier: v.optional(v.string()),
+    door_machine: v.optional(v.string()),
+
+    // Machinery
+    drive_system: v.optional(v.string()),
+    suspension: v.optional(v.string()),
+    machine_placement: v.optional(v.string()),
+    machine_type: v.optional(v.string()),
+    control_system_type: v.optional(v.string()),
+
+    // Inspection detail
+    shaft_lighting: v.optional(v.string()),
+
+    // Emergency phone details
+    emergency_phone_model: v.optional(v.string()),
+    emergency_phone_type: v.optional(v.string()),
+    emergency_phone_price: v.optional(v.number()),
+
+    // Comments
+    comments: v.optional(v.string()),
+  }).index("by_elevator_id", ["elevator_id"]),
+
+  elevator_budgets: defineTable({
+    elevator_id: v.id("elevators"),
+    revision_year: v.number(),
+    recommended_modernization_year: v.optional(v.string()),
+    budget_amount: v.optional(v.number()),
+    measures: v.optional(v.string()),
+    warranty: v.optional(v.boolean()),
+    created_at: v.number(),
+    created_by: v.optional(v.id("users")),
+  })
+    .index("by_elevator_id", ["elevator_id"])
+    .index("by_elevator_id_and_revision_year", [
+      "elevator_id",
+      "revision_year",
     ]),
 
   organizations: defineTable({

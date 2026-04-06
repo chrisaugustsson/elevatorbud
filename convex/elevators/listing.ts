@@ -5,8 +5,8 @@ import { filterArgs, fetchAndFilter, enrichWithOrgName } from "./helpers";
 import { requireAuth, getOrgScope } from "../auth";
 
 /**
- * Returns true when the only active filter is organization_id and status is
- * "active" (the default), meaning we can use the aggregate for count + pagination.
+ * Returns true when no extra filters are active, meaning we can use
+ * the aggregate for O(log n) count + offset-based pagination.
  */
 function canUseAggregate(args: {
   search?: string;
@@ -32,9 +32,7 @@ function canUseAggregate(args: {
   if (args.buildYearMin !== undefined) return false;
   if (args.buildYearMax !== undefined) return false;
   if (args.modernized !== undefined) return false;
-  // Aggregate is sorted by elevator_number; other sort fields need fallback
   if (args.sort && args.sort !== "elevator_number") return false;
-  // Only "active" status is tracked in the aggregate namespace
   const status = args.status ?? "active";
   if (status !== "active") return false;
   return true;
@@ -78,7 +76,6 @@ export const list = query({
         };
       }
 
-      // Use atBatch to get the exact document IDs for this page
       const pageSize = Math.min(limit, totalCount - offset);
       const indices = Array.from({ length: pageSize }, (_, i) =>
         sortOrder === "desc"

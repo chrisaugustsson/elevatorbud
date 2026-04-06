@@ -56,13 +56,13 @@ export function DoorsAndCabSection({
 
       <ComboboxField
         form={form}
-        name="collective"
+        name="dispatch_mode"
         label="Kollektiv"
-        category="collective"
+        category="dispatch_mode"
         placeholder="Välj eller ange kollektiv..."
         changed={
           !!originalValues &&
-          isChanged("collective", formValues, originalValues)
+          isChanged("dispatch_mode", formValues, originalValues)
         }
       />
 
@@ -91,15 +91,15 @@ export function DoorsAndCabSection({
       <FieldWrapper
         changed={
           !!originalValues &&
-          isChanged("daylight_opening", formValues, originalValues)
+          isChanged("door_opening", formValues, originalValues)
         }
       >
-        <form.Field name="daylight_opening">
+        <form.Field name="door_opening">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="daylight_opening">Dagöppning</Label>
+              <Label htmlFor="door_opening">Dagöppning</Label>
               <Input
-                id="daylight_opening"
+                id="door_opening"
                 className="h-11"
                 placeholder="t.ex. 900*2000 (B*H mm)"
                 value={field.state.value}
@@ -114,15 +114,15 @@ export function DoorsAndCabSection({
         <FieldWrapper
           changed={
             !!originalValues &&
-            isChanged("grab_rail", formValues, originalValues)
+            isChanged("door_carrier", formValues, originalValues)
           }
         >
-          <form.Field name="grab_rail">
+          <form.Field name="door_carrier">
             {(field) => (
               <div className="space-y-1.5">
-                <Label htmlFor="grab_rail">Bärbeslag</Label>
+                <Label htmlFor="door_carrier">Bärbeslag</Label>
                 <Input
-                  id="grab_rail"
+                  id="door_carrier"
                   className="h-11"
                   placeholder="Typ..."
                   value={field.state.value}

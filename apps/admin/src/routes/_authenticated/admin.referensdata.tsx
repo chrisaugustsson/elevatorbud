@@ -73,12 +73,12 @@ const CATEGORIES = [
   "district",
   "maintenance_company",
   "inspection_authority",
-  "elevator_designation",
+  "elevator_classification",
   "door_type",
-  "collective",
+  "dispatch_mode",
   "drive_system",
   "machine_placement",
-  "modernization_measures",
+  "measures",
 ] as const;
 
 type Category = (typeof CATEGORIES)[number];
@@ -89,12 +89,12 @@ const CATEGORY_LABELS: Record<Category, string> = {
   district: "Distrikt",
   maintenance_company: "Skötselföretag",
   inspection_authority: "Besiktningsorgan",
-  elevator_designation: "Hissbeteckning",
+  elevator_classification: "Hissbeteckning",
   door_type: "Typ dörrar",
-  collective: "Kollektiv",
+  dispatch_mode: "Kollektiv",
   drive_system: "Drivsystem",
   machine_placement: "Maskinplacering",
-  modernization_measures: "Åtgärder vid modernisering",
+  measures: "Åtgärder vid modernisering",
 };
 
 type SuggestedValue = {

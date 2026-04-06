@@ -118,14 +118,14 @@ export function ModernizationSection({
 
       <ComboboxField
         form={form}
-        name="modernization_measures"
+        name="measures"
         label="Åtgärder vid modernisering"
-        category="modernization_measures"
+        category="measures"
         placeholder="Välj eller ange åtgärder..."
         changed={
           !!originalValues &&
           isChanged(
-            "modernization_measures",
+            "measures",
             formValues,
             originalValues,
           )

@@ -4,7 +4,7 @@ import {
   ClipboardList,
   Database,
   Globe,
-  HardHat,
+
   Mail,
   Plus,
   Upload,
@@ -29,7 +29,7 @@ const navigation: NavGroup[] = [
       { title: "Dashboard", href: "/dashboard", icon: BarChart3 },
       { title: "Register", href: "/register", icon: ClipboardList },
       { title: "Organisationer", href: "/admin/organisationer", icon: Building2 },
-      { title: "Modernisering", href: "/modernisering", icon: HardHat },
+
       { title: "Underhåll", href: "/underhall", icon: Wrench },
     ],
   },

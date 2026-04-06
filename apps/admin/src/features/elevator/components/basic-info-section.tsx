@@ -106,13 +106,13 @@ export function BasicInfoSection({
 
         <ComboboxField
           form={form}
-          name="elevator_designation"
+          name="elevator_classification"
           label="Hissbeteckning"
-          category="elevator_designation"
+          category="elevator_classification"
           placeholder="Välj eller ange beteckning..."
           changed={
             !!originalValues &&
-            isChanged("elevator_designation", formValues, originalValues)
+            isChanged("elevator_classification", formValues, originalValues)
           }
         />
 

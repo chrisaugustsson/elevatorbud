@@ -28,7 +28,7 @@ type PriorityElevator = {
   district?: string;
   recommended_modernization_year?: string;
   budget_amount?: number;
-  modernization_measures?: string;
+  measures?: string;
 };
 
 type PriorityListProps = {
@@ -103,7 +103,7 @@ export function PriorityList({
         },
         meta: { className: "hidden sm:table-cell" },
       }),
-      columnHelper.accessor("modernization_measures", {
+      columnHelper.accessor("measures", {
         header: ({ column }) => (
           <DataGridColumnHeader title="Åtgärd" column={column} />
         ),

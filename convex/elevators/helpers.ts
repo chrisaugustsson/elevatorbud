@@ -13,12 +13,12 @@ const CATEGORY_FIELDS = [
   "district",
   "maintenance_company",
   "inspection_authority",
-  "elevator_designation",
+  "elevator_classification",
   "door_type",
-  "collective",
+  "dispatch_mode",
   "drive_system",
   "machine_placement",
-  "modernization_measures",
+  "measures",
 ] as const;
 
 export async function autoAddSuggestedValues(

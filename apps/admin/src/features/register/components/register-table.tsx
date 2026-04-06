@@ -26,8 +26,6 @@ type HissRow = {
   manufacturer?: string;
   build_year?: number;
   modernization_year?: string;
-  recommended_modernization_year?: string;
-  budget_amount?: number;
   organization_id: string;
   organizationName: string;
 };
@@ -130,25 +128,6 @@ export function RegisterTable({
         ),
         cell: (info) => info.getValue() || "—",
         size: 130,
-      }),
-      columnHelper.accessor("recommended_modernization_year", {
-        header: ({ column }) => (
-          <DataGridColumnHeader title="Rek. modern." column={column} />
-        ),
-        cell: (info) => info.getValue() || "—",
-        size: 130,
-      }),
-      columnHelper.accessor("budget_amount", {
-        header: ({ column }) => (
-          <DataGridColumnHeader title="Budget" column={column} />
-        ),
-        cell: (info) => {
-          const v = info.getValue();
-          return v !== undefined && v !== null
-            ? `${(v / 1000).toFixed(0)} tkr`
-            : "—";
-        },
-        size: 100,
       }),
       columnHelper.display({
         id: "actions",
