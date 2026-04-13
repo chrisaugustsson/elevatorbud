@@ -1,5 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { meOptions } from "../../server/user";
 import { statsOptions, chartDataOptions } from "../../server/analytics";
 import { KpiCards } from "@elevatorbud/ui/components/dashboard/kpi-cards";
@@ -32,6 +33,63 @@ function DashboardPage() {
   const { data: stats } = useSuspenseQuery(statsOptions());
 
   const { data: chartData } = useSuspenseQuery(chartDataOptions());
+
+  const navigate = useNavigate();
+  const currentYear = new Date().getFullYear();
+
+  const goToRegister = useCallback(
+    (params: Record<string, string | number | string[]>) => {
+      navigate({ to: "/register", search: params });
+    },
+    [navigate],
+  );
+
+  const handleDistrictClick = useCallback(
+    (label: string) => goToRegister({ district: [label] }),
+    [goToRegister],
+  );
+
+  const handleTypeClick = useCallback(
+    (label: string) => goToRegister({ elevatorType: [label] }),
+    [goToRegister],
+  );
+
+  const handleManufacturerClick = useCallback(
+    (label: string) => goToRegister({ manufacturer: [label] }),
+    [goToRegister],
+  );
+
+  const handleMaintenanceCompanyClick = useCallback(
+    (label: string) => goToRegister({ maintenanceCompany: [label] }),
+    [goToRegister],
+  );
+
+  const handleAgeClick = useCallback(
+    (label: string) => {
+      // Labels: "0-9 ar", "10-19 ar", ..., "50+ ar", "Okant"
+      if (label === "Okant") return;
+      if (label.startsWith("50+")) {
+        goToRegister({ buildYearMax: currentYear - 50 });
+        return;
+      }
+      const match = label.match(/^(\d+)-(\d+)/);
+      if (!match) return;
+      const minAge = parseInt(match[1], 10);
+      const maxAge = parseInt(match[2], 10);
+      goToRegister({
+        buildYearMin: currentYear - maxAge,
+        buildYearMax: currentYear - minAge,
+      });
+    },
+    [goToRegister, currentYear],
+  );
+
+  const handleTimelineClick = useCallback(
+    (label: string) => {
+      navigate({ to: "/modernisering", search: { year: label } });
+    },
+    [navigate],
+  );
 
   const kpiItems: KpiItem[] = [
     {
@@ -86,35 +144,41 @@ function DashboardPage() {
             title="Hissar per distrikt"
             data={chartData.byDistrict}
             color="var(--color-chart-1, #2563eb)"
+            onBarClick={handleDistrictClick}
           />
 
           <DashboardBarChart
             title="Åldersfördelning"
             data={chartData.ageDistribution}
             color="var(--color-chart-2, #16a34a)"
+            onBarClick={handleAgeClick}
           />
 
           <DashboardPieChart
             title="Hisstyper"
             data={chartData.byElevatorType}
+            onSliceClick={handleTypeClick}
           />
 
           <DashboardBarChart
             title="Topp 10 fabrikat"
             data={chartData.topManufacturers}
             color="var(--color-chart-3, #d97706)"
+            onBarClick={handleManufacturerClick}
           />
 
           <DashboardBarChart
             title="Moderniseringstidslinje"
             data={chartData.modernizationTimeline}
             color="var(--color-chart-4, #dc2626)"
+            onBarClick={handleTimelineClick}
           />
 
           <DashboardPieChart
             title="Skötselföretag"
             data={chartData.byMaintenanceCompany}
             innerRadius={60}
+            onSliceClick={handleMaintenanceCompanyClick}
           />
         </div>
       )}

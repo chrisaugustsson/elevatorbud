@@ -367,7 +367,7 @@ async function listFn(
   filters: FilterInput & {
     page?: number;
     pageSize?: number;
-    sortBy?: "elevatorNumber" | "address" | "district" | "elevatorType" | "manufacturer" | "buildYear" | "maintenanceCompany" | "inspectionMonth";
+    sortBy?: "elevatorNumber" | "address" | "district" | "elevatorType" | "manufacturer" | "buildYear" | "maintenanceCompany" | "inspectionMonth" | "recommendedModernizationYear" | "budgetAmount";
     sortOrder?: "asc" | "desc";
   },
 ) {
@@ -397,6 +397,20 @@ async function listFn(
         status: elevators.status,
         organizationId: elevators.organizationId,
         organizationName: organizations.name,
+        recommendedModernizationYear: sql<string | null>`(
+          SELECT recommended_modernization_year
+          FROM elevator_budgets
+          WHERE elevator_id = ${elevators.id}
+          ORDER BY created_at DESC
+          LIMIT 1
+        )`,
+        budgetAmount: sql<number | null>`(
+          SELECT budget_amount
+          FROM elevator_budgets
+          WHERE elevator_id = ${elevators.id}
+          ORDER BY created_at DESC
+          LIMIT 1
+        )`,
       })
       .from(elevators)
       .leftJoin(
@@ -405,6 +419,26 @@ async function listFn(
       )
       .where(where)
       .orderBy((() => {
+        const dir = sortOrder === "desc" ? sql`DESC` : sql`ASC`;
+        if (sortBy === "recommendedModernizationYear") {
+          return sql`(
+            SELECT recommended_modernization_year::int
+            FROM elevator_budgets
+            WHERE elevator_id = ${elevators.id}
+              AND recommended_modernization_year ~ '^[0-9]+$'
+            ORDER BY created_at DESC
+            LIMIT 1
+          ) ${dir} NULLS LAST`;
+        }
+        if (sortBy === "budgetAmount") {
+          return sql`(
+            SELECT budget_amount
+            FROM elevator_budgets
+            WHERE elevator_id = ${elevators.id}
+            ORDER BY created_at DESC
+            LIMIT 1
+          ) ${dir} NULLS LAST`;
+        }
         const columnMap = {
           elevatorNumber: elevators.elevatorNumber,
           address: elevators.address,
@@ -415,7 +449,7 @@ async function listFn(
           maintenanceCompany: elevators.maintenanceCompany,
           inspectionMonth: elevators.inspectionMonth,
         } as const;
-        const col = columnMap[sortBy];
+        const col = columnMap[sortBy as keyof typeof columnMap];
         return sortOrder === "desc" ? desc(col) : asc(col);
       })())
       .limit(pageSize)
@@ -705,6 +739,8 @@ export const listElevators = createServerFn({ method: "POST" })
           "buildYear",
           "maintenanceCompany",
           "inspectionMonth",
+          "recommendedModernizationYear",
+          "budgetAmount",
         ])
         .optional(),
       sortOrder: z.enum(["asc", "desc"]).optional(),
@@ -718,7 +754,7 @@ export const listElevatorsOptions = (
   filters: z.infer<typeof filterSchema> & {
     page?: number;
     pageSize?: number;
-    sortBy?: "elevatorNumber" | "address" | "district" | "elevatorType" | "manufacturer" | "buildYear" | "maintenanceCompany" | "inspectionMonth";
+    sortBy?: "elevatorNumber" | "address" | "district" | "elevatorType" | "manufacturer" | "buildYear" | "maintenanceCompany" | "inspectionMonth" | "recommendedModernizationYear" | "budgetAmount";
     sortOrder?: "asc" | "desc";
   },
 ) =>

@@ -8,7 +8,7 @@ import {
 import * as React from "react";
 import { ClerkProvider, svSE } from "@elevatorbud/auth";
 import { Toaster } from "@elevatorbud/ui/components/ui/sonner";
-import { ThemeProvider } from "@elevatorbud/ui/hooks/use-theme";
+import { ThemeProvider, themeInitScript } from "@elevatorbud/ui/hooks/use-theme";
 import type { RouterContext } from "../router";
 import appCss from "../styles/app.css?url";
 
@@ -31,6 +31,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     <html lang="sv">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
         <ThemeProvider>

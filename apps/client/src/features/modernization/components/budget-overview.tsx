@@ -12,7 +12,8 @@ import {
 } from "@elevatorbud/ui/lib/chart-helpers";
 import { Bar, Line } from "react-chartjs-2";
 import { TrendingUp } from "lucide-react";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import type { ChartEvent, ActiveElement, Chart as ChartJS } from "chart.js";
 
 type BudgetYearItem = {
   name: string;
@@ -29,7 +30,10 @@ type BudgetOverviewProps = {
   totalBudget: number;
   budgetCumulative: BudgetYearItem[];
   budgetPerDistrikt: BudgetCategoryItem[];
-  budgetPerTyp: BudgetCategoryItem[];
+  onYearClick?: (year: string) => void;
+  selectedYear?: string | null;
+  onDistrictClick?: (district: string) => void;
+  selectedDistrict?: string | null;
 };
 
 function EmptyBudget() {
@@ -40,8 +44,35 @@ function EmptyBudget() {
   );
 }
 
-function BudgetPerYearChart({ data }: { data: BudgetYearItem[] }) {
+function BudgetPerYearChart({
+  data,
+  onYearClick,
+  selectedYear,
+}: {
+  data: BudgetYearItem[];
+  onYearClick?: (year: string) => void;
+  selectedYear?: string | null;
+}) {
   const colors = useChartColors();
+  const chartRef = useRef<ChartJS<"line">>(null);
+
+  const handleClick = useCallback(
+    (_event: ChartEvent, elements: ActiveElement[]) => {
+      if (!onYearClick || elements.length === 0) return;
+      const index = elements[0].index;
+      const year = data[index]?.name;
+      if (year) onYearClick(year);
+    },
+    [onYearClick, data],
+  );
+
+  const barBackgrounds = useMemo(
+    () =>
+      data.map((d) =>
+        selectedYear && d.name !== selectedYear ? colors.chart1 + "40" : colors.chart1,
+      ),
+    [data, selectedYear, colors.chart1],
+  );
 
   const chartData = useMemo(
     () => ({
@@ -51,7 +82,7 @@ function BudgetPerYearChart({ data }: { data: BudgetYearItem[] }) {
           type: "bar" as const,
           label: "Per år",
           data: data.map((d) => d.amount),
-          backgroundColor: colors.chart1,
+          backgroundColor: barBackgrounds,
           borderRadius: 4,
           barPercentage: 0.7,
           order: 2,
@@ -72,7 +103,7 @@ function BudgetPerYearChart({ data }: { data: BudgetYearItem[] }) {
         },
       ],
     }),
-    [data, colors],
+    [data, colors, barBackgrounds],
   );
 
   const options = useMemo(
@@ -80,6 +111,7 @@ function BudgetPerYearChart({ data }: { data: BudgetYearItem[] }) {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: "index" as const, intersect: false },
+      onClick: handleClick,
       plugins: {
         legend: {
           position: "bottom" as const,
@@ -104,12 +136,13 @@ function BudgetPerYearChart({ data }: { data: BudgetYearItem[] }) {
       },
       scales: sharedScaleOptions(colors),
     }),
-    [colors],
+    [colors, handleClick],
   );
 
   return (
     <div className="h-[300px] w-full">
       <Line
+        ref={chartRef}
         data={chartData as Parameters<typeof Line>[0]["data"]}
         options={options}
       />
@@ -117,14 +150,36 @@ function BudgetPerYearChart({ data }: { data: BudgetYearItem[] }) {
   );
 }
 
-function CategoryBarChart({
+function BudgetPerDistrictChart({
   data,
   color,
+  onDistrictClick,
+  selectedDistrict,
 }: {
   data: BudgetCategoryItem[];
   color: string;
+  onDistrictClick?: (district: string) => void;
+  selectedDistrict?: string | null;
 }) {
   const colors = useChartColors();
+
+  const handleClick = useCallback(
+    (_event: ChartEvent, elements: ActiveElement[]) => {
+      if (!onDistrictClick || elements.length === 0) return;
+      const index = elements[0].index;
+      const district = data[index]?.name;
+      if (district) onDistrictClick(district);
+    },
+    [onDistrictClick, data],
+  );
+
+  const backgroundColors = useMemo(
+    () =>
+      data.map((d) =>
+        selectedDistrict && d.name !== selectedDistrict ? color + "40" : color,
+      ),
+    [data, selectedDistrict, color],
+  );
 
   const chartData = useMemo(
     () => ({
@@ -133,13 +188,13 @@ function CategoryBarChart({
         {
           label: "Budget",
           data: data.map((d) => d.amount),
-          backgroundColor: color,
+          backgroundColor: backgroundColors,
           borderRadius: 4,
           barPercentage: 0.7,
         },
       ],
     }),
-    [data, color],
+    [data, backgroundColors],
   );
 
   const options = useMemo(
@@ -147,6 +202,7 @@ function CategoryBarChart({
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: "index" as const, intersect: false },
+      onClick: handleClick,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -159,7 +215,7 @@ function CategoryBarChart({
       },
       scales: sharedScaleOptions(colors),
     }),
-    [colors],
+    [colors, handleClick],
   );
 
   return (
@@ -173,7 +229,10 @@ export function BudgetOverview({
   totalBudget,
   budgetCumulative,
   budgetPerDistrikt,
-  budgetPerTyp,
+  onYearClick,
+  selectedYear,
+  onDistrictClick,
+  selectedDistrict,
 }: BudgetOverviewProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -203,7 +262,7 @@ export function BudgetOverview({
             {budgetCumulative.length === 0 ? (
               <EmptyBudget />
             ) : (
-              <BudgetPerYearChart data={budgetCumulative} />
+              <BudgetPerYearChart data={budgetCumulative} onYearClick={onYearClick} selectedYear={selectedYear} />
             )}
           </CardContent>
         </Card>
@@ -219,28 +278,11 @@ export function BudgetOverview({
             {budgetPerDistrikt.length === 0 ? (
               <EmptyBudget />
             ) : (
-              <CategoryBarChart
+              <BudgetPerDistrictChart
                 data={budgetPerDistrikt}
                 color={colors.chart2}
-              />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Budget per type */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Budget per hisstyp (tkr)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {budgetPerTyp.length === 0 ? (
-              <EmptyBudget />
-            ) : (
-              <CategoryBarChart
-                data={budgetPerTyp}
-                color={colors.chart3}
+                onDistrictClick={onDistrictClick}
+                selectedDistrict={selectedDistrict}
               />
             )}
           </CardContent>

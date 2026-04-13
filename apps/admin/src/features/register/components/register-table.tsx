@@ -174,6 +174,7 @@ export function RegisterTable({
     columns,
     manualSorting: true,
     manualPagination: true,
+    columnResizeMode: "onChange",
     pageCount: totalPages,
     rowCount: totalCount,
     state: {
@@ -207,6 +208,7 @@ export function RegisterTable({
       table={table}
       recordCount={totalCount}
       isLoading={isLoading}
+      tableLayout={{ width: "fixed", columnsResizable: true }}
       onRowClick={(row) => navigate({ to: "/hiss/$id", params: { id: row.id } })}
       emptyMessage={
         <div className="flex flex-col items-center gap-2 text-muted-foreground">

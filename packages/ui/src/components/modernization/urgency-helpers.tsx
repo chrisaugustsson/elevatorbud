@@ -2,18 +2,26 @@ import { Badge } from "../ui/badge";
 
 const currentYear = new Date().getFullYear();
 
+export type PeriodKey = "akut" | "2-4" | "5-9" | "10+";
+
 export type TimelinePeriod = {
+  key: PeriodKey;
   label: string;
   yearFrom: number;
   yearTo: number;
 };
 
 export const PERIODS: TimelinePeriod[] = [
-  { label: "Akut (≤1 år)", yearFrom: 0, yearTo: currentYear + 1 },
-  { label: "2-4 år", yearFrom: currentYear + 2, yearTo: currentYear + 4 },
-  { label: "5-9 år", yearFrom: currentYear + 5, yearTo: currentYear + 9 },
-  { label: "10+ år", yearFrom: currentYear + 10, yearTo: 2099 },
+  { key: "akut", label: "Akut (≤1 år)", yearFrom: 0, yearTo: currentYear + 1 },
+  { key: "2-4", label: "2-4 år", yearFrom: currentYear + 2, yearTo: currentYear + 4 },
+  { key: "5-9", label: "5-9 år", yearFrom: currentYear + 5, yearTo: currentYear + 9 },
+  { key: "10+", label: "10+ år", yearFrom: currentYear + 10, yearTo: 2099 },
 ];
+
+export function getPeriodByKey(key: string | undefined): TimelinePeriod | null {
+  if (!key) return null;
+  return PERIODS.find((p) => p.key === key) ?? null;
+}
 
 export function getUrgencyColor(year: number): string {
   const diff = year - currentYear;

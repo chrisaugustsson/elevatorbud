@@ -83,6 +83,7 @@ function Meddelanden() {
 
   const columns = [
     columnHelper.accessor("status", {
+      size: 110,
       header: ({ column }) => (
         <DataGridColumnHeader title="Status" column={column} />
       ),
@@ -104,48 +105,65 @@ function Meddelanden() {
       },
     }),
     columnHelper.accessor("name", {
+      size: 160,
       header: ({ column }) => (
         <DataGridColumnHeader title="Namn" column={column} />
       ),
       cell: (info) => <span className="font-medium">{info.getValue()}</span>,
     }),
     columnHelper.accessor("email", {
+      size: 220,
       header: ({ column }) => (
         <DataGridColumnHeader title="E-post" column={column} />
       ),
       enableSorting: false,
     }),
     columnHelper.accessor("phone", {
+      size: 140,
       header: ({ column }) => (
         <DataGridColumnHeader title="Telefon" column={column} />
       ),
       enableSorting: false,
-      cell: (info) => info.getValue() || "—",
+      cell: (info) => (
+        <span className="tabular-nums">{info.getValue() || "—"}</span>
+      ),
     }),
     columnHelper.accessor("message", {
+      size: 280,
       header: ({ column }) => (
         <DataGridColumnHeader title="Meddelande" column={column} />
       ),
       enableSorting: false,
-      cell: (info) => (
-        <span className="line-clamp-1 max-w-xs">{info.getValue()}</span>
-      ),
+      cell: (info) => {
+        const v = info.getValue();
+        return (
+          <span title={v} className="block truncate">
+            {v}
+          </span>
+        );
+      },
     }),
     columnHelper.accessor("createdAt", {
+      size: 160,
       header: ({ column }) => (
         <DataGridColumnHeader title="Datum" column={column} />
       ),
-      cell: (info) =>
-        new Date(info.getValue()).toLocaleDateString("sv-SE", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+      cell: (info) => (
+        <span className="tabular-nums">
+          {new Date(info.getValue()).toLocaleDateString("sv-SE", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+      ),
     }),
     columnHelper.display({
       id: "actions",
+      size: 60,
+      enableResizing: false,
       header: "",
       cell: (info) => {
         const row = info.row.original;
@@ -176,6 +194,7 @@ function Meddelanden() {
   const table = useReactTable({
     data: submissions,
     columns,
+    columnResizeMode: "onChange",
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -216,7 +235,11 @@ function Meddelanden() {
         </p>
       </div>
 
-      <DataGrid table={table} recordCount={submissions.length}>
+      <DataGrid
+        table={table}
+        recordCount={submissions.length}
+        tableLayout={{ width: "fixed", columnsResizable: true }}
+      >
         <DataGridContainer>
           <div className="overflow-x-auto">
             <DataGridTable />
