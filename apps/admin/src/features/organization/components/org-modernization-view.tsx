@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useSuspenseQuery, useQuery, keepPreviousData } from "@tanstack/react-query";
 import { timelineOptions, budgetOptions, priorityListOptions } from "~/server/modernization";
 import {
   PERIODS,
@@ -19,26 +19,69 @@ export function OrgModernizationView({
   const [selectedPeriod, setSelectedPeriod] = useState<TimelinePeriod | null>(
     null,
   );
+  const [selectedYear, setSelectedYear] = useState<string | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+  const priorityListRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setPage(0);
+  }, [selectedPeriod, selectedYear, selectedDistrict]);
+
+  const scrollToPriorityList = useCallback(() => {
+    setTimeout(() => {
+      priorityListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }, []);
+
+  const handleYearClick = useCallback((year: string) => {
+    setSelectedYear((prev) => (prev === year ? null : year));
+    setSelectedPeriod(null);
+    scrollToPriorityList();
+  }, [scrollToPriorityList]);
+
+  const handlePeriodSelect = useCallback((period: TimelinePeriod | null) => {
+    setSelectedPeriod(period);
+    setSelectedYear(null);
+  }, []);
+
+  const handleDistrictClick = useCallback((district: string) => {
+    setSelectedDistrict((prev) => (prev === district ? null : district));
+    scrollToPriorityList();
+  }, [scrollToPriorityList]);
 
   const { data: tidslinje } = useSuspenseQuery(timelineOptions(organizationId));
 
   const { data: budget } = useSuspenseQuery(budgetOptions(organizationId));
 
   const prioritetslistaArgs = useMemo(() => {
-    const base = { organizationId, page: 1, pageSize: 50 };
-    if (selectedPeriod) {
-      return {
-        ...base,
-        yearFrom: selectedPeriod.yearFrom,
-        yearTo: selectedPeriod.yearTo,
-      };
+    const base: {
+      organizationId: string;
+      page: number;
+      pageSize: number;
+      yearFrom?: number;
+      yearTo?: number;
+      district?: string;
+    } = { organizationId, page: page + 1, pageSize };
+    if (selectedYear) {
+      const y = parseInt(selectedYear, 10);
+      base.yearFrom = y;
+      base.yearTo = y;
+    } else if (selectedPeriod) {
+      base.yearFrom = selectedPeriod.yearFrom;
+      base.yearTo = selectedPeriod.yearTo;
+    }
+    if (selectedDistrict) {
+      base.district = selectedDistrict;
     }
     return base;
-  }, [organizationId, selectedPeriod]);
+  }, [organizationId, selectedPeriod, selectedYear, selectedDistrict, page, pageSize]);
 
-  const { data: prioritetslistaResult } = useSuspenseQuery(priorityListOptions(prioritetslistaArgs));
-
-  const prioritetslista = prioritetslistaResult.items;
+  const { data: prioritetslistaResult, isLoading } = useQuery({
+    ...priorityListOptions(prioritetslistaArgs),
+    placeholderData: keepPreviousData,
+  });
 
   const tidslinjeData = tidslinje.map((t) => ({
     name: t.year,
@@ -56,17 +99,13 @@ export function OrgModernizationView({
     return { ...p, count };
   });
 
-  // Group flat budget array by year, district, and type
+  // Group flat budget array by year and district
   const byYearMap = new Map<string, number>();
   const byDistrictMap = new Map<string, number>();
-  const byTypeMap = new Map<string, number>();
   for (const b of budget) {
     byYearMap.set(b.year, (byYearMap.get(b.year) ?? 0) + b.totalBudget);
     if (b.district) {
       byDistrictMap.set(b.district, (byDistrictMap.get(b.district) ?? 0) + b.totalBudget);
-    }
-    if (b.elevatorType) {
-      byTypeMap.set(b.elevatorType, (byTypeMap.get(b.elevatorType) ?? 0) + b.totalBudget);
     }
   }
 
@@ -90,40 +129,54 @@ export function OrgModernizationView({
       belopp: Math.round(amount / 1000),
     }));
 
-  const budgetPerTyp = Array.from(byTypeMap.entries())
-    .sort(([, a], [, b]) => b - a)
-    .map(([name, amount]) => ({
-      name,
-      belopp: Math.round(amount / 1000),
-    }));
-
   const totalBudget = Array.from(byYearMap.values()).reduce(
     (sum, amount) => sum + amount,
     0,
   );
+
+  const totalCount = prioritetslistaResult?.total ?? 0;
+  const totalPages = prioritetslistaResult
+    ? Math.ceil(prioritetslistaResult.total / prioritetslistaResult.pageSize)
+    : 0;
 
   return (
     <div className="space-y-6 overflow-x-hidden">
       <PeriodSummaryCards
         periods={periodSummary}
         selectedPeriod={selectedPeriod}
-        onSelectPeriod={setSelectedPeriod}
+        onSelectPeriod={handlePeriodSelect}
       />
 
-      <TimelineChart data={tidslinjeData} />
+      <TimelineChart data={tidslinjeData} onYearClick={handleYearClick} selectedYear={selectedYear} />
 
       <BudgetOverview
         totalBudget={totalBudget}
         budgetCumulative={budgetCumulative}
         budgetPerDistrikt={budgetPerDistrikt}
-        budgetPerTyp={budgetPerTyp}
+        onYearClick={handleYearClick}
+        selectedYear={selectedYear}
+        onDistrictClick={handleDistrictClick}
+        selectedDistrict={selectedDistrict}
       />
 
-      <PriorityList
-        elevators={prioritetslista}
-        selectedPeriod={selectedPeriod}
-        onClearPeriod={() => setSelectedPeriod(null)}
-      />
+      <div ref={priorityListRef}>
+        <PriorityList
+          elevators={prioritetslistaResult?.items ?? []}
+          selectedPeriod={selectedPeriod}
+          selectedYear={selectedYear}
+          selectedDistrict={selectedDistrict}
+          onClearPeriod={() => setSelectedPeriod(null)}
+          onClearYear={() => setSelectedYear(null)}
+          onClearDistrict={() => setSelectedDistrict(null)}
+          totalCount={totalCount}
+          totalPages={totalPages}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          isLoading={isLoading}
+        />
+      </div>
     </div>
   );
 }

@@ -179,14 +179,17 @@ function Anvandare() {
 
   const columns = [
     columnHelper.accessor("name", {
+      size: 180,
       header: ({ column }) => <DataGridColumnHeader title="Namn" column={column} />,
       cell: (info) => <span className="font-medium">{info.getValue()}</span>,
     }),
     columnHelper.accessor("email", {
+      size: 220,
       header: ({ column }) => <DataGridColumnHeader title="E-post" column={column} />,
       enableSorting: false,
     }),
     columnHelper.accessor("role", {
+      size: 90,
       header: ({ column }) => <DataGridColumnHeader title="Roll" column={column} />,
       enableSorting: false,
       cell: (info) => (
@@ -196,6 +199,7 @@ function Anvandare() {
       ),
     }),
     columnHelper.accessor("organizationId", {
+      size: 180,
       header: ({ column }) => <DataGridColumnHeader title="Organisation" column={column} />,
       enableSorting: false,
       cell: (info) => {
@@ -204,6 +208,7 @@ function Anvandare() {
       },
     }),
     columnHelper.accessor("active", {
+      size: 100,
       header: ({ column }) => <DataGridColumnHeader title="Status" column={column} />,
       enableSorting: false,
       cell: (info) => (
@@ -213,16 +218,23 @@ function Anvandare() {
       ),
     }),
     columnHelper.accessor("lastLogin", {
+      size: 160,
       header: ({ column }) => <DataGridColumnHeader title="Senaste inloggning" column={column} />,
       enableSorting: false,
       cell: (info) => {
         const val = info.getValue();
         if (!val) return "—";
-        return new Date(val).toLocaleDateString("sv-SE");
+        return (
+          <span className="tabular-nums">
+            {new Date(val).toLocaleDateString("sv-SE")}
+          </span>
+        );
       },
     }),
     columnHelper.display({
       id: "actions",
+      size: 90,
+      enableResizing: false,
       header: "",
       cell: (info) => {
         const row = info.row.original;
@@ -284,6 +296,7 @@ function Anvandare() {
   const table = useReactTable({
     data: users,
     columns,
+    columnResizeMode: "onChange",
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -340,7 +353,11 @@ function Anvandare() {
         </p>
       </div>
 
-      <DataGrid table={table} recordCount={users.length}>
+      <DataGrid
+        table={table}
+        recordCount={users.length}
+        tableLayout={{ width: "fixed", columnsResizable: true }}
+      >
         <DataGridContainer>
           <div className="overflow-x-auto">
             <DataGridTable />

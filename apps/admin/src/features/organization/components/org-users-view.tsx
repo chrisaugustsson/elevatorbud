@@ -113,18 +113,21 @@ export function OrgUsersView({
 
   const columns = [
     columnHelper.accessor("name", {
+      size: 200,
       header: ({ column }) => (
         <DataGridColumnHeader title="Namn" column={column} />
       ),
       cell: (info) => <span className="font-medium">{info.getValue()}</span>,
     }),
     columnHelper.accessor("email", {
+      size: 240,
       header: ({ column }) => (
         <DataGridColumnHeader title="E-post" column={column} />
       ),
       enableSorting: false,
     }),
     columnHelper.accessor("role", {
+      size: 100,
       header: ({ column }) => (
         <DataGridColumnHeader title="Roll" column={column} />
       ),
@@ -136,6 +139,7 @@ export function OrgUsersView({
       ),
     }),
     columnHelper.accessor("active", {
+      size: 100,
       header: ({ column }) => (
         <DataGridColumnHeader title="Status" column={column} />
       ),
@@ -147,6 +151,7 @@ export function OrgUsersView({
       ),
     }),
     columnHelper.accessor("lastLogin", {
+      size: 160,
       header: ({ column }) => (
         <DataGridColumnHeader title="Senaste inloggning" column={column} />
       ),
@@ -154,11 +159,17 @@ export function OrgUsersView({
       cell: (info) => {
         const val = info.getValue();
         if (!val) return "—";
-        return new Date(val).toLocaleDateString("sv-SE");
+        return (
+          <span className="tabular-nums">
+            {new Date(val).toLocaleDateString("sv-SE")}
+          </span>
+        );
       },
     }),
     columnHelper.display({
       id: "actions",
+      size: 90,
+      enableResizing: false,
       header: "",
       cell: (info) => {
         const row = info.row.original;
@@ -215,6 +226,7 @@ export function OrgUsersView({
   const table = useReactTable({
     data: users,
     columns,
+    columnResizeMode: "onChange",
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -238,6 +250,7 @@ export function OrgUsersView({
       <DataGrid
         table={table}
         recordCount={users.length}
+        tableLayout={{ width: "fixed", columnsResizable: true }}
         emptyMessage={
           <div className="flex flex-col items-center gap-2 text-muted-foreground">
             <Users className="size-8" />

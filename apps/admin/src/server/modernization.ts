@@ -13,6 +13,7 @@ const priorityListInput = z.object({
   organizationId: z.string().uuid().optional(),
   yearFrom: z.number().optional(),
   yearTo: z.number().optional(),
+  district: z.string().optional(),
   page: z.number().min(1).default(1),
   pageSize: z.number().min(1).max(200).default(50),
 });
@@ -97,7 +98,13 @@ async function budget(db: Database, organizationId: string | undefined) {
 async function priorityList(
   db: Database,
   organizationId: string | undefined,
-  input: { yearFrom?: number; yearTo?: number; page: number; pageSize: number },
+  input: {
+    yearFrom?: number;
+    yearTo?: number;
+    district?: string;
+    page: number;
+    pageSize: number;
+  },
 ) {
   const orgFilter = organizationId
     ? sql`AND e.organization_id = ${organizationId}`
@@ -105,12 +112,16 @@ async function priorityList(
 
   const yearFilter =
     input.yearFrom && input.yearTo
-      ? sql`AND lb.recommended_modernization_year ~ '^\d+$' AND lb.recommended_modernization_year::int BETWEEN ${input.yearFrom} AND ${input.yearTo}`
+      ? sql`AND lb.recommended_modernization_year ~ '^[0-9]+$' AND lb.recommended_modernization_year::int BETWEEN ${input.yearFrom} AND ${input.yearTo}`
       : input.yearFrom
-        ? sql`AND lb.recommended_modernization_year ~ '^\d+$' AND lb.recommended_modernization_year::int >= ${input.yearFrom}`
+        ? sql`AND lb.recommended_modernization_year ~ '^[0-9]+$' AND lb.recommended_modernization_year::int >= ${input.yearFrom}`
         : input.yearTo
-          ? sql`AND lb.recommended_modernization_year ~ '^\d+$' AND lb.recommended_modernization_year::int <= ${input.yearTo}`
+          ? sql`AND lb.recommended_modernization_year ~ '^[0-9]+$' AND lb.recommended_modernization_year::int <= ${input.yearTo}`
           : sql``;
+
+  const districtFilter = input.district
+    ? sql`AND e.district = ${input.district}`
+    : sql``;
 
   const offset = (input.page - 1) * input.pageSize;
 
@@ -133,6 +144,7 @@ async function priorityList(
       WHERE e.status = 'active' ${orgFilter}
         AND lb.recommended_modernization_year IS NOT NULL
         ${yearFilter}
+        ${districtFilter}
       ORDER BY lb.recommended_modernization_year, e.elevator_number
       LIMIT ${input.pageSize} OFFSET ${offset}
     `),
@@ -149,6 +161,7 @@ async function priorityList(
       WHERE e.status = 'active' ${orgFilter}
         AND lb.recommended_modernization_year IS NOT NULL
         ${yearFilter}
+        ${districtFilter}
     `),
   ]);
 
@@ -226,6 +239,7 @@ export const getPriorityList = createServerFn({ method: "POST" })
     return priorityList(context.db, data.organizationId, {
       yearFrom: data.yearFrom,
       yearTo: data.yearTo,
+      district: data.district,
       page: data.page,
       pageSize: data.pageSize,
     });

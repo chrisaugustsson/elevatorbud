@@ -200,10 +200,12 @@ function Referensdata() {
   const columns = useMemo(
     () => [
       columnHelper.accessor("value", {
+        size: 320,
         header: ({ column }) => <DataGridColumnHeader title="Värde" column={column} />,
         cell: (info) => <span className="font-medium">{info.getValue()}</span>,
       }),
       columnHelper.accessor("active", {
+        size: 120,
         header: ({ column }) => <DataGridColumnHeader title="Status" column={column} />,
         enableSorting: false,
         cell: (info) => (
@@ -214,6 +216,8 @@ function Referensdata() {
       }),
       columnHelper.display({
         id: "actions",
+        size: 60,
+        enableResizing: false,
         header: "",
         cell: (info) => {
           const row = info.row.original;
@@ -273,6 +277,7 @@ function Referensdata() {
   const table = useReactTable({
     data: filteredValues,
     columns,
+    columnResizeMode: "onChange",
     state: { sorting },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -332,6 +337,7 @@ function Referensdata() {
       <DataGrid
         table={table}
         recordCount={filteredValues.length}
+        tableLayout={{ width: "fixed", columnsResizable: true }}
       >
         <DataGridContainer>
           <div className="overflow-x-auto">

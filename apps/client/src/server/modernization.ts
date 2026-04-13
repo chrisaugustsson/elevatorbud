@@ -96,6 +96,7 @@ export const getPriorityList = createServerFn()
     z.object({
       yearFrom: z.number().optional(),
       yearTo: z.number().optional(),
+      district: z.string().optional(),
       page: z.number().optional(),
       pageSize: z.number().optional(),
     }),
@@ -108,12 +109,16 @@ export const getPriorityList = createServerFn()
 
     const yearFilter =
       data.yearFrom && data.yearTo
-        ? sql`AND lb.recommended_modernization_year ~ '^\d+$' AND lb.recommended_modernization_year::int BETWEEN ${data.yearFrom} AND ${data.yearTo}`
+        ? sql`AND lb.recommended_modernization_year ~ '^[0-9]+$' AND lb.recommended_modernization_year::int BETWEEN ${data.yearFrom} AND ${data.yearTo}`
         : data.yearFrom
-          ? sql`AND lb.recommended_modernization_year ~ '^\d+$' AND lb.recommended_modernization_year::int >= ${data.yearFrom}`
+          ? sql`AND lb.recommended_modernization_year ~ '^[0-9]+$' AND lb.recommended_modernization_year::int >= ${data.yearFrom}`
           : data.yearTo
-            ? sql`AND lb.recommended_modernization_year ~ '^\d+$' AND lb.recommended_modernization_year::int <= ${data.yearTo}`
+            ? sql`AND lb.recommended_modernization_year ~ '^[0-9]+$' AND lb.recommended_modernization_year::int <= ${data.yearTo}`
             : sql``;
+
+    const districtFilter = data.district
+      ? sql`AND e.district = ${data.district}`
+      : sql``;
 
     const [items, countResult] = await Promise.all([
       context.db.execute(sql`
@@ -135,6 +140,7 @@ export const getPriorityList = createServerFn()
           AND e.organization_id = ${orgId}
           AND lb.recommended_modernization_year IS NOT NULL
           ${yearFilter}
+          ${districtFilter}
         ORDER BY lb.recommended_modernization_year, e.elevator_number
         LIMIT ${pageSize} OFFSET ${offset}
       `),
@@ -152,6 +158,7 @@ export const getPriorityList = createServerFn()
           AND e.organization_id = ${orgId}
           AND lb.recommended_modernization_year IS NOT NULL
           ${yearFilter}
+          ${districtFilter}
       `),
     ]);
 
@@ -195,6 +202,7 @@ export const getPriorityList = createServerFn()
 export const priorityListOptions = (filters?: {
   yearFrom?: number;
   yearTo?: number;
+  district?: string;
   page?: number;
   pageSize?: number;
 }) =>

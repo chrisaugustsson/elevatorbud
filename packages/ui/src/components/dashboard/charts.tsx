@@ -1,6 +1,7 @@
 "use client";
 import * as React from "react";
 import { Bar, Doughnut } from "react-chartjs-2";
+import type { ChartEvent, ActiveElement } from "chart.js";
 import {
   useChartColors,
   sharedScaleOptions,
@@ -62,11 +63,13 @@ export function DashboardBarChart({
   data,
   color,
   className,
+  onBarClick,
 }: {
   title: string;
   data: ChartDataPoint[];
   color?: string;
   className?: string;
+  onBarClick?: (label: string, index: number) => void;
 }) {
   const colors = useChartColors();
   const palette = React.useMemo(() => buildPalette(colors), [colors]);
@@ -95,6 +98,22 @@ export function DashboardBarChart({
         mode: "index" as const,
         intersect: false,
       },
+      onClick: onBarClick
+        ? (_event: ChartEvent, elements: ActiveElement[]) => {
+            if (elements.length === 0) return;
+            const idx = elements[0].index;
+            const label = data[idx]?.label;
+            if (label !== undefined) onBarClick(label, idx);
+          }
+        : undefined,
+      onHover: onBarClick
+        ? (event: ChartEvent, elements: ActiveElement[]) => {
+            const target = event.native?.target as HTMLElement | null;
+            if (target) {
+              target.style.cursor = elements.length > 0 ? "pointer" : "default";
+            }
+          }
+        : undefined,
       scales: sharedScaleOptions(colors),
       plugins: {
         legend: { display: false },
@@ -107,7 +126,7 @@ export function DashboardBarChart({
         },
       },
     }),
-    [colors],
+    [colors, onBarClick, data],
   );
 
   return (
@@ -122,11 +141,13 @@ export function DashboardPieChart({
   data,
   className,
   innerRadius,
+  onSliceClick,
 }: {
   title: string;
   data: ChartDataPoint[];
   className?: string;
   innerRadius?: number;
+  onSliceClick?: (label: string, index: number) => void;
 }) {
   const colors = useChartColors();
   const palette = React.useMemo(() => buildPalette(colors), [colors]);
@@ -162,6 +183,22 @@ export function DashboardPieChart({
       responsive: true,
       maintainAspectRatio: false,
       cutout,
+      onClick: onSliceClick
+        ? (_event: ChartEvent, elements: ActiveElement[]) => {
+            if (elements.length === 0) return;
+            const idx = elements[0].index;
+            const label = data[idx]?.label;
+            if (label !== undefined) onSliceClick(label, idx);
+          }
+        : undefined,
+      onHover: onSliceClick
+        ? (event: ChartEvent, elements: ActiveElement[]) => {
+            const target = event.native?.target as HTMLElement | null;
+            if (target) {
+              target.style.cursor = elements.length > 0 ? "pointer" : "default";
+            }
+          }
+        : undefined,
       plugins: {
         legend: {
           position: "bottom" as const,
@@ -190,7 +227,7 @@ export function DashboardPieChart({
         },
       },
     }),
-    [colors, cutout],
+    [colors, cutout, onSliceClick, data],
   );
 
   return (

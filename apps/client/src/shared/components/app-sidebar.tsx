@@ -17,7 +17,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@elevatorbud/ui/components/ui/sidebar";
-import { UserButton } from "@elevatorbud/auth";
+import { UserMenu } from "./user-menu";
 
 const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: BarChart3 },
@@ -68,9 +68,11 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className="flex items-center gap-2 px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-          <UserButton />
-        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <UserMenu />
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

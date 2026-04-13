@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   useSuspenseQuery,
   useQuery,
@@ -14,7 +14,85 @@ import { RegisterToolbar } from "~/features/register/components/register-toolbar
 import { RegisterFilters } from "~/features/register/components/register-filters";
 import { RegisterTable } from "~/features/register/components/register-table";
 
+type SortField =
+  | "elevatorNumber"
+  | "address"
+  | "district"
+  | "elevatorType"
+  | "manufacturer"
+  | "buildYear"
+  | "maintenanceCompany"
+  | "inspectionMonth"
+  | "recommendedModernizationYear"
+  | "budgetAmount";
+
+const VALID_SORT_FIELDS: SortField[] = [
+  "elevatorNumber",
+  "address",
+  "district",
+  "elevatorType",
+  "manufacturer",
+  "buildYear",
+  "maintenanceCompany",
+  "inspectionMonth",
+  "recommendedModernizationYear",
+  "budgetAmount",
+];
+
+const VALID_STATUSES = ["active", "demolished", "archived", "all"];
+
+type RegisterSearch = {
+  search?: string;
+  district?: string[];
+  elevatorType?: string[];
+  manufacturer?: string[];
+  maintenanceCompany?: string[];
+  buildYearMin?: number;
+  buildYearMax?: number;
+  status?: string;
+  sortBy?: SortField;
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
+};
+
+function parseStringArray(value: unknown): string[] | undefined {
+  if (Array.isArray(value)) {
+    const arr = value.filter((v): v is string => typeof v === "string" && v.length > 0);
+    return arr.length > 0 ? arr : undefined;
+  }
+  if (typeof value === "string" && value.length > 0) return [value];
+  return undefined;
+}
+
 export const Route = createFileRoute("/_authenticated/register")({
+  validateSearch: (search: Record<string, unknown>): RegisterSearch => ({
+    search: typeof search.search === "string" && search.search ? search.search : undefined,
+    district: parseStringArray(search.district),
+    elevatorType: parseStringArray(search.elevatorType),
+    manufacturer: parseStringArray(search.manufacturer),
+    maintenanceCompany: parseStringArray(search.maintenanceCompany),
+    buildYearMin:
+      typeof search.buildYearMin === "number" ? search.buildYearMin : undefined,
+    buildYearMax:
+      typeof search.buildYearMax === "number" ? search.buildYearMax : undefined,
+    status:
+      typeof search.status === "string" && VALID_STATUSES.includes(search.status)
+        ? search.status
+        : undefined,
+    sortBy: VALID_SORT_FIELDS.includes(search.sortBy as SortField)
+      ? (search.sortBy as SortField)
+      : undefined,
+    sortOrder:
+      search.sortOrder === "asc" || search.sortOrder === "desc"
+        ? search.sortOrder
+        : undefined,
+    page: typeof search.page === "number" && search.page > 0 ? search.page : undefined,
+    pageSize:
+      typeof search.pageSize === "number" && [25, 50, 100].includes(search.pageSize)
+        ? search.pageSize
+        : undefined,
+  }),
   loader: ({ context }) => {
     context.queryClient.prefetchQuery(suggestedValuesOptions("district"));
     context.queryClient.prefetchQuery(suggestedValuesOptions("elevator_type"));
@@ -43,47 +121,161 @@ type ListResult = {
 };
 
 function Register() {
-  // Search state
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const searchParams = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
 
-  // Sort state (server-side)
-  const [sorting, setSorting] = useState<SortingState>([]);
+  // Derived state from URL
+  const debouncedSearch = searchParams.search ?? "";
+  const filterDistrict = useMemo(() => searchParams.district ?? [], [searchParams.district]);
+  const filterElevatorType = useMemo(
+    () => searchParams.elevatorType ?? [],
+    [searchParams.elevatorType],
+  );
+  const filterManufacturer = useMemo(
+    () => searchParams.manufacturer ?? [],
+    [searchParams.manufacturer],
+  );
+  const filterMaintenanceCompany = useMemo(
+    () => searchParams.maintenanceCompany ?? [],
+    [searchParams.maintenanceCompany],
+  );
+  const buildYearMin = searchParams.buildYearMin?.toString() ?? "";
+  const buildYearMax = searchParams.buildYearMax?.toString() ?? "";
+  const statusFilter = searchParams.status ?? "active";
+  const page = (searchParams.page ?? 1) - 1;
+  const limit = searchParams.pageSize ?? 25;
 
-  // Pagination state
-  const [page, setPage] = useState(0);
-  const [limit, setLimit] = useState(25);
+  const sorting: SortingState = useMemo(
+    () =>
+      searchParams.sortBy
+        ? [{ id: searchParams.sortBy, desc: searchParams.sortOrder === "desc" }]
+        : [],
+    [searchParams.sortBy, searchParams.sortOrder],
+  );
 
-  // Multi-select filter state
-  const [filterDistrict, setFilterDistrict] = useState<string[]>([]);
-  const [filterElevatorType, setFilterElevatorType] = useState<string[]>([]);
-  const [filterManufacturer, setFilterManufacturer] = useState<string[]>([]);
+  // Local-only state for the search input (so typing doesn't spam URL)
+  const [search, setSearch] = useState(debouncedSearch);
 
-  // Status filter
-  const [statusFilter, setStatusFilter] = useState<string>("active");
-
-  // Range filter
-  const [buildYearMin, setBuildYearMin] = useState("");
-  const [buildYearMax, setBuildYearMax] = useState("");
-
-  // Debounce search
+  // Debounce search → URL
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    const timer = setTimeout(() => {
+      if (search !== debouncedSearch) {
+        navigate({
+          search: (prev) => {
+            const merged = { ...prev, search: search || undefined, page: undefined };
+            if (!merged.search) delete merged.search;
+            if (!merged.page) delete merged.page;
+            return merged;
+          },
+          replace: true,
+          resetScroll: false,
+        });
+      }
+    }, 300);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
-  // Reset page when filters change
+  // Sync URL search back into local input when cleared externally
   useEffect(() => {
-    setPage(0);
-  }, [
-    debouncedSearch,
-    filterDistrict,
-    filterElevatorType,
-    filterManufacturer,
-    buildYearMin,
-    buildYearMax,
-    statusFilter,
-  ]);
+    if (debouncedSearch !== search && debouncedSearch === "") {
+      setSearch("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  const updateSearch = useCallback(
+    (next: Partial<RegisterSearch>) => {
+      navigate({
+        search: (prev) => {
+          const merged = { ...prev, ...next } as RegisterSearch;
+          if (!merged.search) delete merged.search;
+          if (!merged.district || merged.district.length === 0) delete merged.district;
+          if (!merged.elevatorType || merged.elevatorType.length === 0)
+            delete merged.elevatorType;
+          if (!merged.manufacturer || merged.manufacturer.length === 0)
+            delete merged.manufacturer;
+          if (!merged.maintenanceCompany || merged.maintenanceCompany.length === 0)
+            delete merged.maintenanceCompany;
+          if (merged.buildYearMin === undefined) delete merged.buildYearMin;
+          if (merged.buildYearMax === undefined) delete merged.buildYearMax;
+          if (!merged.status || merged.status === "active") delete merged.status;
+          if (!merged.sortBy) delete merged.sortBy;
+          if (!merged.sortOrder) delete merged.sortOrder;
+          if (!merged.page || merged.page === 1) delete merged.page;
+          if (!merged.pageSize || merged.pageSize === 25) delete merged.pageSize;
+          return merged;
+        },
+        replace: true,
+        resetScroll: false,
+      });
+    },
+    [navigate],
+  );
+
+  const setFilterDistrict = useCallback(
+    (next: string[]) =>
+      updateSearch({
+        district: next.length > 0 ? next : undefined,
+        page: undefined,
+      }),
+    [updateSearch],
+  );
+  const setFilterElevatorType = useCallback(
+    (next: string[]) =>
+      updateSearch({
+        elevatorType: next.length > 0 ? next : undefined,
+        page: undefined,
+      }),
+    [updateSearch],
+  );
+  const setFilterManufacturer = useCallback(
+    (next: string[]) =>
+      updateSearch({
+        manufacturer: next.length > 0 ? next : undefined,
+        page: undefined,
+      }),
+    [updateSearch],
+  );
+  const setBuildYearMin = useCallback(
+    (val: string) => {
+      const n = val && !isNaN(parseInt(val)) ? parseInt(val) : undefined;
+      updateSearch({ buildYearMin: n, page: undefined });
+    },
+    [updateSearch],
+  );
+  const setBuildYearMax = useCallback(
+    (val: string) => {
+      const n = val && !isNaN(parseInt(val)) ? parseInt(val) : undefined;
+      updateSearch({ buildYearMax: n, page: undefined });
+    },
+    [updateSearch],
+  );
+  const setStatusFilter = useCallback(
+    (val: string) => updateSearch({ status: val, page: undefined }),
+    [updateSearch],
+  );
+  const setSorting = useCallback(
+    (next: SortingState) => {
+      if (next.length === 0) {
+        updateSearch({ sortBy: undefined, sortOrder: undefined });
+      } else {
+        updateSearch({
+          sortBy: next[0].id as SortField,
+          sortOrder: next[0].desc ? "desc" : "asc",
+        });
+      }
+    },
+    [updateSearch],
+  );
+  const setPage = useCallback(
+    (p: number) => updateSearch({ page: p + 1 }),
+    [updateSearch],
+  );
+  const setLimit = useCallback(
+    (s: number) => updateSearch({ pageSize: s, page: undefined }),
+    [updateSearch],
+  );
 
   // Get filter options from suggestedValues (one query per category)
   const { data: districtSuggestions } = useSuspenseQuery(suggestedValuesOptions("district"));
@@ -115,6 +307,9 @@ function Register() {
       : {}),
     ...(filterManufacturer.length > 0
       ? { manufacturer: filterManufacturer }
+      : {}),
+    ...(filterMaintenanceCompany.length > 0
+      ? { maintenanceCompany: filterMaintenanceCompany }
       : {}),
     ...(buildYearMin && !isNaN(parseInt(buildYearMin))
       ? { buildYearMin: parseInt(buildYearMin) }
@@ -167,17 +362,22 @@ function Register() {
     filterDistrict.length > 0 ||
     filterElevatorType.length > 0 ||
     filterManufacturer.length > 0 ||
+    filterMaintenanceCompany.length > 0 ||
     buildYearMin !== "" ||
     buildYearMax !== "" ||
     statusFilter !== "active";
 
   function clearAllFilters() {
-    setFilterDistrict([]);
-    setFilterElevatorType([]);
-    setFilterManufacturer([]);
-    setBuildYearMin("");
-    setBuildYearMax("");
-    setStatusFilter("active");
+    updateSearch({
+      district: undefined,
+      elevatorType: undefined,
+      manufacturer: undefined,
+      maintenanceCompany: undefined,
+      buildYearMin: undefined,
+      buildYearMax: undefined,
+      status: undefined,
+      page: undefined,
+    });
   }
 
   const totalCount = result?.total ?? 0;

@@ -12,6 +12,8 @@ const ThemeContext = React.createContext<ThemeContextValue | null>(null)
 
 const STORAGE_KEY = "elevatorbud-theme"
 
+export const themeInitScript = `(function(){try{var t=localStorage.getItem('${STORAGE_KEY}');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}if(t==='dark'){document.documentElement.classList.add('dark');}}catch(e){}})();`
+
 function getSystemTheme(): Theme {
   if (typeof window === "undefined") return "light"
   return window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -29,10 +31,15 @@ function applyTheme(theme: Theme) {
   root.classList.toggle("dark", theme === "dark")
 }
 
+function getInitialTheme(): Theme {
+  if (typeof document !== "undefined" && document.documentElement.classList.contains("dark")) {
+    return "dark"
+  }
+  return getStoredTheme() ?? getSystemTheme()
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = React.useState<Theme>(() => {
-    return getStoredTheme() ?? getSystemTheme()
-  })
+  const [theme, setThemeState] = React.useState<Theme>(getInitialTheme)
 
   React.useEffect(() => {
     applyTheme(theme)

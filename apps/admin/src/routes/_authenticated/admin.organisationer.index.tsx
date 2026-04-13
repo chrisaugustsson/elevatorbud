@@ -64,6 +64,7 @@ const columnHelper = createColumnHelper<Organisation>();
 
 const columns = [
   columnHelper.accessor("name", {
+    size: 220,
     header: ({ column }) => (
       <DataGridColumnHeader title="Namn" column={column} />
     ),
@@ -72,13 +73,17 @@ const columns = [
     ),
   }),
   columnHelper.accessor("organizationNumber", {
+    size: 140,
     header: ({ column }) => (
       <DataGridColumnHeader title="Org.nummer" column={column} />
     ),
     enableSorting: false,
-    cell: (info) => info.getValue() || "—",
+    cell: (info) => (
+      <span className="tabular-nums">{info.getValue() || "—"}</span>
+    ),
   }),
   columnHelper.accessor("contactPerson", {
+    size: 180,
     header: ({ column }) => (
       <DataGridColumnHeader title="Kontaktperson" column={column} />
     ),
@@ -86,6 +91,7 @@ const columns = [
     cell: (info) => info.getValue() || "—",
   }),
   columnHelper.accessor("email", {
+    size: 240,
     header: ({ column }) => (
       <DataGridColumnHeader title="E-post" column={column} />
     ),
@@ -125,6 +131,7 @@ function Organisationer() {
   const table = useReactTable({
     data: orgs,
     columns,
+    columnResizeMode: "onChange",
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
@@ -163,6 +170,7 @@ function Organisationer() {
       <DataGrid
         table={table}
         recordCount={orgs.length}
+        tableLayout={{ width: "fixed", columnsResizable: true }}
         onRowClick={(row) =>
           navigate({
             to: "/admin/organisationer/$id" as string,
