@@ -13,11 +13,13 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/migrate.ts",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:reset": "tsx src/reset-data.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.0",
     "drizzle-orm": "^0.44.2",
+    "esbuild": "^0.28.0",
     "pg": "^8.20.0"
   },
   "devDependencies": {
