@@ -22,15 +22,27 @@ export const organizations = pgTable("organizations", {
   contactPerson: text("contact_person"),
   phoneNumber: text("phone_number"),
   email: text("email"),
+  parentId: uuid("parent_id").references((): any => organizations.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
 
-export const organizationsRelations = relations(organizations, ({ many }) => ({
-  elevators: many(elevators),
-  users: many(users),
-}));
+export const organizationsRelations = relations(
+  organizations,
+  ({ one, many }) => ({
+    parent: one(organizations, {
+      fields: [organizations.parentId],
+      references: [organizations.id],
+      relationName: "parentChild",
+    }),
+    children: many(organizations, { relationName: "parentChild" }),
+    elevators: many(elevators),
+    users: many(users),
+  }),
+);
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 

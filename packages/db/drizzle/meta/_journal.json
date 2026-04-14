@@ -15,6 +15,13 @@
       "when": 1775502562944,
       "tag": "0001_daily_songbird",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776194146504,
+      "tag": "0002_steep_mentor",
+      "breakpoints": true
     }
   ]
 }
