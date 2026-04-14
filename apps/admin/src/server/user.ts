@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import { createClerkClient } from "@clerk/backend";
 import { users, userOrganizations, organizations } from "@elevatorbud/db/schema";
 import type { Database } from "@elevatorbud/db";
@@ -25,7 +25,7 @@ const listUsersSchema = z
 const updateUserSchema = z.object({
   id: z.string().uuid(),
   role: z.enum(["admin", "customer"]).optional(),
-  organizationId: z.string().uuid().nullable().optional(),
+  organizationIds: z.array(z.string().uuid()).optional(),
   active: z.boolean().optional(),
 });
 
@@ -33,7 +33,7 @@ const createUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
   role: z.enum(["admin", "customer"]).default("customer"),
-  organizationId: z.string().uuid().optional(),
+  organizationIds: z.array(z.string().uuid()).optional(),
 });
 
 type UserWithOrgs = typeof users.$inferSelect & {
@@ -89,7 +89,7 @@ async function updateUserFn(
   db: Database,
   input: z.infer<typeof updateUserSchema>,
 ) {
-  const { id, organizationId, ...data } = input;
+  const { id, organizationIds, ...data } = input;
 
   const [user] = await db
     .update(users)
@@ -97,16 +97,18 @@ async function updateUserFn(
     .where(eq(users.id, id))
     .returning();
 
-  if (organizationId !== undefined) {
+  if (organizationIds !== undefined) {
     await db
       .delete(userOrganizations)
       .where(eq(userOrganizations.userId, id));
 
-    if (organizationId) {
-      await db.insert(userOrganizations).values({
-        userId: id,
-        organizationId,
-      });
+    if (organizationIds.length > 0) {
+      await db.insert(userOrganizations).values(
+        organizationIds.map((orgId) => ({
+          userId: id,
+          organizationId: orgId,
+        })),
+      );
     }
   }
 
@@ -147,17 +149,19 @@ async function createUserFn(
     skipPasswordRequirement: true,
   });
 
-  const { organizationId, ...userFields } = input;
+  const { organizationIds, ...userFields } = input;
   const [user] = await db
     .insert(users)
     .values({ ...userFields, clerkUserId: clerkUser.id, active: true })
     .returning();
 
-  if (organizationId) {
-    await db.insert(userOrganizations).values({
-      userId: user.id,
-      organizationId,
-    });
+  if (organizationIds && organizationIds.length > 0) {
+    await db.insert(userOrganizations).values(
+      organizationIds.map((orgId) => ({
+        userId: user.id,
+        organizationId: orgId,
+      })),
+    );
   }
 
   return user;
@@ -235,4 +239,22 @@ export const deleteUser = createServerFn({ method: "POST" })
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     return deleteUserFn(context.db, data.id);
+  });
+
+export const getChildOrganizations = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .inputValidator(z.object({ parentIds: z.array(z.string().uuid()) }))
+  .handler(async ({ data, context }) => {
+    if (data.parentIds.length === 0) return [];
+    return context.db
+      .select({ id: organizations.id, name: organizations.name, parentId: organizations.parentId })
+      .from(organizations)
+      .where(inArray(organizations.parentId, data.parentIds));
+  });
+
+export const getChildOrganizationsOptions = (parentIds: string[]) =>
+  queryOptions({
+    queryKey: ["organization", "children", parentIds],
+    queryFn: () => getChildOrganizations({ data: { parentIds } }),
+    enabled: parentIds.length > 0,
   });

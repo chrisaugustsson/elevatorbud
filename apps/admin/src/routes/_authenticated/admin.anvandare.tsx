@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listUsersOptions, createUser as createUserFn, updateUser as updateUserFn, deactivateUser as deactivateUserFn, activateUser as activateUserFn, deleteUser as deleteUserFn } from "~/server/user";
+import { useSuspenseQuery, useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { listUsersOptions, createUser as createUserFn, updateUser as updateUserFn, deactivateUser as deactivateUserFn, activateUser as activateUserFn, deleteUser as deleteUserFn, getChildOrganizationsOptions } from "~/server/user";
 import { listOrganizationsOptions } from "~/server/organization";
 import { useForm } from "@tanstack/react-form";
 import {
@@ -46,6 +46,19 @@ import {
   SelectValue,
 } from "@elevatorbud/ui/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@elevatorbud/ui/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@elevatorbud/ui/components/ui/command";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -60,9 +73,15 @@ import {
   UserX,
   UserCheck,
   Trash2,
+  X,
+  Check,
+  ChevronsUpDown,
+  Link,
+  Unlink,
 } from "lucide-react";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import { useUser } from "@elevatorbud/auth";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin/anvandare")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -96,6 +115,7 @@ type Anvandare = {
 type Organisation = {
   id: string;
   name: string;
+  parentId: string | null;
 };
 
 function Anvandare() {
@@ -147,12 +167,12 @@ function Anvandare() {
 
   const { user: currentClerkUser } = useUser();
   const createUser = useMutation({
-    mutationFn: (input: { name: string; email: string; role: "admin" | "customer"; organizationId?: string }) =>
+    mutationFn: (input: { name: string; email: string; role: "admin" | "customer"; organizationIds?: string[] }) =>
       createUserFn({ data: input }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
   });
   const updateUser = useMutation({
-    mutationFn: (input: { id: string; name?: string; email?: string; role?: "admin" | "customer"; organizationId?: string }) =>
+    mutationFn: (input: { id: string; name?: string; email?: string; role?: "admin" | "customer"; organizationIds?: string[] }) =>
       updateUserFn({ data: input }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
   });
@@ -377,7 +397,12 @@ function Anvandare() {
         orgs={orgs}
         defaultOrgId={orgFromSearch}
         onSubmit={async (values) => {
-          await createUser.mutateAsync(values);
+          await createUser.mutateAsync({
+            name: values.name,
+            email: values.email,
+            role: values.role,
+            organizationIds: values.organizationId ? [values.organizationId] : undefined,
+          });
           setCreateOpen(false);
         }}
       />
@@ -387,7 +412,7 @@ function Anvandare() {
         onOpenChange={(open) => {
           if (!open) setEditingUser(null);
         }}
-        orgs={orgs}
+        allOrgs={orgs}
         onSubmit={async (values) => {
           await updateUser.mutateAsync(values);
           setEditingUser(null);
@@ -761,18 +786,18 @@ function CreateUserDialogInner({
 function EditUserDialog({
   user,
   onOpenChange,
-  orgs,
+  allOrgs,
   onSubmit,
 }: {
   user: Anvandare | null;
   onOpenChange: (open: boolean) => void;
-  orgs: Organisation[];
+  allOrgs: Organisation[];
   onSubmit: (values: {
     id: string;
     name?: string;
     email?: string;
     role?: "admin" | "customer";
-    organizationId?: string;
+    organizationIds?: string[];
   }) => Promise<void>;
 }) {
   if (!user) return null;
@@ -781,7 +806,7 @@ function EditUserDialog({
     <EditUserDialogInner
       key={user.id}
       user={user}
-      orgs={orgs}
+      allOrgs={allOrgs}
       onOpenChange={onOpenChange}
       onSubmit={onSubmit}
     />
@@ -790,27 +815,95 @@ function EditUserDialog({
 
 function EditUserDialogInner({
   user,
-  orgs,
+  allOrgs,
   onOpenChange,
   onSubmit,
 }: {
   user: Anvandare;
-  orgs: Organisation[];
+  allOrgs: Organisation[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
     id: string;
     name?: string;
     email?: string;
     role?: "admin" | "customer";
-    organizationId?: string;
+    organizationIds?: string[];
   }) => Promise<void>;
 }) {
+  const initialOrgIds = user.userOrganizations.map((uo) => uo.organizationId);
+  const [selectedOrgIds, setSelectedOrgIds] = useState<string[]>(initialOrgIds);
+  const [orgPickerOpen, setOrgPickerOpen] = useState(false);
+
+  const orgMap = useMemo(() => {
+    const m = new Map<string, Organisation>();
+    for (const org of allOrgs) m.set(org.id, org);
+    return m;
+  }, [allOrgs]);
+
+  const childrenByParent = useMemo(() => {
+    const m = new Map<string, Organisation[]>();
+    for (const org of allOrgs) {
+      if (org.parentId) {
+        const list = m.get(org.parentId) || [];
+        list.push(org);
+        m.set(org.parentId, list);
+      }
+    }
+    return m;
+  }, [allOrgs]);
+
+  const inheritedOrgs = useMemo(() => {
+    const inherited: Array<{ org: Organisation; viaParentName: string }> = [];
+    for (const directId of selectedOrgIds) {
+      const children = childrenByParent.get(directId) || [];
+      const parentOrg = orgMap.get(directId);
+      for (const child of children) {
+        if (!selectedOrgIds.includes(child.id)) {
+          inherited.push({ org: child, viaParentName: parentOrg?.name ?? "" });
+        }
+      }
+    }
+    return inherited;
+  }, [selectedOrgIds, childrenByParent, orgMap]);
+
+  const isRedundantGrant = (orgId: string) => {
+    const org = orgMap.get(orgId);
+    if (!org?.parentId) return false;
+    return selectedOrgIds.includes(org.parentId);
+  };
+
+  const availableOrgs = useMemo(() => {
+    return allOrgs.filter((org) => {
+      if (selectedOrgIds.includes(org.id)) return false;
+      if (org.parentId && selectedOrgIds.includes(org.parentId)) return false;
+      return true;
+    });
+  }, [allOrgs, selectedOrgIds]);
+
+  const handleAddOrg = (orgId: string) => {
+    setSelectedOrgIds((prev) => [...prev, orgId]);
+    setOrgPickerOpen(false);
+  };
+
+  const handleRemoveOrg = (orgId: string) => {
+    const org = orgMap.get(orgId);
+    const children = childrenByParent.get(orgId) || [];
+    const lostChildren = children.filter((c) => !selectedOrgIds.includes(c.id));
+
+    setSelectedOrgIds((prev) => prev.filter((id) => id !== orgId));
+
+    if (lostChildren.length > 0) {
+      toast.info(
+        `Åtkomst borttagen för ${org?.name ?? "organisation"} och ${lostChildren.length} underorganisation${lostChildren.length > 1 ? "er" : ""}: ${lostChildren.map((c) => c.name).join(", ")}`,
+      );
+    }
+  };
+
   const form = useForm({
     defaultValues: {
       name: user.name,
       email: user.email,
       role: user.role as "admin" | "customer",
-      organizationId: user.userOrganizations[0]?.organizationId ?? "",
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
@@ -818,7 +911,7 @@ function EditUserDialogInner({
         name: value.name,
         email: value.email,
         role: value.role,
-        organizationId: value.organizationId || undefined,
+        organizationIds: value.role === "customer" ? selectedOrgIds : [],
       });
       form.reset();
     },
@@ -832,7 +925,7 @@ function EditUserDialogInner({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Redigera användare</DialogTitle>
           <DialogDescription>
@@ -929,7 +1022,7 @@ function EditUserDialogInner({
                   onValueChange={(val) => {
                     field.handleChange(val as "admin" | "customer");
                     if (val === "admin") {
-                      form.setFieldValue("organizationId", "");
+                      setSelectedOrgIds([]);
                     }
                   }}
                 >
@@ -948,47 +1041,96 @@ function EditUserDialogInner({
           <form.Subscribe selector={(state) => state.values.role}>
             {(role) =>
               role === "customer" ? (
-                <form.Field
-                  name="organizationId"
-                  validators={{
-                    onChange: ({ value }) => {
-                      const currentRole = form.getFieldValue("role");
-                      if (currentRole === "customer" && !value)
-                        return "Organisation krävs för kundanvändare";
-                      return undefined;
-                    },
-                  }}
-                >
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label>
-                        Organisation{" "}
-                        <span className="text-destructive">*</span>
-                      </Label>
-                      <Select
-                        value={field.state.value}
-                        onValueChange={field.handleChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Välj organisation" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {orgs.map((org) => (
-                            <SelectItem key={org.id} value={org.id}>
-                              {org.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {field.state.meta.isTouched &&
-                        field.state.meta.errors.map((error, i) => (
-                          <p key={i} className="text-sm text-destructive">
-                            {error}
-                          </p>
-                        ))}
+                <div className="space-y-3">
+                  <Label>Organisationer</Label>
+
+                  {selectedOrgIds.length > 0 && (
+                    <div className="space-y-1">
+                      {selectedOrgIds.map((orgId) => {
+                        const org = orgMap.get(orgId);
+                        const children = childrenByParent.get(orgId) || [];
+                        const impliedChildren = children.filter((c) => !selectedOrgIds.includes(c.id));
+                        return (
+                          <div key={orgId} className="space-y-1">
+                            <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                              <Link className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                              <span className="text-sm font-medium flex-1 truncate">{org?.name ?? orgId}</span>
+                              <Badge variant="default" className="text-xs shrink-0">Direkt</Badge>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveOrg(orgId)}
+                                className="rounded-sm p-0.5 hover:bg-accent"
+                                aria-label={`Ta bort ${org?.name}`}
+                              >
+                                <X className="size-3.5" />
+                              </button>
+                            </div>
+                            {impliedChildren.length > 0 && (
+                              <div className="ml-6 space-y-1">
+                                {impliedChildren.map((child) => (
+                                  <div key={child.id} className="flex items-center gap-2 rounded-md border border-dashed px-3 py-1.5 opacity-70">
+                                    <Unlink className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                                    <span className="text-sm flex-1 truncate">{child.name}</span>
+                                    <Badge variant="outline" className="text-xs shrink-0">via {org?.name}</Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
-                </form.Field>
+
+                  {selectedOrgIds.length === 0 && (
+                    <p className="text-sm text-muted-foreground">Inga organisationer tilldelade.</p>
+                  )}
+
+                  <Popover open={orgPickerOpen} onOpenChange={setOrgPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        role="combobox"
+                        aria-expanded={orgPickerOpen}
+                      >
+                        <Plus className="size-4 mr-1" />
+                        Lägg till organisation
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Sök organisation..." />
+                        <CommandList>
+                          <CommandEmpty>Inga organisationer hittades.</CommandEmpty>
+                          <CommandGroup>
+                            {availableOrgs.map((org) => (
+                              <CommandItem
+                                key={org.id}
+                                value={org.name}
+                                onSelect={() => handleAddOrg(org.id)}
+                              >
+                                {org.name}
+                                {org.parentId && (
+                                  <span className="ml-1 text-xs text-muted-foreground">
+                                    (under {orgMap.get(org.parentId)?.name})
+                                  </span>
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+
+                  {inheritedOrgs.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Effektiv åtkomst: {selectedOrgIds.length + inheritedOrgs.length} organisationer
+                    </p>
+                  )}
+                </div>
               ) : null
             }
           </form.Subscribe>
