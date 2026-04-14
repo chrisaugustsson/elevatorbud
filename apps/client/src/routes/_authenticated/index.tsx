@@ -1,21 +1,27 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { meOptions } from "../../server/user";
-import { defaultParentOrgOptions } from "../../server/context";
-import { toast } from "sonner";
+import { useMemo } from "react";
+import { userDirectOrgsOptions } from "../../server/context";
+import { getLastUsedOrg } from "../../shared/components/org-switcher";
 
 export const Route = createFileRoute("/_authenticated/")({
   loader: ({ context }) => {
-    context.queryClient.prefetchQuery(meOptions());
-    context.queryClient.prefetchQuery(defaultParentOrgOptions());
+    context.queryClient.prefetchQuery(userDirectOrgsOptions());
   },
   component: Home,
 });
 
 function Home() {
-  const { data: defaultOrg } = useSuspenseQuery(defaultParentOrgOptions());
+  const { data: orgs } = useSuspenseQuery(userDirectOrgsOptions());
 
-  if (!defaultOrg) {
+  const targetOrgId = useMemo(() => {
+    if (!orgs || orgs.length === 0) return null;
+    const lastUsed = getLastUsedOrg();
+    if (lastUsed && orgs.some((o) => o.id === lastUsed)) return lastUsed;
+    return orgs[0].id;
+  }, [orgs]);
+
+  if (!targetOrgId) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
@@ -27,5 +33,5 @@ function Home() {
     );
   }
 
-  return <Navigate to="/$parentOrgId/dashboard" params={{ parentOrgId: defaultOrg.id }} />;
+  return <Navigate to="/$parentOrgId/dashboard" params={{ parentOrgId: targetOrgId }} />;
 }

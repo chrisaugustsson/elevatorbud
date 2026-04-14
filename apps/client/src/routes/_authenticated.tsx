@@ -16,8 +16,9 @@ import { Separator } from "@elevatorbud/ui/components/ui/separator";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { useClerk } from "@elevatorbud/auth";
 import { meOptions } from "../server/user";
+import { userDirectOrgsOptions } from "../server/context";
 import { AppSidebar } from "../shared/components/app-sidebar";
-import { OrgDisplay } from "../shared/components/org-display";
+import { OrgSwitcher } from "../shared/components/org-switcher";
 import { GlobalSearch } from "../shared/components/global-search";
 
 const authGuard = createServerFn().handler(async () => {
@@ -32,6 +33,7 @@ export const Route = createFileRoute("/_authenticated")({
   beforeLoad: () => authGuard(),
   loader: ({ context }) => {
     context.queryClient.prefetchQuery(meOptions());
+    context.queryClient.prefetchQuery(userDirectOrgsOptions());
   },
   component: AuthenticatedLayout,
 });
@@ -86,9 +88,7 @@ function AuthenticatedLayout() {
             orientation="vertical"
             className="mr-2 data-[orientation=vertical]:h-4"
           />
-          {parentOrgId && (
-            <OrgDisplay organisationId={parentOrgId} parentOrgId={parentOrgId} />
-          )}
+          <OrgSwitcher />
           <div className="ml-auto">
             <GlobalSearch />
           </div>

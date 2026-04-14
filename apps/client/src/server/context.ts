@@ -68,3 +68,21 @@ export const defaultParentOrgOptions = () =>
     queryKey: ["defaultParentOrg"],
     queryFn: () => getDefaultParentOrg(),
   });
+
+export const getUserDirectOrgs = createServerFn()
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    if (context.user.organizationIds.length === 0) return [];
+
+    return context.db
+      .select({ id: organizations.id, name: organizations.name })
+      .from(organizations)
+      .where(inArray(organizations.id, context.user.organizationIds))
+      .orderBy(organizations.name);
+  });
+
+export const userDirectOrgsOptions = () =>
+  queryOptions({
+    queryKey: ["userDirectOrgs"],
+    queryFn: () => getUserDirectOrgs(),
+  });

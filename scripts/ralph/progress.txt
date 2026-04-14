@@ -219,3 +219,30 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - When restructuring routes in TanStack Router, run `@tanstack/router-cli generate` from the app directory to regenerate `routeTree.gen.ts`
   - Feature components that use hardcoded URLs must also be updated when route structure changes — grep for `/hiss/` patterns
 ---
+
+## 2026-04-14 - US-011
+- Built `OrgSwitcher` component replacing the read-only `OrgDisplay`
+- Added `getUserDirectOrgs` server function + `userDirectOrgsOptions` query to `context.ts`
+- Switcher behavior:
+  - 1 org: static text with tooltip (no dropdown)
+  - 2+ orgs: Popover dropdown on desktop, bottom Sheet on mobile (<768px via `useSidebar().isMobile`)
+  - 10+ orgs: type-to-filter input shown at top of dropdown
+  - Current selection shown with checkmark + `aria-current="true"`
+  - `aria-haspopup="menu"`, `aria-expanded`, `aria-label` on trigger button
+  - `aria-live="polite"` announcement on switch, focus moved to main heading
+  - Skeleton placeholder while orgs loading
+- Updated `_authenticated/index.tsx` to use localStorage for last-used org (key `elevatorbud:lastParentOrgId`), falling back to first org alphabetically
+- Updated `$parentOrgId.tsx` to show toast on invalid/inaccessible org redirect
+- Prefetch `userDirectOrgsOptions` in `_authenticated.tsx` loader and `$parentOrgId.tsx` loader
+- Removed `OrgDisplay` import from `_authenticated.tsx` (component file left but unused)
+- Files changed:
+  - `apps/client/src/shared/components/org-switcher.tsx` (new)
+  - `apps/client/src/routes/_authenticated.tsx`
+  - `apps/client/src/routes/_authenticated/$parentOrgId.tsx`
+  - `apps/client/src/routes/_authenticated/index.tsx`
+  - `apps/client/src/server/context.ts`
+- **Learnings for future iterations:**
+  - `useSidebar().isMobile` provides the mobile breakpoint detection already available in this codebase — no need for custom media query hooks
+  - Sheet (bottom) works well as mobile replacement for Popover dropdowns
+  - `saveLastUsedOrg`/`getLastUsedOrg` exported from component file for reuse in index redirect — keeps localStorage key in one place
+---
