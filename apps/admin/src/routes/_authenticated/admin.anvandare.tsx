@@ -66,6 +66,11 @@ import {
   DropdownMenuTrigger,
 } from "@elevatorbud/ui/components/ui/dropdown-menu";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@elevatorbud/ui/components/ui/collapsible";
+import {
   Plus,
   Users,
   Pencil,
@@ -76,6 +81,7 @@ import {
   X,
   Check,
   ChevronsUpDown,
+  ChevronRight,
   Link,
   Unlink,
 } from "lucide-react";
@@ -1044,6 +1050,10 @@ function EditUserDialogInner({
                 <div className="space-y-3">
                   <Label>Organisationer</Label>
 
+                  <p className="text-xs text-muted-foreground">
+                    Effektiv åtkomst: {selectedOrgIds.length + inheritedOrgs.length} organisationer
+                  </p>
+
                   {selectedOrgIds.length > 0 && (
                     <div className="space-y-1">
                       {selectedOrgIds.map((orgId) => {
@@ -1052,28 +1062,56 @@ function EditUserDialogInner({
                         const impliedChildren = children.filter((c) => !selectedOrgIds.includes(c.id));
                         return (
                           <div key={orgId} className="space-y-1">
-                            <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                              <Link className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                              <span className="text-sm font-medium flex-1 truncate">{org?.name ?? orgId}</span>
-                              <Badge variant="default" className="text-xs shrink-0">Direkt</Badge>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveOrg(orgId)}
-                                className="rounded-sm p-0.5 hover:bg-accent"
-                                aria-label={`Ta bort ${org?.name}`}
-                              >
-                                <X className="size-3.5" />
-                              </button>
-                            </div>
-                            {impliedChildren.length > 0 && (
-                              <div className="ml-6 space-y-1">
-                                {impliedChildren.map((child) => (
-                                  <div key={child.id} className="flex items-center gap-2 rounded-md border border-dashed px-3 py-1.5 opacity-70">
-                                    <Unlink className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                                    <span className="text-sm flex-1 truncate">{child.name}</span>
-                                    <Badge variant="outline" className="text-xs shrink-0">via {org?.name}</Badge>
+                            {impliedChildren.length > 0 ? (
+                              <Collapsible>
+                                <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                                  <CollapsibleTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="rounded-sm p-0.5 hover:bg-accent"
+                                      aria-label={`Visa underorganisationer för ${org?.name}`}
+                                    >
+                                      <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
+                                    </button>
+                                  </CollapsibleTrigger>
+                                  <Link className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                                  <span className="text-sm font-medium flex-1 truncate">{org?.name ?? orgId}</span>
+                                  <Badge variant="default" className="text-xs shrink-0">Direkt</Badge>
+                                  <span className="text-xs text-muted-foreground shrink-0">+{impliedChildren.length}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveOrg(orgId)}
+                                    className="rounded-sm p-0.5 hover:bg-accent"
+                                    aria-label={`Ta bort ${org?.name}`}
+                                  >
+                                    <X className="size-3.5" />
+                                  </button>
+                                </div>
+                                <CollapsibleContent>
+                                  <div className="ml-6 mt-1 space-y-1">
+                                    {impliedChildren.map((child) => (
+                                      <div key={child.id} className="flex items-center gap-2 rounded-md border border-dashed px-3 py-1.5 opacity-70">
+                                        <Unlink className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                                        <span className="text-sm flex-1 truncate">{child.name}</span>
+                                        <Badge variant="outline" className="text-xs shrink-0">via {org?.name}</Badge>
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
+                                </CollapsibleContent>
+                              </Collapsible>
+                            ) : (
+                              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                                <Link className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                                <span className="text-sm font-medium flex-1 truncate">{org?.name ?? orgId}</span>
+                                <Badge variant="default" className="text-xs shrink-0">Direkt</Badge>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveOrg(orgId)}
+                                  className="rounded-sm p-0.5 hover:bg-accent"
+                                  aria-label={`Ta bort ${org?.name}`}
+                                >
+                                  <X className="size-3.5" />
+                                </button>
                               </div>
                             )}
                           </div>
@@ -1124,12 +1162,6 @@ function EditUserDialogInner({
                       </Command>
                     </PopoverContent>
                   </Popover>
-
-                  {inheritedOrgs.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Effektiv åtkomst: {selectedOrgIds.length + inheritedOrgs.length} organisationer
-                    </p>
-                  )}
                 </div>
               ) : null
             }
