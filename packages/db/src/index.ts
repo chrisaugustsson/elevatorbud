@@ -11,3 +11,4 @@ export type Database = ReturnType<typeof createDb>;
 
 export * from "./schema.js";
 export { schema };
+export { getEffectiveOrganizationIds } from "./effective-org-ids.js";
