@@ -41,12 +41,17 @@ const filterSchema = z.object({
   buildYearMax: z.number().optional(),
   modernized: z.boolean().optional(),
   status: z.enum(["active", "demolished", "archived", "all"]).optional(),
+  subOrgId: z.string().uuid().optional(),
 });
 
 type FilterInput = z.infer<typeof filterSchema>;
 
 function buildWhereConditions(filters: FilterInput, contextOrgIds: string[]) {
   const conditions = [inArray(elevators.organizationId, contextOrgIds)];
+
+  if (filters.subOrgId) {
+    conditions.push(eq(elevators.organizationId, filters.subOrgId));
+  }
 
   const status = filters.status ?? "active";
   if (status !== "all") {

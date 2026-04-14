@@ -40,6 +40,8 @@ interface RegisterTableProps {
   totalPages: number;
   page: number;
   pageSize: number;
+  showSubOrg?: boolean;
+  emptyMessage?: React.ReactNode;
 }
 
 export function RegisterTable({
@@ -49,11 +51,13 @@ export function RegisterTable({
   totalPages,
   page,
   pageSize,
+  showSubOrg = false,
+  emptyMessage: emptyMessageProp,
 }: RegisterTableProps) {
   const { parentOrgId } = useParams({ strict: false }) as { parentOrgId: string };
   const columnHelper = createColumnHelper<HissRow>();
-  const columns = useMemo(
-    () => [
+  const columns = useMemo(() => {
+    const cols = [
       columnHelper.accessor("elevatorNumber", {
         size: 130,
         header: ({ column }) => (
@@ -70,6 +74,23 @@ export function RegisterTable({
         ),
         cell: (info) => info.getValue() || "—",
       }),
+      ...(showSubOrg
+        ? [
+            columnHelper.accessor("organizationName", {
+              id: "organizationName",
+              size: 160,
+              enableSorting: false,
+              header: () => (
+                <span className="text-sm font-medium">Organisation</span>
+              ),
+              cell: (info) => (
+                <span className="text-muted-foreground">
+                  {info.getValue() || "—"}
+                </span>
+              ),
+            }),
+          ]
+        : []),
       columnHelper.accessor("district", {
         size: 140,
         header: ({ column }) => (
@@ -109,10 +130,9 @@ export function RegisterTable({
           <span className="tabular-nums">{info.getValue() || "—"}</span>
         ),
       }),
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+    ];
+    return cols;
+  }, [showSubOrg, columnHelper]);
 
   const table = useReactTable({
     data,
@@ -144,10 +164,12 @@ export function RegisterTable({
         window.location.href = `/${parentOrgId}/hiss/${row.id}`;
       }}
       emptyMessage={
-        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-          <Building2 className="size-8" />
-          <p>Inga hissar hittades.</p>
-        </div>
+        emptyMessageProp ?? (
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <Building2 className="size-8" />
+            <p>Inga hissar hittades.</p>
+          </div>
+        )
       }
     >
       <DataGridContainer>

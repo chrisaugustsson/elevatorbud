@@ -86,3 +86,22 @@ export const userDirectOrgsOptions = () =>
     queryKey: ["userDirectOrgs"],
     queryFn: () => getUserDirectOrgs(),
   });
+
+export const getChildOrgs = createServerFn()
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    await getContextOrgIds(context.db, context.user, data.parentOrgId);
+
+    return context.db
+      .select({ id: organizations.id, name: organizations.name })
+      .from(organizations)
+      .where(eq(organizations.parentId, data.parentOrgId))
+      .orderBy(organizations.name);
+  });
+
+export const childOrgsOptions = (parentOrgId: string) =>
+  queryOptions({
+    queryKey: ["childOrgs", parentOrgId],
+    queryFn: () => getChildOrgs({ data: { parentOrgId } }),
+  });
