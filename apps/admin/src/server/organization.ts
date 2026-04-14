@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
-import { organizations } from "@elevatorbud/db/schema";
+import { eq, inArray, and, not } from "drizzle-orm";
+import { organizations, userOrganizations, users } from "@elevatorbud/db/schema";
 import type { Database } from "@elevatorbud/db";
 import { adminMiddleware } from "./auth";
 
@@ -102,4 +102,61 @@ export const updateOrganization = createServerFn({ method: "POST" })
   .inputValidator(updateOrganizationSchema)
   .handler(async ({ data, context }) => {
     return updateOrg(context.db, data);
+  });
+
+// ---------------------------------------------------------------------------
+// Preview parent change impact on user access
+// ---------------------------------------------------------------------------
+
+const previewParentChangeSchema = z.object({
+  orgId: z.string().uuid(),
+  oldParentId: z.string().uuid().nullable(),
+  newParentId: z.string().uuid().nullable(),
+});
+
+type AffectedUser = { id: string; name: string; email: string };
+
+async function computeParentChangeImpact(
+  db: Database,
+  input: z.infer<typeof previewParentChangeSchema>,
+) {
+  const { orgId, oldParentId, newParentId } = input;
+
+  if (oldParentId === newParentId) return { gained: [], lost: [] };
+
+  const directGrantUserIds = await db
+    .select({ userId: userOrganizations.userId })
+    .from(userOrganizations)
+    .where(eq(userOrganizations.organizationId, orgId));
+  const directUserIdSet = new Set(directGrantUserIds.map((r) => r.userId));
+
+  let lost: AffectedUser[] = [];
+  let gained: AffectedUser[] = [];
+
+  if (oldParentId) {
+    const oldParentUsers = await db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .innerJoin(userOrganizations, eq(users.id, userOrganizations.userId))
+      .where(eq(userOrganizations.organizationId, oldParentId));
+    lost = oldParentUsers.filter((u) => !directUserIdSet.has(u.id));
+  }
+
+  if (newParentId) {
+    const newParentUsers = await db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .innerJoin(userOrganizations, eq(users.id, userOrganizations.userId))
+      .where(eq(userOrganizations.organizationId, newParentId));
+    gained = newParentUsers.filter((u) => !directUserIdSet.has(u.id));
+  }
+
+  return { gained, lost };
+}
+
+export const previewParentChange = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .inputValidator(previewParentChangeSchema)
+  .handler(async ({ data, context }) => {
+    return computeParentChangeImpact(context.db, data);
   });
