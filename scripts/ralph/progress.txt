@@ -246,3 +246,25 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - Sheet (bottom) works well as mobile replacement for Popover dropdowns
   - `saveLastUsedOrg`/`getLastUsedOrg` exported from component file for reuse in index redirect — keeps localStorage key in one place
 ---
+
+## 2026-04-14 - US-012
+- Added sub-org filter and sub-org column to register (elevator list) page
+- Added `getChildOrgs` server function + `childOrgsOptions` query to `context.ts`
+- Added `subOrgId` filter to `filterSchema` and `buildWhereConditions` in `elevator.ts`
+- Register page: `subOrg` URL param, fetches child orgs, passes to filters and table
+- `RegisterFilters`: single-select sub-org dropdown (only shown when parent has children), dismissable filter chip
+- `RegisterTable`: conditional `organizationName` column via `showSubOrg` prop
+- Empty state with sub-org name: "Inga hissar i [Sub-Org Name]" + "Rensa filter" action
+- `aria-live="polite"` region announces result count on filter change
+- Filter state persists in URL query params consistent with existing pattern
+- Files changed:
+  - `apps/client/src/server/context.ts`
+  - `apps/client/src/server/elevator.ts`
+  - `apps/client/src/routes/_authenticated/$parentOrgId/register.tsx`
+  - `apps/client/src/features/register/components/register-filters.tsx`
+  - `apps/client/src/features/register/components/register-table.tsx`
+- **Learnings for future iterations:**
+  - `HissRow` already includes `organizationId` and `organizationName` from the server join — no schema change needed to show org column
+  - For conditional columns in TanStack Table, use spread + ternary in the columns array and re-memoize on the toggle
+  - Sub-org filter uses `__all__` as sentinel value for "all" in Select since shadcn Select doesn't support empty string values
+---
