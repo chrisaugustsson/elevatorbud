@@ -5,19 +5,19 @@ import {
   useQuery,
   keepPreviousData,
 } from "@tanstack/react-query";
-import { meOptions } from "../../server/user";
+import { meOptions } from "../../../server/user";
 import {
   elevatorListOptions,
   exportElevatorDataOptions,
-} from "../../server/elevator";
-import { suggestedValuesOptions } from "../../server/suggested-values";
+} from "../../../server/elevator";
+import { suggestedValuesOptions } from "../../../server/suggested-values";
 import { downloadCSV, downloadExcel } from "@elevatorbud/utils/export";
 import type { SortingState } from "@tanstack/react-table";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
-import { RegisterToolbar } from "../../features/register/components/register-toolbar";
-import { RegisterFilters } from "../../features/register/components/register-filters";
-import { RegisterTable } from "../../features/register/components/register-table";
-import { RegisterPagination } from "../../features/register/components/register-pagination";
+import { RegisterToolbar } from "../../../features/register/components/register-toolbar";
+import { RegisterFilters } from "../../../features/register/components/register-filters";
+import { RegisterTable } from "../../../features/register/components/register-table";
+import { RegisterPagination } from "../../../features/register/components/register-pagination";
 
 type SortField =
   | "elevatorNumber"
@@ -66,7 +66,7 @@ function parseStringArray(value: unknown): string[] | undefined {
   return undefined;
 }
 
-export const Route = createFileRoute("/_authenticated/register")({
+export const Route = createFileRoute("/_authenticated/$parentOrgId/register")({
   validateSearch: (search: Record<string, unknown>): RegisterSearch => ({
     search: typeof search.search === "string" && search.search ? search.search : undefined,
     district: parseStringArray(search.district),
@@ -94,9 +94,9 @@ export const Route = createFileRoute("/_authenticated/register")({
         ? search.pageSize
         : undefined,
   }),
-  loader: ({ context }) => {
+  loader: ({ context, params }) => {
     context.queryClient.prefetchQuery(meOptions());
-    context.queryClient.prefetchQuery(elevatorListOptions({ page: 1, pageSize: 25, status: "active" }));
+    context.queryClient.prefetchQuery(elevatorListOptions({ parentOrgId: params.parentOrgId, page: 1, pageSize: 25, status: "active" }));
     context.queryClient.prefetchQuery(suggestedValuesOptions("district"));
     context.queryClient.prefetchQuery(suggestedValuesOptions("elevator_type"));
     context.queryClient.prefetchQuery(suggestedValuesOptions("manufacturer"));
@@ -107,6 +107,7 @@ export const Route = createFileRoute("/_authenticated/register")({
 
 function RegisterPage() {
   const { data: user } = useSuspenseQuery(meOptions());
+  const { parentOrgId } = Route.useParams();
   const searchParams = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
@@ -286,6 +287,7 @@ function RegisterPage() {
     sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : undefined;
 
   const filterBaseArgs = {
+    parentOrgId,
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(filterDistrict.length > 0 ? { district: filterDistrict } : {}),
     ...(filterElevatorType.length > 0
@@ -303,7 +305,6 @@ function RegisterPage() {
     ...(buildYearMax && !isNaN(parseInt(buildYearMax))
       ? { buildYearMax: parseInt(buildYearMax) }
       : {}),
-    organizationId: user!.organizationIds[0] ?? undefined,
     ...(statusFilter !== "alla"
       ? { status: statusFilter as "active" | "demolished" | "archived" | "all" }
       : {}),

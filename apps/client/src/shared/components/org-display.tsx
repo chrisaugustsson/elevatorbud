@@ -4,10 +4,12 @@ import { Building2 } from "lucide-react";
 
 export function OrgDisplay({
   organisationId,
+  parentOrgId,
 }: {
   organisationId: string;
+  parentOrgId: string;
 }) {
-  const { data: org } = useQuery(organizationOptions(organisationId));
+  const { data: org } = useQuery(organizationOptions(organisationId, parentOrgId));
 
   return (
     <div className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -12,6 +12,7 @@ import {
   DataGridColumnHeader,
 } from "@elevatorbud/ui/components/ui/data-grid-table";
 import { Building2 } from "lucide-react";
+import { useParams } from "@tanstack/react-router";
 
 type HissRow = {
   id: string;
@@ -49,6 +50,7 @@ export function RegisterTable({
   page,
   pageSize,
 }: RegisterTableProps) {
+  const { parentOrgId } = useParams({ strict: false }) as { parentOrgId: string };
   const columnHelper = createColumnHelper<HissRow>();
   const columns = useMemo(
     () => [
@@ -139,7 +141,7 @@ export function RegisterTable({
       recordCount={data.length}
       tableLayout={{ width: "fixed", columnsResizable: true }}
       onRowClick={(row) => {
-        window.location.href = `/hiss/${row.id}`;
+        window.location.href = `/${parentOrgId}/hiss/${row.id}`;
       }}
       emptyMessage={
         <div className="flex flex-col items-center gap-2 text-muted-foreground">

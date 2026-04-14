@@ -2,6 +2,7 @@ import {
   createFileRoute,
   Outlet,
   redirect,
+  useParams,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { auth } from "@elevatorbud/auth/server";
@@ -38,6 +39,8 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const { signOut } = useClerk();
   const { data: user } = useSuspenseQuery(meOptions());
+  const params = useParams({ strict: false }) as { parentOrgId?: string };
+  const parentOrgId = params.parentOrgId;
 
   if (user === null) {
     return (
@@ -83,8 +86,8 @@ function AuthenticatedLayout() {
             orientation="vertical"
             className="mr-2 data-[orientation=vertical]:h-4"
           />
-          {user.organizationIds[0] && (
-            <OrgDisplay organisationId={user.organizationIds[0]} />
+          {parentOrgId && (
+            <OrgDisplay organisationId={parentOrgId} parentOrgId={parentOrgId} />
           )}
           <div className="ml-auto">
             <GlobalSearch />

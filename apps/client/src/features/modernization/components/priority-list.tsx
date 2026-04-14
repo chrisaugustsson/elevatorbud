@@ -16,6 +16,7 @@ import {
 } from "@elevatorbud/ui/components/ui/data-grid-table";
 import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { Building2, ChevronDown, ChevronRight } from "lucide-react";
+import { useParams } from "@tanstack/react-router";
 import type { TimelinePeriod } from "@elevatorbud/ui/components/modernization/urgency-helpers";
 import { getUrgencyBadge } from "@elevatorbud/ui/components/modernization/urgency-helpers";
 
@@ -49,6 +50,7 @@ type PriorityListProps = {
 const columnHelper = createColumnHelper<PriorityElevator>();
 
 function ExpandedRow({ row }: { row: PriorityElevator }) {
+  const { parentOrgId } = useParams({ strict: false }) as { parentOrgId: string };
   const measures = row.modernizationMeasures
     ? row.modernizationMeasures.split(",").map((m) => m.trim()).filter(Boolean)
     : [];
@@ -77,7 +79,7 @@ function ExpandedRow({ row }: { row: PriorityElevator }) {
         )}
       </div>
       <a
-        href={`/hiss/${row.id}`}
+        href={`/${parentOrgId}/hiss/${row.id}`}
         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
       >
         Visa hissdetaljer

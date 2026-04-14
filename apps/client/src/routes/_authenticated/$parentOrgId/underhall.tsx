@@ -1,31 +1,31 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
-import { meOptions } from "../../server/user";
+import { meOptions } from "../../../server/user";
 import {
   inspectionCalendarOptions,
   maintenanceCompaniesOptions,
   emergencyPhoneStatusOptions,
   inspectionListOptions,
-} from "../../server/maintenance";
-import { InspectionCalendarSection } from "../../features/maintenance/components/inspection-calendar-section";
+} from "../../../server/maintenance";
+import { InspectionCalendarSection } from "../../../features/maintenance/components/inspection-calendar-section";
 import {
   MaintenanceCompaniesSection,
   type ForetagData,
-} from "../../features/maintenance/components/maintenance-companies-section";
+} from "../../../features/maintenance/components/maintenance-companies-section";
 import {
   EmergencyPhoneSection,
   type NodData,
-} from "../../features/maintenance/components/emergency-phone-section";
-import { UnderhallSkeleton } from "../../features/maintenance/components/underhall-skeleton";
-import type { InspectionListItem } from "../../features/maintenance/components/inspection-calendar-section";
+} from "../../../features/maintenance/components/emergency-phone-section";
+import { UnderhallSkeleton } from "../../../features/maintenance/components/underhall-skeleton";
+import type { InspectionListItem } from "../../../features/maintenance/components/inspection-calendar-section";
 
-export const Route = createFileRoute("/_authenticated/underhall")({
-  loader: ({ context }) => {
+export const Route = createFileRoute("/_authenticated/$parentOrgId/underhall")({
+  loader: ({ context, params }) => {
     context.queryClient.prefetchQuery(meOptions());
-    context.queryClient.prefetchQuery(inspectionCalendarOptions());
-    context.queryClient.prefetchQuery(maintenanceCompaniesOptions());
-    context.queryClient.prefetchQuery(emergencyPhoneStatusOptions());
+    context.queryClient.prefetchQuery(inspectionCalendarOptions(params.parentOrgId));
+    context.queryClient.prefetchQuery(maintenanceCompaniesOptions(params.parentOrgId));
+    context.queryClient.prefetchQuery(emergencyPhoneStatusOptions(params.parentOrgId));
   },
   component: UnderhallPage,
   pendingComponent: UnderhallSkeleton,
@@ -50,20 +50,21 @@ const currentMonthIndex = new Date().getMonth();
 const currentMonthName = MANADER[currentMonthIndex];
 
 function UnderhallPage() {
+  const { parentOrgId } = Route.useParams();
   const [selectedManad, setSelectedManad] = useState<string | null>(null);
 
-  const { data: kalender } = useSuspenseQuery(inspectionCalendarOptions());
+  const { data: kalender } = useSuspenseQuery(inspectionCalendarOptions(parentOrgId));
 
   const { data: foretag } = useSuspenseQuery(
-    maintenanceCompaniesOptions(),
+    maintenanceCompaniesOptions(parentOrgId),
   );
 
   const { data: nodtelefon } = useSuspenseQuery(
-    emergencyPhoneStatusOptions(),
+    emergencyPhoneStatusOptions(parentOrgId),
   );
 
   const { data: besiktningslista } = useQuery({
-    ...inspectionListOptions(selectedManad!),
+    ...inspectionListOptions(selectedManad!, parentOrgId),
     enabled: !!selectedManad,
   });
 

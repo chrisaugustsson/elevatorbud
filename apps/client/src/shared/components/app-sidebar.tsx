@@ -4,7 +4,7 @@ import {
   HardHat,
   Wrench,
 } from "lucide-react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useParams, useRouterState } from "@tanstack/react-router";
 import {
   Sidebar,
   SidebarContent,
@@ -20,15 +20,17 @@ import {
 import { UserMenu } from "./user-menu";
 
 const navItems = [
-  { title: "Dashboard", href: "/dashboard", icon: BarChart3 },
-  { title: "Register", href: "/register", icon: ClipboardList },
-  { title: "Modernisering", href: "/modernisering", icon: HardHat },
-  { title: "Underhåll", href: "/underhall", icon: Wrench },
+  { title: "Dashboard", path: "dashboard", icon: BarChart3 },
+  { title: "Register", path: "register", icon: ClipboardList },
+  { title: "Modernisering", path: "modernisering", icon: HardHat },
+  { title: "Underhåll", path: "underhall", icon: Wrench },
 ] as const;
 
 export function AppSidebar() {
   const routerState = useRouterState();
   const pathname = routerState.location.pathname;
+  const params = useParams({ strict: false }) as { parentOrgId?: string };
+  const parentOrgId = params.parentOrgId;
 
   return (
     <Sidebar collapsible="icon">
@@ -46,23 +48,23 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={
-                      pathname === item.href ||
-                      (item.href === "/dashboard" && pathname === "/")
-                    }
-                    tooltip={item.title}
-                  >
-                    <Link to={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {parentOrgId && navItems.map((item) => {
+                const href = `/${parentOrgId}/${item.path}`;
+                return (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname.includes(`/${item.path}`)}
+                      tooltip={item.title}
+                    >
+                      <Link to={`/$parentOrgId/${item.path}`} params={{ parentOrgId }}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

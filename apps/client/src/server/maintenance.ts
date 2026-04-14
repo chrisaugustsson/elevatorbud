@@ -1,20 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { elevators, organizations } from "@elevatorbud/db/schema";
 import { authMiddleware } from "./auth";
+import { getContextOrgIds } from "./context";
 
 export const getInspectionCalendar = createServerFn()
   .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const orgId = context.user.organizationIds[0];
+  .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
 
     const result = await context.db.execute(sql`
       SELECT inspection_month as month, count(*)::int as count
       FROM elevators e
       WHERE e.status = 'active'
-        AND e.organization_id = ${orgId}
+        AND e.organization_id = ANY(${contextOrgIds})
         AND inspection_month IS NOT NULL
       GROUP BY inspection_month
       ORDER BY inspection_month
@@ -27,16 +29,17 @@ export const getInspectionCalendar = createServerFn()
     }));
   });
 
-export const inspectionCalendarOptions = () =>
+export const inspectionCalendarOptions = (parentOrgId: string) =>
   queryOptions({
-    queryKey: ["maintenance", "inspectionCalendar"],
-    queryFn: () => getInspectionCalendar(),
+    queryKey: ["maintenance", "inspectionCalendar", parentOrgId],
+    queryFn: () => getInspectionCalendar({ data: { parentOrgId } }),
   });
 
 export const getMaintenanceCompanies = createServerFn()
   .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const orgId = context.user.organizationIds[0];
+  .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
 
     const result = await context.db.execute(sql`
       SELECT
@@ -45,7 +48,7 @@ export const getMaintenanceCompanies = createServerFn()
         count(*)::int as count
       FROM elevators e
       WHERE e.status = 'active'
-        AND e.organization_id = ${orgId}
+        AND e.organization_id = ANY(${contextOrgIds})
         AND maintenance_company IS NOT NULL
       GROUP BY maintenance_company, district
       ORDER BY maintenance_company, district
@@ -76,16 +79,17 @@ export const getMaintenanceCompanies = createServerFn()
     return [...companiesMap.values()].sort((a, b) => b.total - a.total);
   });
 
-export const maintenanceCompaniesOptions = () =>
+export const maintenanceCompaniesOptions = (parentOrgId: string) =>
   queryOptions({
-    queryKey: ["maintenance", "companies"],
-    queryFn: () => getMaintenanceCompanies(),
+    queryKey: ["maintenance", "companies", parentOrgId],
+    queryFn: () => getMaintenanceCompanies({ data: { parentOrgId } }),
   });
 
 export const getEmergencyPhoneStatus = createServerFn()
   .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const orgId = context.user.organizationIds[0];
+  .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
 
     const result = await context.db.execute(sql`
       SELECT
@@ -97,7 +101,7 @@ export const getEmergencyPhoneStatus = createServerFn()
       FROM elevators e
       LEFT JOIN elevator_details d ON d.elevator_id = e.id
       WHERE e.status = 'active'
-        AND e.organization_id = ${orgId}
+        AND e.organization_id = ANY(${contextOrgIds})
     `);
 
     type EmergencyPhoneRow = {
@@ -117,17 +121,17 @@ export const getEmergencyPhoneStatus = createServerFn()
     };
   });
 
-export const emergencyPhoneStatusOptions = () =>
+export const emergencyPhoneStatusOptions = (parentOrgId: string) =>
   queryOptions({
-    queryKey: ["maintenance", "emergencyPhoneStatus"],
-    queryFn: () => getEmergencyPhoneStatus(),
+    queryKey: ["maintenance", "emergencyPhoneStatus", parentOrgId],
+    queryFn: () => getEmergencyPhoneStatus({ data: { parentOrgId } }),
   });
 
 export const getInspectionList = createServerFn()
   .middleware([authMiddleware])
-  .inputValidator(z.object({ month: z.string() }))
+  .inputValidator(z.object({ month: z.string(), parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationIds[0];
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
 
     return context.db
       .select({
@@ -145,14 +149,14 @@ export const getInspectionList = createServerFn()
         and(
           eq(elevators.status, "active"),
           eq(elevators.inspectionMonth, data.month),
-          eq(elevators.organizationId, orgId),
+          inArray(elevators.organizationId, contextOrgIds),
         ),
       )
       .orderBy(elevators.elevatorNumber);
   });
 
-export const inspectionListOptions = (month: string) =>
+export const inspectionListOptions = (month: string, parentOrgId: string) =>
   queryOptions({
-    queryKey: ["maintenance", "inspectionList", month],
-    queryFn: () => getInspectionList({ data: { month } }),
+    queryKey: ["maintenance", "inspectionList", month, parentOrgId],
+    queryFn: () => getInspectionList({ data: { month, parentOrgId } }),
   });

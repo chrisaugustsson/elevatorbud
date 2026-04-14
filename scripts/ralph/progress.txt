@@ -168,3 +168,54 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - `[[data-state=open]>&]:rotate-90` is the Tailwind pattern for rotating a child icon based on Collapsible open state
   - Both anvandare.tsx and org-users-view.tsx EditUserDialogInner must be updated in sync (same pattern, different data sources)
 ---
+
+## 2026-04-14 - US-010
+- Scoped all client-app queries to current parent org context (parent + direct children)
+- Created `apps/client/src/server/context.ts` with `getContextOrgIds(db, user, parentOrgId)` helper
+  - Validates parentOrgId is in user's direct grants, then fetches children
+  - Also provides `validateParentContext` and `getDefaultParentOrg` server functions
+- Restructured routes: all pages moved under `_authenticated/$parentOrgId/` path segment
+  - URL pattern is now `/:parentOrgId/dashboard`, `/:parentOrgId/register`, etc.
+  - `$parentOrgId.tsx` layout route validates access, redirects to default org on invalid
+  - `_authenticated/index.tsx` redirects to default parent org's dashboard
+- Updated all server functions to accept `parentOrgId` input:
+  - `elevator.ts`: `buildWhereConditions` uses `inArray(organizationId, contextOrgIds)` instead of `eq(organizationId, orgId)`
+  - `analytics.ts`, `maintenance.ts`, `modernization.ts`: raw SQL uses `= ANY(${contextOrgIds})` instead of `= ${orgId}`
+  - `organization.ts`: validates requested org is in context org IDs
+  - All query options now require `parentOrgId` parameter and include it in query keys
+- Updated navigation components:
+  - `app-sidebar.tsx`: dynamic links using `/$parentOrgId/...` with `useParams`
+  - `global-search.tsx`: dynamic navigation and search scoped to current parent
+  - `user-menu.tsx`: profile link includes parentOrgId
+  - `org-display.tsx`: accepts parentOrgId prop for organization query
+- Updated feature components with hardcoded `/hiss/` links:
+  - `register-table.tsx`, `priority-list.tsx`, `inspection-calendar-section.tsx` use `useParams` to build dynamic URLs
+- Files changed:
+  - `apps/client/src/server/context.ts` (new)
+  - `apps/client/src/server/elevator.ts`
+  - `apps/client/src/server/analytics.ts`
+  - `apps/client/src/server/maintenance.ts`
+  - `apps/client/src/server/modernization.ts`
+  - `apps/client/src/server/organization.ts`
+  - `apps/client/src/routes/_authenticated.tsx`
+  - `apps/client/src/routes/_authenticated/index.tsx`
+  - `apps/client/src/routes/_authenticated/$parentOrgId.tsx` (new)
+  - `apps/client/src/routes/_authenticated/$parentOrgId/dashboard.tsx` (moved)
+  - `apps/client/src/routes/_authenticated/$parentOrgId/register.tsx` (moved)
+  - `apps/client/src/routes/_authenticated/$parentOrgId/hiss.$id.tsx` (moved)
+  - `apps/client/src/routes/_authenticated/$parentOrgId/modernisering.tsx` (moved)
+  - `apps/client/src/routes/_authenticated/$parentOrgId/underhall.tsx` (moved)
+  - `apps/client/src/routes/_authenticated/$parentOrgId/profil.tsx` (moved)
+  - `apps/client/src/shared/components/app-sidebar.tsx`
+  - `apps/client/src/shared/components/global-search.tsx`
+  - `apps/client/src/shared/components/org-display.tsx`
+  - `apps/client/src/shared/components/user-menu.tsx`
+  - `apps/client/src/features/register/components/register-table.tsx`
+  - `apps/client/src/features/modernization/components/priority-list.tsx`
+  - `apps/client/src/features/maintenance/components/inspection-calendar-section.tsx`
+- **Learnings for future iterations:**
+  - `= ANY(${array})` is the cleanest pattern for drizzle raw SQL with postgres arrays — avoids IN-list construction
+  - `useParams({ strict: false })` enables accessing route params from shared components that aren't route-aware
+  - When restructuring routes in TanStack Router, run `@tanstack/router-cli generate` from the app directory to regenerate `routeTree.gen.ts`
+  - Feature components that use hardcoded URLs must also be updated when route structure changes — grep for `/hiss/` patterns
+---

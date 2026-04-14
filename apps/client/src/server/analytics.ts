@@ -1,17 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
-import { eq, and, sql } from "drizzle-orm";
+import { and, sql, inArray } from "drizzle-orm";
+import { z } from "zod";
 import { elevators } from "@elevatorbud/db/schema";
 import { authMiddleware } from "./auth";
+import { getContextOrgIds } from "./context";
 
 const NOT_MODERNIZED = "Ej ombyggd";
 
 export const getStats = createServerFn()
   .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const orgId = context.user.organizationIds[0];
-    const activeCondition = eq(elevators.status, "active");
-    const where = and(activeCondition, eq(elevators.organizationId, orgId));
+  .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
+    const where = and(
+      sql`${elevators.status} = 'active'`,
+      inArray(elevators.organizationId, contextOrgIds),
+    );
 
     const currentYear = new Date().getFullYear();
 
@@ -40,7 +45,7 @@ export const getStats = createServerFn()
           LIMIT 1
         ) lb ON true
         WHERE e.status = 'active'
-        AND e.organization_id = ${orgId}
+        AND e.organization_id = ANY(${contextOrgIds})
       `),
     ]);
 
@@ -65,17 +70,18 @@ export const getStats = createServerFn()
     };
   });
 
-export const statsOptions = () =>
+export const statsOptions = (parentOrgId: string) =>
   queryOptions({
-    queryKey: ["analytics", "stats"],
-    queryFn: () => getStats(),
+    queryKey: ["analytics", "stats", parentOrgId],
+    queryFn: () => getStats({ data: { parentOrgId } }),
   });
 
 export const getChartData = createServerFn()
   .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const orgId = context.user.organizationIds[0];
-    const orgFilter = sql`AND e.organization_id = ${orgId}`;
+  .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
+    const orgFilter = sql`AND e.organization_id = ANY(${contextOrgIds})`;
     const activeFilter = sql`e.status = 'active'`;
 
     const [
@@ -165,8 +171,8 @@ export const getChartData = createServerFn()
     };
   });
 
-export const chartDataOptions = () =>
+export const chartDataOptions = (parentOrgId: string) =>
   queryOptions({
-    queryKey: ["analytics", "chartData"],
-    queryFn: () => getChartData(),
+    queryKey: ["analytics", "chartData", parentOrgId],
+    queryFn: () => getChartData({ data: { parentOrgId } }),
   });

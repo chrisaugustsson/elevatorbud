@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { meOptions } from "../../server/user";
-import { statsOptions, chartDataOptions } from "../../server/analytics";
+import { meOptions } from "../../../server/user";
+import { statsOptions, chartDataOptions } from "../../../server/analytics";
 import { KpiCards } from "@elevatorbud/ui/components/dashboard/kpi-cards";
 import type { KpiItem } from "@elevatorbud/ui/components/dashboard/kpi-cards";
 import {
@@ -19,29 +19,30 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/dashboard")({
-  loader: ({ context }) => {
+export const Route = createFileRoute("/_authenticated/$parentOrgId/dashboard")({
+  loader: ({ context, params }) => {
     context.queryClient.prefetchQuery(meOptions());
-    context.queryClient.prefetchQuery(statsOptions());
-    context.queryClient.prefetchQuery(chartDataOptions());
+    context.queryClient.prefetchQuery(statsOptions(params.parentOrgId));
+    context.queryClient.prefetchQuery(chartDataOptions(params.parentOrgId));
   },
   component: DashboardPage,
   pendingComponent: DashboardSkeleton,
 });
 
 function DashboardPage() {
-  const { data: stats } = useSuspenseQuery(statsOptions());
+  const { parentOrgId } = Route.useParams();
+  const { data: stats } = useSuspenseQuery(statsOptions(parentOrgId));
 
-  const { data: chartData } = useSuspenseQuery(chartDataOptions());
+  const { data: chartData } = useSuspenseQuery(chartDataOptions(parentOrgId));
 
   const navigate = useNavigate();
   const currentYear = new Date().getFullYear();
 
   const goToRegister = useCallback(
-    (params: Record<string, string | number | string[]>) => {
-      navigate({ to: "/register", search: params });
+    (searchParams: Record<string, string | number | string[]>) => {
+      navigate({ to: "/$parentOrgId/register", params: { parentOrgId }, search: searchParams });
     },
-    [navigate],
+    [navigate, parentOrgId],
   );
 
   const handleDistrictClick = useCallback(
@@ -86,9 +87,9 @@ function DashboardPage() {
 
   const handleTimelineClick = useCallback(
     (label: string) => {
-      navigate({ to: "/modernisering", search: { year: label } });
+      navigate({ to: "/$parentOrgId/modernisering", params: { parentOrgId }, search: { year: label } });
     },
-    [navigate],
+    [navigate, parentOrgId],
   );
 
   const kpiItems: KpiItem[] = [

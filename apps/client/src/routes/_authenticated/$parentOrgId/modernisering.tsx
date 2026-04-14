@@ -1,12 +1,12 @@
 import { useMemo, useRef, useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery, keepPreviousData } from "@tanstack/react-query";
-import { meOptions } from "../../server/user";
+import { meOptions } from "../../../server/user";
 import {
   timelineOptions,
   budgetOptions,
   priorityListOptions,
-} from "../../server/modernization";
+} from "../../../server/modernization";
 import {
   PERIODS,
   getUrgencyColor,
@@ -15,9 +15,9 @@ import {
   type PeriodKey,
 } from "@elevatorbud/ui/components/modernization/urgency-helpers";
 import { PeriodSummaryCards } from "@elevatorbud/ui/components/modernization/period-summary-cards";
-import { TimelineChart } from "../../features/modernization/components/timeline-chart";
-import { BudgetOverview } from "../../features/modernization/components/budget-overview";
-import { PriorityList } from "../../features/modernization/components/priority-list";
+import { TimelineChart } from "../../../features/modernization/components/timeline-chart";
+import { BudgetOverview } from "../../../features/modernization/components/budget-overview";
+import { PriorityList } from "../../../features/modernization/components/priority-list";
 import { ModernizationSkeleton } from "@elevatorbud/ui/components/modernization/modernization-skeleton";
 
 type ModerniseringSearch = {
@@ -30,7 +30,7 @@ type ModerniseringSearch = {
 
 const VALID_PERIODS: PeriodKey[] = ["akut", "2-4", "5-9", "10+"];
 
-export const Route = createFileRoute("/_authenticated/modernisering")({
+export const Route = createFileRoute("/_authenticated/$parentOrgId/modernisering")({
   validateSearch: (search: Record<string, unknown>): ModerniseringSearch => ({
     period: VALID_PERIODS.includes(search.period as PeriodKey)
       ? (search.period as PeriodKey)
@@ -48,17 +48,18 @@ export const Route = createFileRoute("/_authenticated/modernisering")({
         ? search.pageSize
         : undefined,
   }),
-  loader: ({ context }) => {
+  loader: ({ context, params }) => {
     context.queryClient.prefetchQuery(meOptions());
-    context.queryClient.prefetchQuery(timelineOptions());
-    context.queryClient.prefetchQuery(budgetOptions());
-    context.queryClient.prefetchQuery(priorityListOptions({ page: 1, pageSize: 25 }));
+    context.queryClient.prefetchQuery(timelineOptions(params.parentOrgId));
+    context.queryClient.prefetchQuery(budgetOptions(params.parentOrgId));
+    context.queryClient.prefetchQuery(priorityListOptions({ parentOrgId: params.parentOrgId, page: 1, pageSize: 25 }));
   },
   component: ModerniseringPage,
   pendingComponent: ModernizationSkeleton,
 });
 
 function ModerniseringPage() {
+  const { parentOrgId } = Route.useParams();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const priorityListRef = useRef<HTMLDivElement>(null);
@@ -128,17 +129,18 @@ function ModerniseringPage() {
     [selectedDistrict, updateSearch, scrollToPriorityList],
   );
 
-  const { data: tidslinje } = useSuspenseQuery(timelineOptions());
-  const { data: budget } = useSuspenseQuery(budgetOptions());
+  const { data: tidslinje } = useSuspenseQuery(timelineOptions(parentOrgId));
+  const { data: budget } = useSuspenseQuery(budgetOptions(parentOrgId));
 
   const prioritetslistaArgs = useMemo(() => {
     const base: {
+      parentOrgId: string;
       page: number;
       pageSize: number;
       yearFrom?: number;
       yearTo?: number;
       district?: string;
-    } = { page: page + 1, pageSize };
+    } = { parentOrgId, page: page + 1, pageSize };
     if (selectedYear) {
       const y = parseInt(selectedYear, 10);
       base.yearFrom = y;
@@ -151,7 +153,7 @@ function ModerniseringPage() {
       base.district = selectedDistrict;
     }
     return base;
-  }, [selectedPeriod, selectedYear, selectedDistrict, page, pageSize]);
+  }, [parentOrgId, selectedPeriod, selectedYear, selectedDistrict, page, pageSize]);
 
   const { data: prioritetslista, isLoading } = useQuery({
     ...priorityListOptions(prioritetslistaArgs),

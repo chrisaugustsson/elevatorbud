@@ -21,7 +21,7 @@ import {
 import { Moon, Sun, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_authenticated/profil")({
+export const Route = createFileRoute("/_authenticated/$parentOrgId/profil")({
   component: ProfilPage,
 });
 
