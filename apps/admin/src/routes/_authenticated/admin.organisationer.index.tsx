@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listOrganizationsOptions, createOrganization, updateOrganization } from "~/server/organization";
@@ -36,8 +36,27 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@elevatorbud/ui/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@elevatorbud/ui/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@elevatorbud/ui/components/ui/command";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@elevatorbud/ui/components/ui/tooltip";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus, Building2, UserPlus } from "lucide-react";
+import { Plus, Building2, UserPlus, Check, ChevronsUpDown, X } from "lucide-react";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 
 export const Route = createFileRoute(
@@ -94,12 +113,12 @@ function Organisationer() {
   const queryClient = useQueryClient();
   const { data: orgs } = useSuspenseQuery(listOrganizationsOptions());
   const createOrg = useMutation({
-    mutationFn: (input: { name: string; organizationNumber?: string }) =>
+    mutationFn: (input: { name: string; organizationNumber?: string; parentId?: string | null }) =>
       createOrganization({ data: input }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["organization"] }); },
   });
   const updateOrg = useMutation({
-    mutationFn: (input: { id: string; name?: string; organizationNumber?: string }) =>
+    mutationFn: (input: { id: string; name?: string; organizationNumber?: string; parentId?: string | null }) =>
       updateOrganization({ data: input }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["organization"] }); },
   });
@@ -176,6 +195,7 @@ function Organisationer() {
       <CreateOrgDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
+        orgs={orgs}
         onSubmit={async (values) => {
           await createOrg.mutateAsync(values);
           setCreateOpen(false);
@@ -184,6 +204,7 @@ function Organisationer() {
 
       <EditOrgDialog
         org={editOrg}
+        orgs={orgs}
         onOpenChange={(open) => {
           if (!open) setEditOrg(null);
         }}
@@ -197,27 +218,141 @@ function Organisationer() {
   );
 }
 
+function ParentOrgSelect({
+  value,
+  onChange,
+  orgs,
+  excludeId,
+  disabled,
+  disabledReason,
+}: {
+  value: string | null;
+  onChange: (value: string | null) => void;
+  orgs: Organisation[];
+  excludeId?: string;
+  disabled?: boolean;
+  disabledReason?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const rootOrgs = useMemo(
+    () => orgs.filter((o) => o.parentId === null && o.id !== excludeId),
+    [orgs, excludeId],
+  );
+
+  const selectedName = rootOrgs.find((o) => o.id === value)?.name;
+
+  const trigger = (
+    <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+          disabled={disabled}
+        >
+          <span className="truncate">
+            {selectedName ?? "Ingen (toppnivå)"}
+          </span>
+          <div className="flex items-center gap-1 ml-2 shrink-0">
+            {value && !disabled && (
+              <span
+                role="button"
+                tabIndex={0}
+                aria-label="Rensa val"
+                className="rounded-sm hover:bg-accent p-0.5"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onChange(null);
+                  }
+                }}
+              >
+                <X className="size-3" />
+              </span>
+            )}
+            <ChevronsUpDown className="size-4 opacity-50" />
+          </div>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Sök organisation..." />
+          <CommandList>
+            <CommandEmpty>Inga organisationer hittades.</CommandEmpty>
+            <CommandGroup>
+              {rootOrgs.map((org) => (
+                <CommandItem
+                  key={org.id}
+                  value={org.name}
+                  onSelect={() => {
+                    onChange(org.id === value ? null : org.id);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={org.id === value ? "opacity-100" : "opacity-0"}
+                  />
+                  {org.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+
+  if (disabled && disabledReason) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>{trigger}</div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{disabledReason}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return trigger;
+}
+
 function CreateOrgDialog({
   open,
   onOpenChange,
+  orgs,
   onSubmit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  orgs: Organisation[];
   onSubmit: (values: {
     name: string;
     organizationNumber?: string;
+    parentId?: string | null;
   }) => Promise<void>;
 }) {
   const form = useForm({
     defaultValues: {
       name: "",
       organizationNumber: "",
+      parentId: null as string | null,
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
         name: value.name,
         organizationNumber: value.organizationNumber || undefined,
+        parentId: value.parentId,
       });
       form.reset();
     },
@@ -309,6 +444,19 @@ function CreateOrgDialog({
             )}
           </form.Field>
 
+          <form.Field name="parentId">
+            {(field) => (
+              <div className="space-y-2">
+                <Label>Moderorganisation</Label>
+                <ParentOrgSelect
+                  value={field.state.value}
+                  onChange={(v) => field.handleChange(v)}
+                  orgs={orgs}
+                />
+              </div>
+            )}
+          </form.Field>
+
           <DialogFooter>
             <Button
               type="button"
@@ -335,14 +483,17 @@ function CreateOrgDialog({
 
 function EditOrgDialog({
   org,
+  orgs,
   onOpenChange,
   onSubmit,
 }: {
   org: Organisation | null;
+  orgs: Organisation[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
     name?: string;
     organizationNumber?: string;
+    parentId?: string | null;
   }) => Promise<void>;
 }) {
   if (!org) return null;
@@ -351,6 +502,7 @@ function EditOrgDialog({
     <EditOrgDialogInner
       key={org.id}
       org={org}
+      orgs={orgs}
       onOpenChange={onOpenChange}
       onSubmit={onSubmit}
     />
@@ -359,25 +511,35 @@ function EditOrgDialog({
 
 function EditOrgDialogInner({
   org,
+  orgs,
   onOpenChange,
   onSubmit,
 }: {
   org: Organisation;
+  orgs: Organisation[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
     name?: string;
     organizationNumber?: string;
+    parentId?: string | null;
   }) => Promise<void>;
 }) {
+  const hasChildren = useMemo(
+    () => orgs.some((o) => o.parentId === org.id),
+    [orgs, org.id],
+  );
+
   const form = useForm({
     defaultValues: {
       name: org.name,
       organizationNumber: org.organizationNumber ?? "",
+      parentId: org.parentId,
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
         name: value.name,
         organizationNumber: value.organizationNumber || undefined,
+        parentId: value.parentId,
       });
     },
   });
@@ -468,6 +630,22 @@ function EditOrgDialogInner({
                       {error}
                     </p>
                   ))}
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="parentId">
+            {(field) => (
+              <div className="space-y-2">
+                <Label>Moderorganisation</Label>
+                <ParentOrgSelect
+                  value={field.state.value}
+                  onChange={(v) => field.handleChange(v)}
+                  orgs={orgs}
+                  excludeId={org.id}
+                  disabled={hasChildren}
+                  disabledReason="Denna organisation har underorganisationer och kan inte själv ha en moderorganisation"
+                />
               </div>
             )}
           </form.Field>

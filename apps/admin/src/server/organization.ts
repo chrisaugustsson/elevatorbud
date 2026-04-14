@@ -13,12 +13,14 @@ import { adminMiddleware } from "./auth";
 const createOrganizationSchema = z.object({
   name: z.string().min(1),
   organizationNumber: z.string().optional(),
+  parentId: z.string().uuid().nullable().optional(),
 });
 
 const updateOrganizationSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).optional(),
   organizationNumber: z.string().optional(),
+  parentId: z.string().uuid().nullable().optional(),
 });
 
 // ---------------------------------------------------------------------------
