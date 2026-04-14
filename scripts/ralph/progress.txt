@@ -53,3 +53,118 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - Local UI types must match Drizzle's full return shape including fields from related tables (e.g. `parentId` on organizations from US-001)
   - `replace_all: true` with Edit tool is efficient for mechanical find-and-replace across a file
 ---
+
+## 2026-04-14 - US-003
+- Removed `contactPerson`, `phoneNumber`, `email` columns from `organizations` table
+- Added `contactPersonName`, `contactPersonPhone`, `contactPersonEmail` columns to `elevators` table
+- Updated organization server functions (create/update schemas) to remove contact fields
+- Updated organization list page: removed contact columns, form fields in create/edit dialogs, mutation types
+- Updated org detail page: removed contactPerson/email/phoneNumber display
+- Updated type definitions in anvandare.tsx and org-users-view.tsx to match new org shape
+- Migration: `0004_panoramic_mikhail_rasputin.sql`
+- Files changed:
+  - `packages/db/src/schema.ts`
+  - `packages/db/drizzle/0004_panoramic_mikhail_rasputin.sql`
+  - `apps/admin/src/server/organization.ts`
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx`
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.$id.tsx`
+  - `apps/admin/src/routes/_authenticated/admin.anvandare.tsx`
+  - `apps/admin/src/features/organization/components/org-users-view.tsx`
+- **Learnings for future iterations:**
+  - When moving fields between tables, update all local type aliases that mirror the Drizzle shape (they appear in multiple route files and feature components)
+  - Organization forms/dialogs need both the create and edit variants cleaned up independently
+---
+
+## 2026-04-14 - US-004
+- Created `packages/db/src/reset-data.ts` — truncates elevator_budgets, elevator_details, elevators, user_organizations, organizations, users in FK order
+- Requires `--confirm` flag to execute; refuses to run against production-looking DATABASE_URLs
+- Added `db:reset` script to packages/db/package.json, runnable via `pnpm db:reset --confirm`
+- Files changed: `packages/db/src/reset-data.ts`, `packages/db/package.json`
+- **Learnings for future iterations:**
+  - Neon HTTP driver + drizzle `sql.raw()` works for raw TRUNCATE statements
+  - TRUNCATE CASCADE handles FK dependencies even if table order is already correct
+---
+
+## 2026-04-14 - US-005
+- Created `getEffectiveOrganizationIds(db, userId)` in `packages/db/src/effective-org-ids.ts`
+- Two-step query: fetch direct grants from `userOrganizations`, then fetch children where `parentId IN directIds`, merge and deduplicate with `Set`
+- Exported from `packages/db/src/index.ts`
+- Added vitest to `packages/db` devDependencies, added `test` script
+- 5 unit tests with mocked DB covering: no grants, single grant (no children), grant with children, multiple roots with children, deduplication
+- Files changed: `packages/db/src/effective-org-ids.ts`, `packages/db/src/effective-org-ids.test.ts`, `packages/db/src/index.ts`, `packages/db/package.json`
+- **Learnings for future iterations:**
+  - Remote Neon DB may not have local migrations applied — mock-based unit tests avoid this dependency
+  - Drizzle's `inArray` works well for the "children of direct grants" query pattern
+  - vitest integrates cleanly with the existing tsconfig/ESM setup — no extra config needed
+---
+
+## 2026-04-14 - US-006
+- Added `parentId` (nullable UUID) to create/update organization Zod schemas in server functions
+- Added searchable `ParentOrgSelect` component using Popover + Command (cmdk) pattern
+- Create dialog: includes parent org dropdown, filters to root orgs only
+- Edit dialog: includes parent org dropdown, excludes the org being edited, disabled with tooltip when org has children
+- Clearing the dropdown sets parentId to null (top-level org)
+- Files changed:
+  - `apps/admin/src/server/organization.ts`
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx`
+- **Learnings for future iterations:**
+  - Popover + Command (cmdk) is the standard searchable-select pattern in this codebase — use it over the Combobox component (which is designed for free-text with suggestions)
+  - Wrapping a disabled element in a Tooltip requires an extra `<div>` wrapper since disabled elements don't fire pointer events
+---
+
+## 2026-04-14 - US-007
+- Updated server schemas: `organizationId` → `organizationIds: string[]` for updateUser and createUser
+- Updated `updateUserFn` to delete-all + batch-insert for multi-org sync
+- Updated `createUserFn` to accept and insert multiple org IDs
+- Added `getChildOrganizations` server function for inherited access display
+- Rewrote EditUserDialog (in both anvandare.tsx and org-users-view.tsx) to support multi-org management:
+  - Direct grants shown with solid border, `Link` icon, and "Direkt" badge
+  - Inherited (child) orgs shown below each parent grant with dashed border, `Unlink` icon, and "via [parent]" badge
+  - Searchable org picker (Popover + Command) to add orgs, filters out already-selected and child-of-selected orgs
+  - Toast notification on revoke listing lost inherited child orgs
+  - Effective access count shown when inherited orgs exist
+- CreateUserDialog still uses single-org select, converted to `organizationIds` array on submit
+- Files changed:
+  - `apps/admin/src/server/user.ts`
+  - `apps/admin/src/routes/_authenticated/admin.anvandare.tsx`
+  - `apps/admin/src/features/organization/components/org-users-view.tsx`
+- **Learnings for future iterations:**
+  - Both anvandare.tsx and org-users-view.tsx have their own EditUserDialogInner — both must be updated in sync
+  - The `availableOrgs` filter that excludes children of selected parents is key to preventing redundant grants
+  - `useMemo` for org maps/lookups avoids re-computing on every render in dialogs with many orgs
+---
+
+## 2026-04-14 - US-008
+- Added `previewParentChange` server function to `apps/admin/src/server/organization.ts`
+  - Computes access diff: users with direct grant on old parent lose inherited access, users on new parent gain it
+  - Excludes users who have direct grant on the org itself (they keep access regardless)
+  - Returns empty diff when parentId hasn't changed
+- Added `ParentChangeWarningDialog` component to org list page
+  - Shows aggregate counts with green/red badges (gain/lose indicators with icons, not color alone)
+  - Expandable "Visa berörda användare" section using Collapsible, listing name + email + direction icon per user
+  - Admin must click "Bekräfta ändring" to proceed; "Avbryt" cancels
+  - No warning shown when change has no access impact (direct submit)
+- Intercepts form submit in `EditOrgDialogInner` when parentId changed to call preview before saving
+- Files changed:
+  - `apps/admin/src/server/organization.ts`
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx`
+- **Learnings for future iterations:**
+  - Form `onSubmit` can be async and used to intercept submit to show a confirmation dialog before applying
+  - Collapsible from radix-ui works well for expandable sections inside dialogs
+  - When computing access diffs, remember to exclude users with direct grants on the org being modified (they're unaffected by parent changes)
+---
+
+## 2026-04-14 - US-009
+- Added effective access preview to user-org management in both edit user dialogs
+- "Effektiv åtkomst: N organisationer" always shown at top of org section (not just when inherited > 0)
+- Direct grant rows with children are now collapsible (Collapsible from radix-ui) — chevron toggle reveals child orgs
+- Direct grants without children render without expand affordance
+- Collapsed state shows "+N" count hint next to the Direkt badge
+- Inherited orgs remain read-only with dashed border, muted opacity, outline badge "via [parent]", and Unlink icon
+- Files changed:
+  - `apps/admin/src/routes/_authenticated/admin.anvandare.tsx`
+  - `apps/admin/src/features/organization/components/org-users-view.tsx`
+- **Learnings for future iterations:**
+  - `[[data-state=open]>&]:rotate-90` is the Tailwind pattern for rotating a child icon based on Collapsible open state
+  - Both anvandare.tsx and org-users-view.tsx EditUserDialogInner must be updated in sync (same pattern, different data sources)
+---
