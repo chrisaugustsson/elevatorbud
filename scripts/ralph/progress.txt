@@ -1,294 +1,55 @@
 # Ralph Progress Log
-Started: fre  3 apr. 2026 16:46:10 CEST
+Started: tis 14 apr. 2026 21:13:58 CEST
 ---
 
 ## Codebase Patterns
 
-### TanStack Query + Convex Integration
-- Package: `@convex-dev/react-query` provides `ConvexQueryClient`, `convexQuery`, `convexAction`
-- Package: `@tanstack/react-router-ssr-query` provides `setupRouterSsrQueryIntegration` (PRD references old name `@tanstack/react-router-with-query` / `routerWithQueryClient` — the API was renamed)
-- Setup: ConvexReactClient → ConvexQueryClient(convexClient) → QueryClient with hashFn/queryFn → connect → setupRouterSsrQueryIntegration
-- `setupRouterSsrQueryIntegration` wraps router's `Wrap` with `QueryClientProvider` (composes with existing Wrap)
-- Router `Wrap` has `ConvexProvider` for SSR; root route adds `ConvexProviderWithClerk` for client auth (inner overrides outer)
-- `convexQuery(api.foo.bar, args)` returns query options for `useQuery`/`useSuspenseQuery`
-- `convexQuery(api.foo.bar, "skip")` returns options with `enabled: false`
-- Mutations/actions stay on `convex/react` — only queries migrate to TanStack Query
-
-### useSuspenseQuery Type Workaround
-- `convexQuery()` returns a union type (skip vs non-skip) that `useSuspenseQuery` rejects
-- Workaround: extract `queryKey` and `staleTime` individually from the convexQuery result
-- The default `queryFn` on the QueryClient handles the actual fetching
-- Pattern: `const opts = convexQuery(api.foo, {}); useSuspenseQuery({ queryKey: opts.queryKey, staleTime: opts.staleTime })`
-- For `ensureQueryData` in loaders: pass `convexQuery()` directly (its type is accepted)
-
-### SSR Auth Pattern
-- Root route `beforeLoad` fetches Clerk token via `createServerFn` and sets it on `convexQueryClient.serverHttpClient?.setAuth(token)`
-- This enables authenticated Convex queries during SSR (e.g. `ensureQueryData` in loaders)
-- `serverHttpClient` is only present during SSR; on client it's `undefined` (safe with optional chaining)
-- Client-side auth handled by `ConvexProviderWithClerk` in root route component
-
-### Dependent/Conditional Queries
-- Primary query: `useSuspenseQuery` with queryKey/staleTime extraction
-- Dependent query: `useQuery` from `@tanstack/react-query` with `convexQuery(api.foo, condition ? args : "skip")` — spread directly
-- The "skip" variant sets `enabled: false` automatically, so no manual `enabled` flag needed
-- `useQuery` (not `useSuspenseQuery`) is correct here because the query may not fire
+- **Self-referential FK in Drizzle**: Use `(): any =>` for the references callback to avoid circular type issues. Use `relationName` on both sides of self-referential relations.
+- **DB-level constraints for hierarchy**: Use a BEFORE INSERT OR UPDATE trigger (not a check constraint) when enforcement requires querying other rows. Drizzle doesn't generate triggers, so add them manually to the migration SQL.
+- **Platform mismatch (macOS → Linux container)**: Must `npm install -g pnpm` and `CI=true pnpm install --no-frozen-lockfile` to get working node_modules. esbuild also needs the correct platform binary — install matching version via `npm install @esbuild/linux-arm64@<version>` in the package dir, then use `ESBUILD_BINARY_PATH` env var.
 
 ---
 
-## 2026-04-03 - US-001
-- Installed `@convex-dev/react-query`, `@tanstack/react-query`, `@tanstack/react-router-ssr-query`
-- Rewrote `apps/admin/src/router.tsx`: creates ConvexReactClient, ConvexQueryClient, QueryClient; wires hashFn/queryFn/connect; adds context and Wrap with ConvexProvider; enables defaultPreload:'intent'; exports RouterContext type
-- Files changed: `apps/admin/package.json`, `apps/admin/src/router.tsx`, `pnpm-lock.yaml`
+## 2026-04-14 - US-001
+- Added nullable `parentId` column to `organizations` table with self-referential FK (onDelete: set null)
+- Added Drizzle self-relation (`parent`/`children` with `relationName: "parentChild"`)
+- Created migration `0002_steep_mentor.sql` with trigger `enforce_one_level_org_hierarchy` that prevents:
+  - Setting a parent on an org that already has children
+  - Setting a parent that itself has a parent
+- Files changed: `packages/db/src/schema.ts`, `packages/db/drizzle/0002_steep_mentor.sql`, `packages/db/drizzle/meta/0002_snapshot.json`, `packages/db/drizzle/meta/_journal.json`
 - **Learnings for future iterations:**
-  - PRD references `@tanstack/react-router-with-query` and `routerWithQueryClient()` — these were renamed to `@tanstack/react-router-ssr-query` and `setupRouterSsrQueryIntegration()`
-  - `setupRouterSsrQueryIntegration` reads existing `router.options.Wrap` and composes with `QueryClientProvider` — set `Wrap` on `createRouter` BEFORE calling `setupRouterSsrQueryIntegration`
-  - `createRouter` `context` option works even when root route uses `createRootRoute` (not `createRootRouteWithContext`) — types pass, will be properly typed in US-002
+  - `drizzle-kit generate` must be run from `packages/db/` with correct esbuild binary
+  - Trigger SQL must be appended manually after drizzle-kit generates the base migration
 ---
 
-## 2026-04-03 - US-002
-- Rewrote `apps/admin/src/routes/__root.tsx` to use `createRootRouteWithContext<RouterContext>()`
-- Added `beforeLoad` with server function (`getConvexToken`) that fetches Clerk token and sets it on `convexQueryClient.serverHttpClient`
-- Split providers: `shellComponent` (RootDocument) is HTML shell only with ThemeProvider; `component` (RootLayout) renders ClerkProvider → ConvexProviderWithClerk → Outlet + Toaster
-- Removed module-level `ConvexReactClient` instantiation (now uses `convexClient` from route context, created in router.tsx)
-- Files changed: `apps/admin/src/routes/__root.tsx`
+## 2026-04-14 - US-002
+- Created `user_organizations` join table with composite PK (userId, organizationId), cascade delete on both FKs
+- Removed `organizationId` column from `users` table
+- Updated Drizzle relations: users → userOrganizations → organizations (many-to-many)
+- Updated `User` type: replaced `organizationId: string | null` with `organizationIds: string[]`
+- Updated auth middleware to query join table for user's organization IDs
+- Updated admin `user.ts`: listUsers filters via join table, createUser/updateUser manage join table rows
+- Updated all client app server functions: `context.user.organizationId!` → `context.user.organizationIds[0]`
+- Updated admin UI types (Anvandare, UserRecord, Organisation) to match Drizzle return shapes including `parentId`
+- Migration: `0003_same_alex_power.sql`
+- Files changed:
+  - `packages/db/src/schema.ts`
+  - `packages/types/src/index.ts`
+  - `packages/auth/src/middleware.ts`
+  - `apps/admin/src/server/user.ts`
+  - `apps/admin/src/routes/_authenticated/admin.anvandare.tsx`
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx`
+  - `apps/admin/src/features/organization/components/org-users-view.tsx`
+  - `apps/client/src/server/analytics.ts`
+  - `apps/client/src/server/elevator.ts`
+  - `apps/client/src/server/maintenance.ts`
+  - `apps/client/src/server/modernization.ts`
+  - `apps/client/src/server/organization.ts`
+  - `apps/client/src/routes/_authenticated.tsx`
+  - `apps/client/src/routes/_authenticated/register.tsx`
+  - `packages/db/drizzle/0003_same_alex_power.sql`
 - **Learnings for future iterations:**
-  - `ConvexQueryClient.serverHttpClient` is typed as `ConvexHttpClient | undefined` — exists during SSR, undefined on client. Use optional chaining `?.setAuth()` safely
-  - `import type { RouterContext }` avoids circular dependency: router.tsx → routeTree.gen.ts → __root.tsx → router.tsx — type-only imports are erased at compile time
-  - Provider nesting: Router Wrap has `ConvexProvider` (SSR), root route component has `ConvexProviderWithClerk` (client auth). Inner provider overrides outer context — both share the same `ConvexReactClient` instance
-  - `getConvexToken` server function wrapped in try-catch — failure means SSR queries are unauthenticated but client auth still works via ClerkProvider
----
-
-## 2026-04-03 - US-003
-- Migrated `_authenticated.tsx` from manual ConvexHttpClient prefetch to `ensureQueryData` + `useSuspenseQuery`
-- Removed `ConvexHttpClient` import and `convex/browser` dependency
-- Simplified `authGuard` to only check authentication (no more server-side user prefetch)
-- Added `loader` with `ensureQueryData(convexQuery(api.users.me, {}))` for blocking SSR prefetch
-- Replaced `useQuery(api.users.me)` with `useSuspenseQuery` + extracted queryKey/staleTime
-- Removed `prefetchedUser / liveUser` fallback pattern and `if (user === undefined)` loading state
-- Kept null check (webhook not synced) and `user.role !== 'admin'` check
-- Files changed: `apps/admin/src/routes/_authenticated.tsx`
-- **Learnings for future iterations:**
-  - `convexQuery()` return type is a conditional union: when args type includes optional `"skip"`, TypeScript can't narrow the return to the non-skip branch
-  - `useSuspenseQuery` rejects the union because one branch has `queryFn: skipToken` — need to extract `queryKey` and `staleTime` individually
-  - `ensureQueryData` is more lenient with types — accepts the `convexQuery()` union directly
-  - `_authenticated` beforeLoad runs AFTER root's beforeLoad, so auth token is already set on serverHttpClient
----
-
-## 2026-04-03 - US-004
-- Migrated `dashboard.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Removed `if (data === undefined)` loading check
-- Added `pendingComponent: DashboardSkeleton` to route definition (reuses existing skeleton)
-- Used `queryKey`/`staleTime` extraction pattern (same as US-003)
-- Kept `DashboardData` type assertion on destructured `data` since Convex return type is generic
-- Files changed: `apps/admin/src/routes/_authenticated/dashboard.tsx`
-- **Learnings for future iterations:**
-  - Simple page migrations follow a repeatable pattern: swap import, extract opts, destructure with type assertion, add pendingComponent, remove loading check
-  - No mutations on dashboard — purely read-only, so no `convex/react` imports remain
----
-
-## 2026-04-03 - US-005
-- Migrated `admin.organisationer.index.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Extracted inline skeleton loading state to `OrganisationerSkeleton` pendingComponent on route definition
-- Removed `if (orgs === undefined)` loading check
-- Removed `(orgs as Organisation[] | undefined) ?? []` type assertion — `useSuspenseQuery` guarantees data is defined
-- Kept `useMutation` calls (create, update) on `convex/react`
-- Files changed: `apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx`
-- **Learnings for future iterations:**
-  - Pages with mutations: keep `useMutation` import from `convex/react`, only migrate `useQuery` to TanStack Query
-  - Table data: `useSuspenseQuery` guarantees data, so `data ?? []` fallback is no longer needed — pass data directly to `useReactTable`
----
-
-## 2026-04-03 - US-006
-- Migrated `admin.anvandare.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Both `useQuery` calls migrated: `api.organizations.list` and `api.userAdmin.list` (with dynamic filter/search args)
-- Extracted inline skeleton loading state to `AnvandareSkeleton` pendingComponent on route definition
-- Removed `if (users === undefined || orgs === undefined)` loading check
-- Removed `(users as Anvandare[] | undefined) ?? []` and `(orgs as Organisation[])` type assertions
-- Kept `useAction` calls (create, update, deactivate, activate, remove) on `convex/react`
-- Files changed: `apps/admin/src/routes/_authenticated/admin.anvandare.tsx`
-- **Learnings for future iterations:**
-  - Pages with `useAction` (not `useMutation`): same pattern — keep `useAction` import from `convex/react`, only migrate `useQuery`
-  - Dynamic query args (filters, debounced search): `convexQuery` generates a new `queryKey` when args change, `useSuspenseQuery` re-fetches automatically
-  - Multiple queries in one component: each gets its own `convexQuery` opts + `useSuspenseQuery` call
----
-
-## 2026-04-03 - US-007
-- Migrated `admin.referensdata.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Extracted inline skeleton to `ReferensdataSkeleton` pendingComponent on route definition (enhanced with header/controls skeleton)
-- Removed `if (values === undefined)` loading check and `(values as SuggestedValue[] | undefined)` type assertions
-- Removed `filteredValues ?? []` fallback — `useSuspenseQuery` guarantees data
-- Kept `useMutation` calls (create, update, merge, deactivate, activate) on `convex/react`
-- Files changed: `apps/admin/src/routes/_authenticated/admin.referensdata.tsx`
-- **Learnings for future iterations:**
-  - Pages with dynamic query args (category selector): same `useSuspenseQuery` pattern works — new queryKey triggers re-fetch automatically
-  - Skeleton pendingComponent can be enhanced beyond the original inline skeleton to include controls/header for a better loading experience
----
-
-## 2026-04-03 - US-008
-- Migrated `admin.organisationer.$id.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- All three `useQuery` calls migrated: `api.organizations.get`, `api.elevators.analytics.stats`, `api.elevators.analytics.chartData`
-- Created new `DetailSkeleton` pendingComponent matching full page layout (header with back button, contact info, tab bar, KPI cards grid, charts grid)
-- Removed `OverviewSkeleton` (no longer used inline) — loading handled by route-level `pendingComponent`
-- Removed `if (org === undefined)` loading check; kept `if (org === null)` not-found check
-- Removed `stats === undefined || chartData === undefined` conditional in Översikt tab — data guaranteed by `useSuspenseQuery`
-- Removed conditional `stats ? [...] : []` for kpiItems — stats always defined
-- No mutations/actions in this file — no `convex/react` imports remain
-- Files changed: `apps/admin/src/routes/_authenticated/admin.organisationer.$id.tsx`
-- **Learnings for future iterations:**
-  - Pages with nullable query results (org can be `null` for not-found): `useSuspenseQuery` eliminates `undefined` (loading) but `null` remains a valid data value — keep null checks
-  - Pages with multiple queries that all feed the same view: all can use `useSuspenseQuery` — Suspense boundary (pendingComponent) handles the loading state for all of them simultaneously
-  - When a page has both inline skeletons (OverviewSkeleton) and a route-level skeleton (DetailSkeleton), the route-level pendingComponent replaces both — remove the inline one
----
-
-## 2026-04-03 - US-009
-- Migrated `hiss.$id.index.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Hiss query: `useSuspenseQuery` with queryKey/staleTime extraction pattern
-- Org query: `useQuery` from `@tanstack/react-query` with `convexQuery(..., "skip")` pattern — conditional on hiss being non-null
-- Enhanced `DetailSkeleton` pendingComponent matching full page layout (header with back button + badge, separator, 7 card sections with varying field counts)
-- Changed `if (hiss === undefined)` loading check to `if (hiss === null)` not-found check with user-facing message
-- Kept `useMutation` (archive) on `convex/react`
-- Files changed: `apps/admin/src/routes/_authenticated/hiss.$id.index.tsx`
-- **Learnings for future iterations:**
-  - Pages with dependent/conditional queries: use `useSuspenseQuery` for the primary query and `useQuery` (from @tanstack/react-query) for the dependent query with `convexQuery(api.foo, condition ? args : "skip")` — the "skip" variant sets `enabled: false` automatically
-  - Original code had no null handling for hiss (would crash on null) — migration is a good time to add proper not-found UI
----
-
-## 2026-04-03 - US-010
-- Migrated `hiss.$id.redigera.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Both `useQuery` calls migrated: `api.elevators.crud.get` and `api.organizations.list` — both use `useSuspenseQuery` with queryKey/staleTime extraction
-- Created `RedigeraSkeleton` pendingComponent matching tabbed form layout (header, 4-tab bar, 3 card sections with form fields grid, save bar)
-- Removed `if (!hiss || !initialized)` loading spinner — Suspense handles loading via pendingComponent
-- Added `if (hiss === null)` not-found check with back button
-- Kept `useMutation` (update) on `convex/react`
-- Kept `useEffect` for form initialization from server data + `initialized` flag (needed for one-time form population)
-- Files changed: `apps/admin/src/routes/_authenticated/hiss.$id.redigera.tsx`
-- **Learnings for future iterations:**
-  - Form edit pages: `useEffect` for one-time form initialization from server data still needed with Suspense — the `initialized` flag prevents re-populating on subscription updates
-  - `orgs` prop on `BasicInfoSection` accepts `undefined` but with `useSuspenseQuery` it's always defined — no breaking change
----
-
-## 2026-04-03 - US-011
-- Migrated `register.tsx` from `useQuery` (convex/react) to `useSuspenseQuery`/`useQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Two always-active queries (`suggestedValues.list`, `elevators.listing.list`) migrated to `useSuspenseQuery` with queryKey/staleTime extraction
-- Conditional export query (`elevators.listing.exportData`) migrated to `useQuery` from @tanstack/react-query with `convexQuery(..., "skip")` pattern
-- Removed `if (result === undefined)` loading check — Suspense handles loading via route-level `pendingComponent`
-- Added `pendingComponent: RegisterSkeleton` to route definition (reuses existing skeleton)
-- Removed redundant `as SuggestedValueItem[]` type assertion in `filterOptions` useMemo — data type already set in destructuring
-- Files changed: `apps/admin/src/routes/_authenticated/register.tsx`
-- **Learnings for future iterations:**
-  - Pages with mixed query patterns: always-active queries → `useSuspenseQuery`, conditional queries (export, search) → `useQuery` from @tanstack/react-query with `convexQuery(..., "skip")`
-  - `RegisterFilters` already accepts `filterOptions: FilterOptions | null` — `useSuspenseQuery` guarantees non-null, so type is still compatible (no narrowing needed)
-  - Export pattern (click triggers query, useEffect triggers download) works unchanged with TanStack Query — `useQuery` with "skip" returns `undefined` when disabled, same behavior as Convex `useQuery` with "skip"
----
-
-## 2026-04-03 - US-012
-- Migrated `modernisering.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- All four `useQuery` calls migrated: `timeline`, `budget`, `measures`, `priorityList` — all use `useSuspenseQuery` with queryKey/staleTime extraction
-- Reused existing `ModernizationSkeleton` as route-level `pendingComponent`
-- Removed `if (tidslinje === undefined || budget === undefined || atgarder === undefined || prioritetslista === undefined)` loading check
-- Kept `prioritetslistaArgs` useMemo with dynamic args based on `selectedPeriod` state — `useSuspenseQuery` re-fetches when args change
-- Kept `as never` type assertion on `prioritetslistaArgs` (needed because the args object shape varies)
-- Files changed: `apps/admin/src/routes/_authenticated/modernisering.tsx`
-- **Learnings for future iterations:**
-  - Straightforward migration when all queries are always-active (no conditional/skip queries)
-  - Dynamic query args via `useMemo` work seamlessly — `convexQuery` generates new queryKey when args change
-  - Existing skeleton components can be reused directly as `pendingComponent` without modification
----
-
-## 2026-04-03 - US-013
-- Migrated `underhall.tsx` from `useQuery` (convex/react) to `useSuspenseQuery`/`useQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Three always-active queries (`inspectionCalendar`, `companies`, `emergencyPhoneStatus`) migrated to `useSuspenseQuery` with queryKey/staleTime extraction
-- Conditional query (`inspectionList`) migrated to `useQuery` from @tanstack/react-query with `convexQuery(..., "skip")` pattern — conditional on `selectedManad` state
-- Reused existing `MaintenanceSkeleton` as route-level `pendingComponent`
-- Removed `if (kalender === undefined || foretag === undefined || nodtelefon === undefined)` loading check
-- Removed intermediate variables (`foretagData`, `nodData`) — destructured directly from `useSuspenseQuery` with type assertions
-- Files changed: `apps/admin/src/routes/_authenticated/underhall.tsx`
-- **Learnings for future iterations:**
-  - Mixed query pattern (always-active + conditional) same as US-011: `useSuspenseQuery` for always-active, `useQuery` with "skip" for conditional
-  - `convexQuery(..., "skip")` works with spread into `useQuery` options — no need for manual `enabled` flag
----
-
-## 2026-04-03 - US-014
-- Migrated `ny.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Single `useQuery` call (`api.organizations.list`) migrated to `useSuspenseQuery` with queryKey/staleTime extraction
-- Created `NyHissSkeleton` pendingComponent matching wizard form layout (header, step indicator, form fields, bottom navigation)
-- Kept `useMutation` (create) on `convex/react`
-- No inline loading checks to remove — `orgs` was passed directly to `ElevatorWizard` which already handled `undefined`
-- With `useSuspenseQuery`, `orgs` is now always defined — still compatible with `ElevatorWizard` props (`Array | undefined`)
-- Files changed: `apps/admin/src/routes/_authenticated/ny.tsx`
-- **Learnings for future iterations:**
-  - Simple single-query pages are the fastest to migrate — swap import, extract opts, add skeleton, done
-  - Components that already accept `T | undefined` props need no changes when switching to `useSuspenseQuery` (T is compatible with T | undefined)
----
-
-## 2026-04-03 - US-015
-- Migrated `webbplats.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Query is inside `PageTab` child component (not route component) — each tab has its own `useQuery(api.cms.getPage, { slug })`
-- Wrapped each `<PageTab>` in `<Suspense fallback={<PageTabSkeleton />}>` for per-tab loading
-- Created `WebbplatsSkeleton` route-level `pendingComponent` (header, tab bar, form fields)
-- Created `PageTabSkeleton` for per-tab Suspense fallback (header with badge/switch, form fields)
-- Removed `if (page === undefined)` loading check
-- Kept `useMutation` calls (createPage, updatePage) on `convex/react`
-- Kept `useEffect` for syncing `published` state from server data
-- Files changed: `apps/admin/src/routes/_authenticated/webbplats.tsx`
-- **Learnings for future iterations:**
-  - When query is inside a child component (not route component): wrap the child in `<Suspense>` with a skeleton fallback, AND add route-level `pendingComponent`
-  - `useSuspenseQuery` in a child component + `<Suspense>` boundary = loading handled by Suspense, not inline checks
-  - CMS page pattern: each tab mounts/unmounts its own `PageTab` — Suspense triggers per-tab on first render of each tab
----
-
-## 2026-04-03 - US-016
-- Migrated `sok.tsx` from `useQuery` (convex/react) to `useQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Migrated `global-search.tsx` from `useQuery` (convex/react) to `useQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Both use `convexQuery(api.foo, condition ? args : "skip")` spread pattern — "skip" sets `enabled: false` automatically
-- Replaced `results === undefined` loading check with `isFetching` from query result
-- Replaced `results !== undefined` empty-state guard with `!isFetching`
-- Added type assertions `as { data: T | undefined; isFetching: boolean }` to preserve local types
-- Files changed: `apps/admin/src/routes/_authenticated/sok.tsx`, `apps/admin/src/shared/components/global-search.tsx`
-- **Learnings for future iterations:**
-  - Conditional queries: use `useQuery` (not `useSuspenseQuery`) with `convexQuery(api.foo, condition ? args : "skip")` — spread directly, no manual `enabled` flag needed
-  - `convexQuery` with "skip" union type causes `data` to resolve as `any` — need type assertion on the destructured result (same pattern as dependent queries in US-009)
-  - Loading states: `isFetching` is true only during active network requests; when query is disabled (`enabled: false`), `isFetching` is false
----
-
-## 2026-04-03 - US-017
-- Migrated all four org feature components from `useQuery` (convex/react) to TanStack Query + `convexQuery`
-- `org-register-view.tsx`: Two always-active queries (`suggestedValues.list`, `elevators.listing.list`) → `useSuspenseQuery`; conditional export query → `useQuery` with "skip"; removed `if (result === undefined)` check; exported `RegisterViewSkeleton`
-- `org-modernization-view.tsx`: All three queries (`timeline`, `budget`, `priorityList`) → `useSuspenseQuery`; removed `if (... === undefined)` check; removed `ModernizationSkeleton` import (no longer used inline)
-- `org-maintenance-view.tsx`: Three always-active queries → `useSuspenseQuery`; conditional `inspectionList` → `useQuery` with "skip"; removed `if (... === undefined)` check; removed `MaintenanceSkeleton` import
-- `org-users-view.tsx`: Main `userAdmin.list` query → `useSuspenseQuery`; dialog's `organizations.list` → `useQuery` (non-suspense, renders in dialog); removed `if (users === undefined)` check; removed `?? []` fallback on table data; exported `OrgUsersSkeleton`; moved `Organisation` type to module level
-- Parent `admin.organisationer.$id.tsx`: Added `<Suspense>` wrapper around each tab view with appropriate skeleton fallbacks; imported skeletons from feature components and shared modules
-- Files changed: `apps/admin/src/features/organization/components/org-register-view.tsx`, `org-modernization-view.tsx`, `org-maintenance-view.tsx`, `org-users-view.tsx`, `apps/admin/src/routes/_authenticated/admin.organisationer.$id.tsx`
-- **Learnings for future iterations:**
-  - Feature components (non-route) use same `useSuspenseQuery` pattern as route components — parent wraps in `<Suspense fallback={<Skeleton />}>`
-  - Conditional queries in feature components: same "skip" pattern — `useQuery` from @tanstack/react-query with `convexQuery(api.foo, condition ? args : "skip")`
-  - Dialog-internal queries: use `useQuery` (non-suspense) since Suspense would hide the dialog — optional chaining on `data` handles loading
-  - When exporting skeletons for Suspense fallbacks, keep them in the same file as the component they represent for colocation
-  - `useSuspenseQuery` guarantees data: remove `?? []` fallbacks, remove `as T | undefined` assertions, pass data directly
----
-
-## 2026-04-03 - US-018
-- Migrated three non-route hooks/components from `useQuery` (convex/react) to TanStack Query + `convexQuery`
-- `hissnummer-field.tsx`: Conditional query → `useQuery` from @tanstack/react-query with `convexQuery(api.foo, condition ? args : "skip")` spread pattern; type assertion on destructured result
-- `use-suggestions.ts`: Always-active query → `useSuspenseQuery` with queryKey/staleTime extraction; removed `if (!data) return []` guard — data guaranteed by Suspense
-- `use-import-machine.ts`: Two queries migrated — `currentUser` (always-active) and `analysis` (conditional with "skip") both to `useQuery` from @tanstack/react-query with `convexQuery` spread; `useAction` kept on `convex/react`; state machine logic unchanged
-- Files changed: `apps/admin/src/features/elevator/components/hissnummer-field.tsx`, `apps/admin/src/features/elevator/hooks/use-suggestions.ts`, `apps/admin/src/features/import/hooks/use-import-machine.ts`
-- **Learnings for future iterations:**
-  - Non-route hooks follow the same patterns as route components: conditional → `useQuery` + "skip", always-active → `useSuspenseQuery`
-  - `use-import-machine.ts` uses `useQuery` (not `useSuspenseQuery`) for both queries since the import machine hook is not guaranteed to have a Suspense boundary and `currentUser` is only used for email (non-critical)
-  - State machine hooks: only touch the query/action imports, leave all `useState`/`useCallback`/`useRef` logic untouched
----
-
-## 2026-04-03 - US-019
-- Final cleanup pass — removed deprecated code made obsolete by the migration
-- Removed `ConvexClerkProvider` from `packages/auth/src/provider.tsx` (unused wrapper component — both apps use `ConvexProviderWithClerk` directly)
-- Removed `ConvexClerkProvider` export from `packages/auth/src/index.ts`
-- Verified: `ConvexHttpClient`/`convex/browser` already removed (US-003)
-- Verified: module-level `ConvexReactClient` already removed from `__root.tsx` (US-002)
-- Verified: no `useQuery` from `convex/react` remains — only `useMutation`/`useAction` imports (legitimate)
-- Verified: remaining `as ... | undefined` type assertions are TanStack Query "skip" union workarounds (needed), not old Convex workarounds
-- Files changed: `packages/auth/src/provider.tsx`, `packages/auth/src/index.ts`
-- **Learnings for future iterations:**
-  - Type assertions on conditional `useQuery` with `convexQuery(..., "skip")` are inherent to the TanStack Query integration — they are NOT Convex workarounds to clean up
-  - Final cleanup stories benefit from grepping first to verify what's already been addressed by prior stories
+  - When removing a column from a table, grep for ALL references across the entire codebase (types, middleware, server functions, UI components)
+  - Local UI types must match Drizzle's full return shape including fields from related tables (e.g. `parentId` on organizations from US-001)
+  - `replace_all: true` with Edit tool is efficient for mechanical find-and-replace across a file
 ---

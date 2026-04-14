@@ -59,11 +59,15 @@ type UserRecord = {
   email: string;
   name: string;
   role: "admin" | "customer";
-  organizationId: string | null;
   active: boolean;
   createdAt: Date;
   lastLogin: Date | null;
-  organization: { id: string; name: string; organizationNumber: string | null; contactPerson: string | null; phoneNumber: string | null; email: string | null; createdAt: Date } | null;
+  userOrganizations: Array<{
+    userId: string;
+    organizationId: string;
+    createdAt: Date;
+    organization: { id: string; name: string; organizationNumber: string | null; contactPerson: string | null; phoneNumber: string | null; email: string | null; parentId: string | null; createdAt: Date };
+  }>;
 };
 
 type Organisation = { id: string; name: string };
@@ -408,7 +412,7 @@ function EditUserDialogInner({
       name: user.name,
       email: user.email,
       role: user.role as "admin" | "customer",
-      organizationId: user.organizationId ?? "",
+      organizationId: user.userOrganizations[0]?.organizationId ?? "",
     },
     onSubmit: async ({ value }) => {
       await onSubmit({

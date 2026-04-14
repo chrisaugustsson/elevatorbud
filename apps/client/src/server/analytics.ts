@@ -9,7 +9,7 @@ const NOT_MODERNIZED = "Ej ombyggd";
 export const getStats = createServerFn()
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
     const activeCondition = eq(elevators.status, "active");
     const where = and(activeCondition, eq(elevators.organizationId, orgId));
 
@@ -74,7 +74,7 @@ export const statsOptions = () =>
 export const getChartData = createServerFn()
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
     const orgFilter = sql`AND e.organization_id = ${orgId}`;
     const activeFilter = sql`e.status = 'active'`;
 

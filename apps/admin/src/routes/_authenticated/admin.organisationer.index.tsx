@@ -57,6 +57,7 @@ type Organisation = {
   contactPerson: string | null;
   phoneNumber: string | null;
   email: string | null;
+  parentId: string | null;
   createdAt: Date;
 };
 

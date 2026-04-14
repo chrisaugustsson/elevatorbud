@@ -83,8 +83,8 @@ function AuthenticatedLayout() {
             orientation="vertical"
             className="mr-2 data-[orientation=vertical]:h-4"
           />
-          {user.organizationId && (
-            <OrgDisplay organisationId={user.organizationId} />
+          {user.organizationIds[0] && (
+            <OrgDisplay organisationId={user.organizationIds[0]} />
           )}
           <div className="ml-auto">
             <GlobalSearch />

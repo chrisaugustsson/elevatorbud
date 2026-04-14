@@ -303,7 +303,7 @@ function RegisterPage() {
     ...(buildYearMax && !isNaN(parseInt(buildYearMax))
       ? { buildYearMax: parseInt(buildYearMax) }
       : {}),
-    organizationId: user!.organizationId ?? undefined,
+    organizationId: user!.organizationIds[0] ?? undefined,
     ...(statusFilter !== "alla"
       ? { status: statusFilter as "active" | "demolished" | "archived" | "all" }
       : {}),

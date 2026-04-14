@@ -82,11 +82,15 @@ type Anvandare = {
   email: string;
   name: string;
   role: "admin" | "customer";
-  organizationId: string | null;
   active: boolean;
   createdAt: Date;
   lastLogin: Date | null;
-  organization: { id: string; name: string; organizationNumber: string | null; contactPerson: string | null; phoneNumber: string | null; email: string | null; createdAt: Date } | null;
+  userOrganizations: Array<{
+    userId: string;
+    organizationId: string;
+    createdAt: Date;
+    organization: { id: string; name: string; organizationNumber: string | null; contactPerson: string | null; phoneNumber: string | null; email: string | null; parentId: string | null; createdAt: Date };
+  }>;
 };
 
 type Organisation = {
@@ -198,13 +202,15 @@ function Anvandare() {
         </Badge>
       ),
     }),
-    columnHelper.accessor("organizationId", {
+    columnHelper.display({
+      id: "organization",
       size: 180,
       header: ({ column }) => <DataGridColumnHeader title="Organisation" column={column} />,
       enableSorting: false,
-      cell: (info) => {
-        const orgId = info.getValue();
-        return orgId ? orgMap.get(orgId) ?? "—" : "—";
+      cell: ({ row }) => {
+        const orgs = row.original.userOrganizations;
+        if (orgs.length === 0) return "—";
+        return orgs.map((uo) => uo.organization.name).join(", ");
       },
     }),
     columnHelper.accessor("active", {
@@ -804,7 +810,7 @@ function EditUserDialogInner({
       name: user.name,
       email: user.email,
       role: user.role as "admin" | "customer",
-      organizationId: user.organizationId ?? "",
+      organizationId: user.userOrganizations[0]?.organizationId ?? "",
     },
     onSubmit: async ({ value }) => {
       await onSubmit({

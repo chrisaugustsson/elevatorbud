@@ -9,7 +9,7 @@ export const getOrganization = createServerFn()
   .middleware([authMiddleware])
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
 
     // Client can only fetch their own organization
     if (data.id !== orgId) {

@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { createClerkClient } from "@clerk/backend";
-import { users } from "@elevatorbud/db/schema";
+import { users, userOrganizations, organizations } from "@elevatorbud/db/schema";
 import type { Database } from "@elevatorbud/db";
 import { adminMiddleware } from "./auth";
 
@@ -36,6 +36,13 @@ const createUserSchema = z.object({
   organizationId: z.string().uuid().optional(),
 });
 
+type UserWithOrgs = typeof users.$inferSelect & {
+  userOrganizations: Array<{
+    organizationId: string;
+    organization: typeof organizations.$inferSelect;
+  }>;
+};
+
 // ---------------------------------------------------------------------------
 // Inlined query logic
 // Admin sees ALL users — no org scoping.
@@ -45,15 +52,35 @@ async function listUsersFn(
   db: Database,
   filters?: z.infer<typeof listUsersSchema>,
 ) {
+  if (filters?.organizationId) {
+    const userIds = await db
+      .select({ userId: userOrganizations.userId })
+      .from(userOrganizations)
+      .where(eq(userOrganizations.organizationId, filters.organizationId));
+
+    const conditions = [
+      inArray(
+        users.id,
+        userIds.map((r) => r.userId),
+      ),
+    ];
+    if (filters?.role) conditions.push(eq(users.role, filters.role));
+
+    if (userIds.length === 0) return [];
+
+    return db.query.users.findMany({
+      where: and(...conditions),
+      with: { userOrganizations: { with: { organization: true } } },
+      orderBy: (u, { asc }) => [asc(u.name)],
+    });
+  }
+
   const conditions = [];
   if (filters?.role) conditions.push(eq(users.role, filters.role));
-  if (filters?.organizationId) {
-    conditions.push(eq(users.organizationId, filters.organizationId));
-  }
 
   return db.query.users.findMany({
     where: conditions.length ? and(...conditions) : undefined,
-    with: { organization: true },
+    with: { userOrganizations: { with: { organization: true } } },
     orderBy: (u, { asc }) => [asc(u.name)],
   });
 }
@@ -62,12 +89,27 @@ async function updateUserFn(
   db: Database,
   input: z.infer<typeof updateUserSchema>,
 ) {
-  const { id, ...data } = input;
+  const { id, organizationId, ...data } = input;
+
   const [user] = await db
     .update(users)
     .set(data)
     .where(eq(users.id, id))
     .returning();
+
+  if (organizationId !== undefined) {
+    await db
+      .delete(userOrganizations)
+      .where(eq(userOrganizations.userId, id));
+
+    if (organizationId) {
+      await db.insert(userOrganizations).values({
+        userId: id,
+        organizationId,
+      });
+    }
+  }
+
   return user;
 }
 
@@ -105,10 +147,19 @@ async function createUserFn(
     skipPasswordRequirement: true,
   });
 
+  const { organizationId, ...userFields } = input;
   const [user] = await db
     .insert(users)
-    .values({ ...input, clerkUserId: clerkUser.id, active: true })
+    .values({ ...userFields, clerkUserId: clerkUser.id, active: true })
     .returning();
+
+  if (organizationId) {
+    await db.insert(userOrganizations).values({
+      userId: user.id,
+      organizationId,
+    });
+  }
+
   return user;
 }
 

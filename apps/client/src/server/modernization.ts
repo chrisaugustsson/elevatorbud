@@ -7,7 +7,7 @@ import { authMiddleware } from "./auth";
 export const getTimeline = createServerFn()
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
 
     const result = await context.db.execute(sql`
       SELECT
@@ -44,7 +44,7 @@ export const timelineOptions = () =>
 export const getBudget = createServerFn()
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
 
     const result = await context.db.execute(sql`
       SELECT
@@ -102,7 +102,7 @@ export const getPriorityList = createServerFn()
     }),
   )
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
     const page = data.page ?? 1;
     const pageSize = data.pageSize ?? 50;
     const offset = (page - 1) * pageSize;

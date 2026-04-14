@@ -1,7 +1,7 @@
 import { createMiddleware } from "@tanstack/react-start";
 import { auth } from "@clerk/tanstack-react-start/server";
 import { createDb } from "@elevatorbud/db";
-import { users } from "@elevatorbud/db/schema";
+import { users, userOrganizations } from "@elevatorbud/db/schema";
 import { eq } from "drizzle-orm";
 import type { User } from "@elevatorbud/types";
 
@@ -26,13 +26,18 @@ async function resolveUser(requiredRole?: "admin" | "customer") {
     throw new Error("Kräver admin-behörighet");
   }
 
+  const orgRows = await db
+    .select({ organizationId: userOrganizations.organizationId })
+    .from(userOrganizations)
+    .where(eq(userOrganizations.userId, dbUser.id));
+
   const user: User = {
     id: dbUser.id,
     clerkUserId: dbUser.clerkUserId,
     email: dbUser.email,
     name: dbUser.name,
     role: dbUser.role,
-    organizationId: dbUser.organizationId,
+    organizationIds: orgRows.map((r) => r.organizationId),
     active: dbUser.active,
   };
 
@@ -68,13 +73,18 @@ export async function getAuthUser(): Promise<User | null> {
   });
   if (!dbUser) return null;
 
+  const orgRows = await db
+    .select({ organizationId: userOrganizations.organizationId })
+    .from(userOrganizations)
+    .where(eq(userOrganizations.userId, dbUser.id));
+
   return {
     id: dbUser.id,
     clerkUserId: dbUser.clerkUserId,
     email: dbUser.email,
     name: dbUser.name,
     role: dbUser.role,
-    organizationId: dbUser.organizationId,
+    organizationIds: orgRows.map((r) => r.organizationId),
     active: dbUser.active,
   };
 }

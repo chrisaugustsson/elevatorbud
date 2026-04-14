@@ -112,7 +112,7 @@ export const getElevator = createServerFn()
   .middleware([authMiddleware])
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
     const elevator = await context.db.query.elevators.findFirst({
       where: and(
         eq(elevators.id, data.id),
@@ -136,7 +136,7 @@ export const getElevatorDetails = createServerFn()
   .middleware([authMiddleware])
   .inputValidator(z.object({ elevatorId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
 
     // Verify elevator belongs to user's org
     const elevator = await context.db.query.elevators.findFirst({
@@ -163,7 +163,7 @@ export const getLatestBudget = createServerFn()
   .middleware([authMiddleware])
   .inputValidator(z.object({ elevatorId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
 
     // Verify elevator belongs to user's org
     const elevator = await context.db.query.elevators.findFirst({
@@ -191,7 +191,7 @@ export const searchElevators = createServerFn()
   .middleware([authMiddleware])
   .inputValidator(z.object({ search: z.string() }))
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
 
     if (!data.search.trim()) return [];
     const s = `%${data.search}%`;
@@ -246,7 +246,7 @@ export const listElevators = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(listInputSchema)
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
     const page = data.page ?? 1;
     const pageSize = data.pageSize ?? 50;
     const sortBy = data.sortBy ?? "elevatorNumber";
@@ -324,7 +324,7 @@ export const exportElevatorData = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(filterSchema)
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
     const where = buildWhereConditions(data, orgId);
 
     return context.db

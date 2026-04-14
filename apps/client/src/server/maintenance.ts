@@ -8,7 +8,7 @@ import { authMiddleware } from "./auth";
 export const getInspectionCalendar = createServerFn()
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
 
     const result = await context.db.execute(sql`
       SELECT inspection_month as month, count(*)::int as count
@@ -36,7 +36,7 @@ export const inspectionCalendarOptions = () =>
 export const getMaintenanceCompanies = createServerFn()
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
 
     const result = await context.db.execute(sql`
       SELECT
@@ -85,7 +85,7 @@ export const maintenanceCompaniesOptions = () =>
 export const getEmergencyPhoneStatus = createServerFn()
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
 
     const result = await context.db.execute(sql`
       SELECT
@@ -127,7 +127,7 @@ export const getInspectionList = createServerFn()
   .middleware([authMiddleware])
   .inputValidator(z.object({ month: z.string() }))
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const orgId = context.user.organizationIds[0];
 
     return context.db
       .select({

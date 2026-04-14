@@ -10,6 +10,7 @@ import {
   jsonb,
   numeric,
   check,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
@@ -40,7 +41,7 @@ export const organizationsRelations = relations(
     }),
     children: many(organizations, { relationName: "parentChild" }),
     elevators: many(elevators),
-    users: many(users),
+    userOrganizations: many(userOrganizations),
   }),
 );
 
@@ -56,7 +57,6 @@ export const users = pgTable(
     role: text("role", { enum: ["admin", "customer"] })
       .notNull()
       .default("customer"),
-    organizationId: uuid("organization_id").references(() => organizations.id),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -66,18 +66,48 @@ export const users = pgTable(
   (t) => [
     unique("users_clerk_user_id_unique").on(t.clerkUserId),
     unique("users_email_unique").on(t.email),
-    index("users_organization_id_idx").on(t.organizationId),
     index("users_role_idx").on(t.role),
     check("users_role_check", sql`${t.role} IN ('admin', 'customer')`),
   ],
 );
 
-export const usersRelations = relations(users, ({ one }) => ({
-  organization: one(organizations, {
-    fields: [users.organizationId],
-    references: [organizations.id],
-  }),
+export const usersRelations = relations(users, ({ many }) => ({
+  userOrganizations: many(userOrganizations),
 }));
+
+// ─── User–Organization join table ───────────────────────────────────────────
+
+export const userOrganizations = pgTable(
+  "user_organizations",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.organizationId] }),
+  ],
+);
+
+export const userOrganizationsRelations = relations(
+  userOrganizations,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userOrganizations.userId],
+      references: [users.id],
+    }),
+    organization: one(organizations, {
+      fields: [userOrganizations.organizationId],
+      references: [organizations.id],
+    }),
+  }),
+);
 
 // ─── Elevators (core) ────────────────────────────────────────────────────────
 
