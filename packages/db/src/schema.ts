@@ -20,9 +20,6 @@ export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   organizationNumber: text("organization_number"),
-  contactPerson: text("contact_person"),
-  phoneNumber: text("phone_number"),
-  email: text("email"),
   parentId: uuid("parent_id").references((): any => organizations.id, {
     onDelete: "set null",
   }),
@@ -139,6 +136,11 @@ export const elevators = pgTable(
     // Emergency phone (summary flags for charts)
     hasEmergencyPhone: boolean("has_emergency_phone"),
     needsUpgrade: boolean("needs_upgrade"),
+
+    // Contact person
+    contactPersonName: text("contact_person_name"),
+    contactPersonPhone: text("contact_person_phone"),
+    contactPersonEmail: text("contact_person_email"),
 
     // Metadata
     organizationId: uuid("organization_id")

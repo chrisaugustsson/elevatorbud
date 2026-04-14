@@ -13,18 +13,12 @@ import { adminMiddleware } from "./auth";
 const createOrganizationSchema = z.object({
   name: z.string().min(1),
   organizationNumber: z.string().optional(),
-  contactPerson: z.string().optional(),
-  phoneNumber: z.string().optional(),
-  email: z.string().email().optional(),
 });
 
 const updateOrganizationSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).optional(),
   organizationNumber: z.string().optional(),
-  contactPerson: z.string().optional(),
-  phoneNumber: z.string().optional(),
-  email: z.string().email().optional(),
 });
 
 // ---------------------------------------------------------------------------

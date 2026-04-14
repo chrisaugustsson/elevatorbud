@@ -54,9 +54,6 @@ type Organisation = {
   id: string;
   name: string;
   organizationNumber: string | null;
-  contactPerson: string | null;
-  phoneNumber: string | null;
-  email: string | null;
   parentId: string | null;
   createdAt: Date;
 };
@@ -83,22 +80,6 @@ const columns = [
       <span className="tabular-nums">{info.getValue() || "—"}</span>
     ),
   }),
-  columnHelper.accessor("contactPerson", {
-    size: 180,
-    header: ({ column }) => (
-      <DataGridColumnHeader title="Kontaktperson" column={column} />
-    ),
-    enableSorting: false,
-    cell: (info) => info.getValue() || "—",
-  }),
-  columnHelper.accessor("email", {
-    size: 240,
-    header: ({ column }) => (
-      <DataGridColumnHeader title="E-post" column={column} />
-    ),
-    enableSorting: false,
-    cell: (info) => info.getValue() || "—",
-  }),
 ];
 
 function validateOrganisationsnummer(value: string): string | undefined {
@@ -113,12 +94,12 @@ function Organisationer() {
   const queryClient = useQueryClient();
   const { data: orgs } = useSuspenseQuery(listOrganizationsOptions());
   const createOrg = useMutation({
-    mutationFn: (input: { name: string; organizationNumber?: string; contactPerson?: string; phoneNumber?: string; email?: string }) =>
+    mutationFn: (input: { name: string; organizationNumber?: string }) =>
       createOrganization({ data: input }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["organization"] }); },
   });
   const updateOrg = useMutation({
-    mutationFn: (input: { id: string; name?: string; organizationNumber?: string; contactPerson?: string; phoneNumber?: string; email?: string }) =>
+    mutationFn: (input: { id: string; name?: string; organizationNumber?: string }) =>
       updateOrganization({ data: input }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["organization"] }); },
   });
@@ -226,26 +207,17 @@ function CreateOrgDialog({
   onSubmit: (values: {
     name: string;
     organizationNumber?: string;
-    contactPerson?: string;
-    phoneNumber?: string;
-    email?: string;
   }) => Promise<void>;
 }) {
   const form = useForm({
     defaultValues: {
       name: "",
       organizationNumber: "",
-      contactPerson: "",
-      phoneNumber: "",
-      email: "",
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
         name: value.name,
         organizationNumber: value.organizationNumber || undefined,
-        contactPerson: value.contactPerson || undefined,
-        phoneNumber: value.phoneNumber || undefined,
-        email: value.email || undefined,
       });
       form.reset();
     },
@@ -337,49 +309,6 @@ function CreateOrgDialog({
             )}
           </form.Field>
 
-          <form.Field name="contactPerson">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Kontaktperson</Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="Förnamn Efternamn"
-                />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="phoneNumber">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Telefonnummer</Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="070-123 45 67"
-                />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="email">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>E-post</Label>
-                <Input
-                  id={field.name}
-                  type="email"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="kontakt@foretag.se"
-                />
-              </div>
-            )}
-          </form.Field>
-
           <DialogFooter>
             <Button
               type="button"
@@ -414,9 +343,6 @@ function EditOrgDialog({
   onSubmit: (values: {
     name?: string;
     organizationNumber?: string;
-    contactPerson?: string;
-    phoneNumber?: string;
-    email?: string;
   }) => Promise<void>;
 }) {
   if (!org) return null;
@@ -441,26 +367,17 @@ function EditOrgDialogInner({
   onSubmit: (values: {
     name?: string;
     organizationNumber?: string;
-    contactPerson?: string;
-    phoneNumber?: string;
-    email?: string;
   }) => Promise<void>;
 }) {
   const form = useForm({
     defaultValues: {
       name: org.name,
       organizationNumber: org.organizationNumber ?? "",
-      contactPerson: org.contactPerson ?? "",
-      phoneNumber: org.phoneNumber ?? "",
-      email: org.email ?? "",
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
         name: value.name,
         organizationNumber: value.organizationNumber || undefined,
-        contactPerson: value.contactPerson || undefined,
-        phoneNumber: value.phoneNumber || undefined,
-        email: value.email || undefined,
       });
     },
   });
@@ -551,46 +468,6 @@ function EditOrgDialogInner({
                       {error}
                     </p>
                   ))}
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="contactPerson">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Kontaktperson</Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="phoneNumber">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Telefonnummer</Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="email">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>E-post</Label>
-                <Input
-                  id={field.name}
-                  type="email"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
               </div>
             )}
           </form.Field>

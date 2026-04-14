@@ -186,9 +186,6 @@ function OrganisationDetail() {
           </div>
           <div className="ml-10 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
             {org.organizationNumber && <span>{org.organizationNumber}</span>}
-            {org.contactPerson && <span>{org.contactPerson}</span>}
-            {org.email && <span>{org.email}</span>}
-            {org.phoneNumber && <span>{org.phoneNumber}</span>}
           </div>
         </div>
       </div>

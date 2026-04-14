@@ -89,7 +89,7 @@ type Anvandare = {
     userId: string;
     organizationId: string;
     createdAt: Date;
-    organization: { id: string; name: string; organizationNumber: string | null; contactPerson: string | null; phoneNumber: string | null; email: string | null; parentId: string | null; createdAt: Date };
+    organization: { id: string; name: string; organizationNumber: string | null; parentId: string | null; createdAt: Date };
   }>;
 };
 

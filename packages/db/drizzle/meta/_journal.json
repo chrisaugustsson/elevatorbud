@@ -29,6 +29,13 @@
       "when": 1776194757376,
       "tag": "0003_same_alex_power",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776195137793,
+      "tag": "0004_panoramic_mikhail_rasputin",
+      "breakpoints": true
     }
   ]
 }
