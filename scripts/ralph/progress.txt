@@ -465,3 +465,21 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - Resolved org mapping stored client-side avoids modifying server-side `analyzeImport` — clean separation of user choices vs server analysis
   - `listOrganizationsOptions` already exists in `organization.ts` — no new server function needed
 ---
+
+## 2026-04-15 - US-022
+- Added inline `CreateOrgDialog` to `OrgMappingSection` — opens from the "Skapa organisation" dropdown option
+- Dialog fields: name (prefilled from Excel row), optional parent organization (searchable dropdown of root orgs)
+- On save: calls `createOrganization` server function, invalidates org list query, auto-selects new org on the mapping row
+- All import state (parsed Excel, sheet selections, column mappings, other org mappings) persists across dialog open/close
+- Dialog confirms discard when closed with modified fields (`window.confirm`)
+- Focus restored to triggering combobox button on dialog close via `triggerRefMap` (Map of refs per excel name)
+- Removed `CREATE_SENTINEL` from import machine — orgs are now created inline, not deferred to import time
+- Added `ParentOrgSelect` component locally (simplified from org management page pattern)
+- Files changed:
+  - `apps/admin/src/features/import/components/org-mapping-section.tsx`
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+- **Learnings for future iterations:**
+  - `useForm` from `@tanstack/react-form` needs `form.reset()` + `form.setFieldValue()` in `useEffect` to sync `defaultValues` when dialog reopens with a different name
+  - `triggerRefMap` (Map<string, HTMLButtonElement>) pattern enables focus restoration across multiple rows without per-row state
+  - Removing `CREATE_SENTINEL` simplifies the import machine — all org mappings are resolved to real IDs before proceeding
+---
