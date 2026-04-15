@@ -113,8 +113,8 @@ export function PreviewSection({
                 variant="default"
               />
               <StatCard
-                label="Organisationer"
-                value={resolvedOrgMapping ? resolvedOrgMapping.matchedOrgs.length : analysis.summary.matchedOrgs}
+                label="Nya org."
+                value={resolvedOrgMapping ? resolvedOrgMapping.newOrgNames.length : analysis.summary.newOrgs}
                 variant="default"
               />
             </div>

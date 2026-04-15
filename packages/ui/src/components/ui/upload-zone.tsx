@@ -44,9 +44,15 @@ function UploadZone({
   return (
     <Card className={className}>
       <CardContent className="pt-6">
+        {/*
+          Drop container is NOT interactive for click/keyboard users — the
+          visible "Välj fil" button (below) is the accessible affordance.
+          Keeping the drag/drop handlers here is fine: drag events have no
+          a11y requirement because they require a pointing device anyway.
+        */}
         <div
           className={cn(
-            "flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 text-center transition-colors",
+            "flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 text-center transition-colors",
             isDragOver
               ? "border-primary bg-primary/5"
               : "border-muted-foreground/25 hover:border-muted-foreground/50",
@@ -54,7 +60,6 @@ function UploadZone({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
         >
           <Upload
             aria-hidden="true"

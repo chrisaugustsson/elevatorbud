@@ -420,16 +420,22 @@ export function useImportMachine() {
   }, []);
 
   const handleBackToMapping = useCallback(() => {
-    // Re-enter column mapping at the first sheet, using the previously
-    // confirmed mapping (if any) as inherited defaults. Preserve parseResult
-    // and the resolved org-mapping so going back to preview later restores
-    // the admin's selections.
-    const firstSheet = selectedSheets[0];
-    if (!firstSheet) return;
+    // Re-enter column mapping at the LAST sheet the admin confirmed before
+    // advancing to org-mapping — advancing forward walks through every sheet
+    // in order, so the final one is where they left off. Previously this
+    // reset to index 0 which forced the admin to click "Nästa ark" through
+    // every already-mapped sheet again (US-018, UX polish). The per-sheet
+    // mappings in `sheetMappings` already persist, so only the index is
+    // restored here; previously confirmed mappings are passed as inherited
+    // defaults. parseResult and resolvedOrgMapping are preserved so Back
+    // from preview later still restores selections.
+    if (selectedSheets.length === 0) return;
+    const lastIndex = selectedSheets.length - 1;
+    const lastSheet = selectedSheets[lastIndex];
 
-    const existing = sheetMappings.get(firstSheet);
-    setCurrentSheetIndex(0);
-    if (loadSheetForMapping(firstSheet, existing?.mappings)) {
+    const existing = sheetMappings.get(lastSheet);
+    setCurrentSheetIndex(lastIndex);
+    if (loadSheetForMapping(lastSheet, existing?.mappings)) {
       setStatus("mapping");
     }
   }, [selectedSheets, sheetMappings, loadSheetForMapping]);

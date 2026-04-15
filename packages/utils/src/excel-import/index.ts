@@ -1,9 +1,8 @@
 import * as XLSX from "xlsx";
-import type { ParsedElevator, ImportWarning, FullImportResult, ElevatorParseResult, SheetInfo } from "./types";
-import { parseElevatorSheet } from "./parse-elevator-sheet";
+import type { SheetInfo } from "./types";
 
 // Re-export everything consumers need
-export { parseElevatorSheet, parseElevatorSheetWithMapping } from "./parse-elevator-sheet";
+export { parseElevatorSheetWithMapping } from "./parse-elevator-sheet";
 export { ELEVATOR_COLUMNS } from "./column-mappings";
 export { HEADER_ALIASES, TARGET_FIELDS } from "./header-aliases";
 export { autoMapSheet, autoMapColumns, detectHeaderRow, getSheetData } from "./auto-mapper";
@@ -46,36 +45,4 @@ export function getWorkbookSheetInfo(workbook: XLSX.WorkBook): SheetInfo[] {
       firstRowPreview: firstRow,
     };
   });
-}
-
-/**
- * Parses an entire Excel import file.
- * Looks for a 'Hissar' sheet by default; returns elevator data.
- */
-export function parseExcelImport(workbook: XLSX.WorkBook): FullImportResult {
-  const sheetNames = workbook.SheetNames;
-  const hasHissar = sheetNames.includes("Hissar");
-
-  const allWarnings: ImportWarning[] = [];
-  const allInvalidRows: { row: number; sheet: string; reason: string }[] = [];
-
-  let hissarResult: ElevatorParseResult;
-  if (hasHissar) {
-    hissarResult = parseElevatorSheet(workbook);
-    allWarnings.push(...hissarResult.warnings);
-    allInvalidRows.push(
-      ...hissarResult.invalidRows.map((r) => ({ ...r, sheet: "Hissar" })),
-    );
-  } else {
-    hissarResult = { elevators: [], warnings: [], invalidRows: [], sheetName: "Hissar" };
-  }
-
-  return {
-    elevators: hissarResult.elevators,
-    warnings: allWarnings,
-    invalidRows: allInvalidRows,
-    sheets: {
-      elevators: { found: hasHissar, count: hissarResult.elevators.length },
-    },
-  };
 }
