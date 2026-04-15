@@ -1,5 +1,5 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { Pool } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
 import { sql } from "drizzle-orm";
 
 const PROD_PATTERNS = [
@@ -33,8 +33,8 @@ if (looksLikeProd) {
   process.exit(1);
 }
 
-const client = neon(databaseUrl);
-const db = drizzle(client);
+const pool = new Pool({ connectionString: databaseUrl });
+const db = drizzle(pool);
 
 // FK dependency order (children before parents):
 //   elevator_budgets    → elevators, users
@@ -60,4 +60,5 @@ for (const table of tables) {
   console.log(`Truncated ${table}`);
 }
 
+await pool.end();
 console.log("Reset complete.");
