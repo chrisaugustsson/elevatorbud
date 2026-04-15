@@ -507,3 +507,25 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - When resolved org mapping is built client-side (US-022 inline creation), the import server function can receive `_organizationId` per row and skip all org creation/lookup
   - Removing batching simplifies error handling — a single transactional call means either everything succeeds or nothing does
 ---
+
+## 2026-04-15 - US-024
+- Created `ImportStepper` component showing 5 steps with numbered circles, check marks for completed steps, and highlighted current step
+- Added screen-reader-only text announcing current step ("Steg 2 av 5: Välj ark")
+- Added back navigation handlers to import machine: `handleBackToUpload`, `handleBackToSheetSelection`, `handleBackToMapping`, `handleBackToOrgMapping`
+- Back navigation preserves state: workbook ref, sheet infos, selected sheets, sheet mappings, parse results, org mappings all retained appropriately per step
+- Renamed `onCancel` → `onBack` and "Avbryt" → "Tillbaka" on all step components (sheet selection, column mapping, org mapping, preview)
+- Each step has exactly one primary CTA and one secondary (Back) except upload which has no back
+- Stepper uses semantic `<nav>` + `<ol>` with `aria-current="step"` on the active step circle
+- Files changed:
+  - `apps/admin/src/features/import/components/import-stepper.tsx` (new)
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+  - `apps/admin/src/features/import/components/sheet-selection-section.tsx`
+  - `apps/admin/src/features/import/components/column-mapping-section.tsx`
+  - `apps/admin/src/features/import/components/org-mapping-section.tsx`
+  - `apps/admin/src/features/import/components/preview-section.tsx`
+- **Learnings for future iterations:**
+  - Back navigation needs different levels of state reset per target step — going back to sheet selection clears mappings but keeps workbook/sheet infos
+  - `handleReset` can just alias `handleBackToUpload` since full reset = back to step 1
+  - Step labels hidden on narrow screens via `hidden sm:inline` keeps stepper compact on mobile
+---
