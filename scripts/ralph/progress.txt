@@ -551,3 +551,17 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - `aria-live="assertive"` on error containers ensures screen readers announce errors immediately
   - `e.stopPropagation()` on nested button inside clickable div prevents the parent's onClick from double-firing
 ---
+
+## 2026-04-15 - US-026
+- Added validation: if all selected sheets have zero data rows, "Nästa" button is disabled
+- Added warning banner explaining the issue when all selected sheets are empty
+- Verified existing implementations cover other acceptance criteria:
+  - Empty sheets already show inline warning with AlertTriangle icon (from US-017)
+  - Missing mandatory fields already shown with red destructive badges (from US-019)
+  - "Bekräfta mappning" button already disabled when mandatory fields missing (from US-019)
+- Files changed:
+  - `apps/admin/src/features/import/components/sheet-selection-section.tsx`
+  - `scripts/ralph/prd.json`
+- **Learnings for future iterations:**
+  - Check existing implementations before coding — most of US-026 was already done across US-017 and US-019
+---

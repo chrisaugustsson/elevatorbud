@@ -46,7 +46,10 @@ export function SheetSelectionSection({
     }
   };
 
-  const canProceed = selected.size > 0;
+  const allSelectedEmpty = selected.size > 0 && [...selected].every(
+    (name) => sheetInfos.find((s) => s.name === name)?.rowCount === 0,
+  );
+  const canProceed = selected.size > 0 && !allSelectedEmpty;
 
   return (
     <Card>
@@ -110,6 +113,13 @@ export function SheetSelectionSection({
             );
           })}
         </div>
+
+        {allSelectedEmpty && (
+          <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            Alla valda ark saknar datarader. Välj minst ett ark som innehåller data.
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={onBack}>
