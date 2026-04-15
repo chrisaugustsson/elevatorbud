@@ -286,3 +286,29 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - React class component ErrorBoundary is still required — no hook equivalent for `getDerivedStateFromError`
   - `queryClient.invalidateQueries` with specific query key is the retry mechanism for error boundaries
 ---
+
+## 2026-04-15 - US-014
+- Added sub-org drill-down to modernisering page when parent has children
+- Added `subOrgId` filter parameter to `getTimeline`, `getBudget`, and `getPriorityList` server functions
+- Added `getSubOrgBreakdown` server function returning per-org elevator counts for modernization
+- Created `SubOrgBreakdownChart` component (horizontal bar chart) with click drill-down
+- Added `subOrg` URL search param to modernisering page for filter state persistence
+- Clicking a sub-org bar filters all other charts (timeline, budget, priority list) to that sub-org
+- Dismissable filter chip appears above chart grid and in priority list header when sub-org selected
+- `aria-live="polite"` region announces drill-down changes
+- When parent has no children, sub-org chart is not rendered at all
+- Added keyboard accessibility (Enter/Space drill-down) and cursor pointer hover states to all chart components (timeline, budget per year, budget per district, sub-org breakdown)
+- All charts now have `tabIndex={0}`, `role="img"`, `aria-label`, and `onKeyDown` handlers
+- Files changed:
+  - `apps/client/src/server/modernization.ts`
+  - `apps/client/src/features/modernization/components/sub-org-breakdown-chart.tsx` (new)
+  - `apps/client/src/features/modernization/components/timeline-chart.tsx`
+  - `apps/client/src/features/modernization/components/budget-overview.tsx`
+  - `apps/client/src/features/modernization/components/priority-list.tsx`
+  - `apps/client/src/routes/_authenticated/$parentOrgId/modernisering.tsx`
+- **Learnings for future iterations:**
+  - Chart.js `onHover` callback with canvas `style.cursor` toggle is the standard way to show pointer cursor on clickable bars
+  - Chart.js canvas elements accept `tabIndex`, `onKeyDown`, `role`, `aria-label` props for keyboard accessibility
+  - `chartRef.current.getActiveElements()` provides the currently focused/hovered element index for keyboard-triggered drill-downs
+  - Pattern: server functions accept optional `subOrgId`, default to full `contextOrgIds` when absent — single `filterOrgIds` variable keeps queries clean
+---
