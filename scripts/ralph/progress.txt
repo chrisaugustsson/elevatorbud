@@ -401,3 +401,29 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - `extractOrgNamesOptions` query is keyed on row count to avoid re-extraction when parsed data hasn't changed
   - Parsed rows remain in client state (`parseResult`) — no server-side storage needed since client already has them
 ---
+
+## 2026-04-15 - US-019
+- Added per-sheet column mapping with sequential flow and inherited defaults
+- Import machine now tracks `currentSheetIndex` and `sheetMappings` (Map<sheetName, { mappings, headerRowIndex }>)
+- `loadSheetForMapping()` helper: auto-maps a sheet, then overlays inherited mappings from previous sheet by matching header names (case-insensitive)
+- First sheet uses pure `autoMapSheet` (existing `HEADER_ALIASES` logic); subsequent sheets inherit previous sheet's resolved mapping as defaults
+- `handleMappingConfirm` saves per-sheet mapping and advances to next sheet or triggers final parse with all sheet configs
+- Column mapping section: added sheet progress indicator ("Ark 2 av 4: [sheet name]") with visual step dots
+- Missing mandatory fields now shown with red destructive badges instead of amber warning
+- "Bekräfta mappning" button disabled when mandatory fields missing; shows "Nästa ark" when more sheets remain
+- Updated `parseExcelImportWithMapping` to accept `SheetMappingConfig[]` — parses all sheets and concatenates elevators
+- Added `SheetMappingConfig` type, exported from utils barrel
+- Files changed:
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `apps/admin/src/features/import/components/column-mapping-section.tsx`
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+  - `packages/utils/src/excel-import/parse-excel-import-with-mapping.ts`
+  - `packages/utils/src/excel-import/types.ts`
+  - `packages/utils/src/excel-import/index.ts`
+  - `packages/utils/src/index.ts`
+- **Learnings for future iterations:**
+  - Inherited mapping overlay: match by normalized header name (lowercase, trimmed) — auto-map takes priority, inherited fills gaps
+  - `parseExcelImportWithMapping` now uses discriminated union pattern (checks for `sheetName` property) for backward compatibility
+  - Component `key` should include both sheet name and header row index to force remount on sheet change
+  - `Map<string, T>` in React state requires `new Map(existing)` spread pattern for immutable updates
+---
