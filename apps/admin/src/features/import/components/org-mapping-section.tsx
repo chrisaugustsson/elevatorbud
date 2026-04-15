@@ -263,15 +263,29 @@ function OrgMappingRow({
   triggerRef: (el: HTMLButtonElement | null) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
   const selectedOrg = existingOrgs.find((o) => o.id === mapping.orgId);
   const isResolved = mapping.orgId !== null;
 
+  const MAX_VISIBLE = 100;
+  const filteredOrgs = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q
+      ? existingOrgs.filter((o) => o.name.toLowerCase().includes(q))
+      : existingOrgs;
+  }, [existingOrgs, search]);
+  const visibleOrgs = useMemo(
+    () => filteredOrgs.slice(0, MAX_VISIBLE),
+    [filteredOrgs],
+  );
+  const hiddenCount = Math.max(0, filteredOrgs.length - visibleOrgs.length);
+
   return (
     <div className="grid grid-cols-[1fr_1fr] items-center gap-4 px-4 py-3">
       <div className="flex items-center gap-2 min-w-0">
-        <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="truncate text-sm font-medium">
+        <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="truncate text-sm font-medium" title={mapping.excelName}>
           {mapping.excelName}
         </span>
       </div>
@@ -283,6 +297,7 @@ function OrgMappingRow({
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            title={selectedOrg?.name ?? undefined}
             className={cn(
               "w-full justify-between",
               !isResolved && "border-destructive text-destructive",
@@ -308,15 +323,20 @@ function OrgMappingRow({
           className="w-[var(--radix-popover-trigger-width)] p-0"
           align="start"
         >
-          <Command>
-            <CommandInput placeholder="Sök organisation..." />
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="Sök organisation..."
+              value={search}
+              onValueChange={setSearch}
+            />
             <CommandList>
               <CommandEmpty>Inga organisationer hittades.</CommandEmpty>
               <CommandGroup>
-                {existingOrgs.map((org) => (
+                {visibleOrgs.map((org) => (
                   <CommandItem
                     key={org.id}
                     value={org.name}
+                    title={org.name}
                     onSelect={() => {
                       onSelect(org.id);
                       setOpen(false);
@@ -338,6 +358,11 @@ function OrgMappingRow({
                     )}
                   </CommandItem>
                 ))}
+                {hiddenCount > 0 && (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                    Visar {visibleOrgs.length} av {visibleOrgs.length + hiddenCount}. Skriv för att filtrera fler.
+                  </div>
+                )}
               </CommandGroup>
               <CommandSeparator />
               <CommandGroup>
@@ -373,6 +398,8 @@ function CreateOrgDialog({
   existingOrgs: { id: string; name: string; parentId: string | null }[];
   onSubmit: (values: { name: string; parentId?: string | null }) => Promise<void>;
 }) {
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+
   const form = useForm({
     defaultValues: {
       name: defaultName,
@@ -400,18 +427,22 @@ function CreateOrgDialog({
     return name !== defaultName || parentId !== null;
   };
 
+  const closeWithoutConfirm = () => {
+    form.reset();
+    onOpenChange(false);
+  };
+
   const handleOpenChange = (next: boolean) => {
     if (!next && hasModifiedFields()) {
-      const confirmed = window.confirm(
-        "Du har osparade ändringar. Vill du stänga dialogen?",
-      );
-      if (!confirmed) return;
+      setConfirmDiscardOpen(true);
+      return;
     }
     if (!next) form.reset();
     onOpenChange(next);
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -496,6 +527,37 @@ function CreateOrgDialog({
         </form>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Kasta ändringarna?</DialogTitle>
+          <DialogDescription>
+            Du har osparade ändringar. Om du stänger dialogen försvinner de.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setConfirmDiscardOpen(false)}
+          >
+            Fortsätt redigera
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => {
+              setConfirmDiscardOpen(false);
+              closeWithoutConfirm();
+            }}
+          >
+            Kasta ändringar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 

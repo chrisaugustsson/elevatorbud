@@ -97,7 +97,7 @@ export function SheetSelectionSection({
                       {sheet.rowCount} {sheet.rowCount === 1 ? "rad" : "rader"}
                     </Badge>
                     {isEmpty && (
-                      <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300">
                         <AlertTriangle className="h-3 w-3" aria-hidden="true" />
                         Inga datarader
                       </span>
@@ -118,7 +118,11 @@ export function SheetSelectionSection({
         </div>
 
         {allSelectedEmpty && (
-          <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200" aria-live="polite">
+          <div
+            className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+            role="alert"
+            aria-live="polite"
+          >
             <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
             Alla valda ark saknar datarader. Välj minst ett ark som innehåller data.
           </div>

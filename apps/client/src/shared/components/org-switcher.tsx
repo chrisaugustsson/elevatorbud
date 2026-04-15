@@ -95,10 +95,12 @@ export function OrgSwitcher() {
       // route-level crossfade remount in $parentOrgId.tsx.
       announce(`Bytte till ${orgName}`);
       requestAnimationFrame(() => {
-        const heading = document.getElementById("page-heading");
-        if (heading instanceof HTMLElement) {
-          heading.setAttribute("tabindex", "-1");
-          heading.focus();
+        const target =
+          document.getElementById("page-heading") ??
+          document.querySelector<HTMLElement>("main[role='main'], [role='main'], main");
+        if (target instanceof HTMLElement) {
+          target.setAttribute("tabindex", "-1");
+          target.focus({ preventScroll: true });
         }
       });
     },

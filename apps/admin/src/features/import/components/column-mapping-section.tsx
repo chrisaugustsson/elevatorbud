@@ -221,7 +221,15 @@ export function ColumnMappingSection({
       {/* Mapping table */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base" ref={headingRef} tabIndex={-1}>Kolumnmappning</CardTitle>
+          <CardTitle className="text-base" ref={headingRef} tabIndex={-1}>
+            Kolumnmappning
+            {sheetProgress && sheetProgress.total > 1 && (
+              <span className="sr-only">
+                {" "}— Steg 3 av 5. Ark {sheetProgress.current} av {sheetProgress.total}
+                {sheetName ? `: ${sheetName}` : ""}
+              </span>
+            )}
+          </CardTitle>
           <CardDescription>
             Koppla kolumner i filen till rätt fält. Automatiskt matchade
             kolumner är förvalda.

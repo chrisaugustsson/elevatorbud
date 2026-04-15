@@ -131,16 +131,25 @@ function ChartSkeleton() {
 
 // --- Empty Chart ---
 
-function EmptyChart({ title }: { title: string }) {
+function EmptyChart({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle?: string;
+}) {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex h-[300px] flex-col items-center justify-center gap-2 text-muted-foreground">
-          <BarChart3 className="h-8 w-8" />
-          <p className="text-sm">Ingen data ännu</p>
+        <div className="flex h-[300px] flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+          <BarChart3 className="h-8 w-8" aria-hidden="true" />
+          <p className="text-sm font-medium">Ingen data ännu</p>
+          {subtitle && (
+            <p className="max-w-[260px] text-xs">{subtitle}</p>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -153,7 +162,13 @@ function DistrictChart({ parentOrgId }: { parentOrgId: string }) {
   const { data } = useSuspenseQuery(
     singleChartOptions(parentOrgId, "byDistrict"),
   );
-  if (data.length === 0) return <EmptyChart title="Hissar per distrikt" />;
+  if (data.length === 0)
+    return (
+      <EmptyChart
+        title="Hissar per distrikt"
+        subtitle="Inga hissar har tilldelats ett distrikt ännu."
+      />
+    );
   return (
     <DistrictChartInner data={data} parentOrgId={parentOrgId} />
   );
@@ -191,7 +206,12 @@ function AgeDistributionChart({ parentOrgId }: { parentOrgId: string }) {
     singleChartOptions(parentOrgId, "ageDistribution"),
   );
   if (data.length === 0)
-    return <EmptyChart title="Åldersfördelning" />;
+    return (
+      <EmptyChart
+        title="Åldersfördelning"
+        subtitle="Ingen byggår registrerat på hissarna ännu."
+      />
+    );
   return (
     <AgeDistributionChartInner data={data} parentOrgId={parentOrgId} />
   );
@@ -243,7 +263,13 @@ function ElevatorTypeChart({ parentOrgId }: { parentOrgId: string }) {
   const { data } = useSuspenseQuery(
     singleChartOptions(parentOrgId, "byElevatorType"),
   );
-  if (data.length === 0) return <EmptyChart title="Hisstyper" />;
+  if (data.length === 0)
+    return (
+      <EmptyChart
+        title="Hisstyper"
+        subtitle="Inga hisstyper är registrerade ännu."
+      />
+    );
   return <ElevatorTypeChartInner data={data} parentOrgId={parentOrgId} />;
 }
 
@@ -274,7 +300,12 @@ function ManufacturerChart({ parentOrgId }: { parentOrgId: string }) {
     singleChartOptions(parentOrgId, "topManufacturers"),
   );
   if (data.length === 0)
-    return <EmptyChart title="Topp 10 fabrikat" />;
+    return (
+      <EmptyChart
+        title="Topp 10 fabrikat"
+        subtitle="Inga fabrikat är registrerade på hissarna ännu."
+      />
+    );
   return <ManufacturerChartInner data={data} parentOrgId={parentOrgId} />;
 }
 
@@ -314,7 +345,12 @@ function ModernizationTimelineChart({
     singleChartOptions(parentOrgId, "modernizationTimeline"),
   );
   if (data.length === 0)
-    return <EmptyChart title="Moderniseringstidslinje" />;
+    return (
+      <EmptyChart
+        title="Moderniseringstidslinje"
+        subtitle="Inga planerade moderniseringar registrerade ännu."
+      />
+    );
   return (
     <ModernizationTimelineChartInner data={data} parentOrgId={parentOrgId} />
   );
@@ -356,7 +392,12 @@ function MaintenanceCompanyChart({
     singleChartOptions(parentOrgId, "byMaintenanceCompany"),
   );
   if (data.length === 0)
-    return <EmptyChart title="Skötselföretag" />;
+    return (
+      <EmptyChart
+        title="Skötselföretag"
+        subtitle="Inget skötselföretag är registrerat på hissarna ännu."
+      />
+    );
   return (
     <MaintenanceCompanyChartInner data={data} parentOrgId={parentOrgId} />
   );

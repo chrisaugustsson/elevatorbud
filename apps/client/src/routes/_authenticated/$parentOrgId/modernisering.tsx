@@ -288,7 +288,7 @@ function ModerniseringPage() {
 
       <div aria-live="polite" className="sr-only">
         {selectedSubOrgName
-          ? `Filtrerar på ${selectedSubOrgName}`
+          ? `Filtrerad till ${selectedSubOrgName}`
           : "Visar alla organisationer"}
       </div>
 

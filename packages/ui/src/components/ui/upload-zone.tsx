@@ -51,24 +51,18 @@ function UploadZone({
               ? "border-primary bg-primary/5"
               : "border-muted-foreground/25 hover:border-muted-foreground/50",
           )}
-          role="button"
-          tabIndex={0}
-          aria-label={title}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault()
-              fileInputRef.current?.click()
-            }
-          }}
         >
-          <Upload className={cn(
-            "mx-auto h-10 w-10 transition-colors",
-            isDragOver ? "text-primary" : "text-muted-foreground/50",
-          )} />
+          <Upload
+            aria-hidden="true"
+            className={cn(
+              "mx-auto h-10 w-10 transition-colors",
+              isDragOver ? "text-primary" : "text-muted-foreground/50",
+            )}
+          />
           <p className="mt-4 text-sm font-medium">{title}</p>
           {subtitle && (
             <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
@@ -78,6 +72,7 @@ function UploadZone({
             variant="outline"
             size="sm"
             className="mt-4"
+            aria-label={title}
             onClick={(e) => {
               e.stopPropagation()
               fileInputRef.current?.click()

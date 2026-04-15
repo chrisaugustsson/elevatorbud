@@ -58,8 +58,11 @@ export function ImportStepper({ status }: { status: ImportStatus }) {
                 <span
                   className={cn(
                     "text-sm",
-                    isCurrent ? "inline font-medium text-foreground" : "hidden text-muted-foreground sm:inline",
+                    isCurrent
+                      ? "inline max-w-[10rem] truncate font-medium text-foreground sm:max-w-none"
+                      : "hidden text-muted-foreground sm:inline",
                   )}
+                  title={step.label}
                 >
                   {step.label}
                 </span>

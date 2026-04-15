@@ -438,7 +438,9 @@ function RegisterPage() {
       )}
       <div aria-live="polite" className="sr-only">
         {hasChildOrgs && totalCount !== undefined
-          ? `${totalCount} hissar visas`
+          ? selectedSubOrgName
+            ? `Visar ${totalCount} hissar i ${selectedSubOrgName}`
+            : `Visar ${totalCount} hissar i alla underorganisationer`
           : ""}
       </div>
       <RegisterTable
