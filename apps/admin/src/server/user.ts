@@ -85,6 +85,36 @@ async function listUsersFn(
   });
 }
 
+/**
+ * Enforce FR-33 server-side: granting a user access to both a parent org AND
+ * one of its sub-orgs is redundant and must be rejected. The UI blocks this
+ * but a direct server-fn call would otherwise bypass it.
+ *
+ * Must be called INSIDE the transaction that writes userOrganizations so a
+ * violation rolls back cleanly.
+ */
+async function assertNoParentChildOverlap(
+  tx: Parameters<Parameters<Database["transaction"]>[0]>[0],
+  organizationIds: string[],
+) {
+  if (organizationIds.length < 2) return;
+  const overlap = await tx
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(
+      and(
+        inArray(organizations.id, organizationIds),
+        inArray(organizations.parentId, organizationIds),
+      ),
+    )
+    .limit(1);
+  if (overlap.length > 0) {
+    throw new Error(
+      "Cannot grant access to both a parent organization and its sub-organization. Remove the redundant grant.",
+    );
+  }
+}
+
 async function updateUserFn(
   db: Database,
   input: z.infer<typeof updateUserSchema>,
@@ -96,6 +126,10 @@ async function updateUserFn(
   // delete but before the insert would leave the user with no org rows at
   // all (effectively orphaned from their grants).
   return await db.transaction(async (tx) => {
+    if (organizationIds !== undefined) {
+      await assertNoParentChildOverlap(tx, organizationIds);
+    }
+
     const [user] = await tx
       .update(users)
       .set(data)
@@ -162,6 +196,10 @@ async function createUserFn(
   // (Clerk creation sits outside the tx — it's remote and can't join a pg
   // transaction — but the DB writes are atomic between themselves.)
   return await db.transaction(async (tx) => {
+    if (organizationIds && organizationIds.length > 0) {
+      await assertNoParentChildOverlap(tx, organizationIds);
+    }
+
     const [user] = await tx
       .insert(users)
       .values({ ...userFields, clerkUserId: clerkUser.id, active: true })

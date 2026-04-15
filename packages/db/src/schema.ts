@@ -25,6 +25,15 @@ export const organizations = pgTable(
     organizationNumber: text("organization_number"),
     // Self-reference: use AnyPgColumn to break the circular type reference
     // instead of `: any`. This is the Drizzle-recommended pattern.
+    //
+    // Hierarchy depth (one level) is enforced by the DB trigger
+    // `enforce_one_level_org_hierarchy` in migration 0002. Residual race under
+    // concurrent writes at READ COMMITTED: two simultaneous transactions could
+    // each pass the "target parent has no parent" / "this org has no children"
+    // checks and produce a 2-level chain. Acceptable for admin-app traffic
+    // (low concurrency, small number of admin users). If concurrent org edits
+    // become real, upgrade the trigger to `SELECT ... FOR UPDATE` on the
+    // target parent row inside the transaction.
     parentId: uuid("parent_id").references(
       (): AnyPgColumn => organizations.id,
       { onDelete: "set null" },
@@ -176,6 +185,14 @@ export const elevators = pgTable(
     index("elevators_district_idx").on(t.district),
     index("elevators_manufacturer_idx").on(t.manufacturer),
     index("elevators_elevator_type_idx").on(t.elevatorType),
+    // Elevator numbers are only unique within an org (the same number can
+    // legitimately belong to different orgs). This composite unique prevents
+    // the import cross-org move bug: matching by elevatorNumber alone would
+    // otherwise let an import silently reassign another org's elevator.
+    unique("elevators_organization_id_elevator_number_unique").on(
+      t.organizationId,
+      t.elevatorNumber,
+    ),
     check("elevators_status_check", sql`${t.status} IN ('active', 'demolished', 'archived')`),
     check("elevators_build_year_check", sql`${t.buildYear} IS NULL OR (${t.buildYear} >= 1800 AND ${t.buildYear} <= 2100)`),
   ],

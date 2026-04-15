@@ -11,35 +11,59 @@ function getDb() {
   return _db;
 }
 
+// Short-TTL cache keyed by Clerk user ID. TanStack Start middleware runs per
+// server-fn invocation with no shared request object we can hang a WeakMap
+// off, so a 5-second TTL is the pragmatic alternative: a single HTTP request
+// usually fires several server fns in rapid succession, and caching for 5s
+// collapses those to one Clerk+DB hit while keeping the staleness window far
+// shorter than any meaningful permission change. Active/role changes take
+// effect at most 5s later on the next server-fn call.
+const USER_CACHE_TTL_MS = 5_000;
+type CachedUser = { user: User; expiresAt: number };
+const userCache = new Map<string, CachedUser>();
+
 async function resolveUser(requiredRole?: "admin" | "customer") {
   const { userId } = await auth();
   if (!userId) throw new Error("Ej autentiserad");
 
   const db = getDb();
-  const dbUser = await db.query.users.findFirst({
-    where: eq(users.clerkUserId, userId),
-  });
+  const now = Date.now();
+  const cached = userCache.get(userId);
 
-  if (!dbUser) throw new Error("Ej autentiserad");
-  if (!dbUser.active) throw new Error("Kontot är inaktiverat");
-  if (requiredRole && dbUser.role !== requiredRole) {
-    throw new Error("Kräver admin-behörighet");
+  let user: User;
+  if (cached && cached.expiresAt > now) {
+    user = cached.user;
+  } else {
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.clerkUserId, userId),
+    });
+
+    if (!dbUser) throw new Error("Ej autentiserad");
+    if (!dbUser.active) throw new Error("Kontot är inaktiverat");
+
+    const orgRows = await db
+      .select({ organizationId: userOrganizations.organizationId })
+      .from(userOrganizations)
+      .where(eq(userOrganizations.userId, dbUser.id));
+
+    user = {
+      id: dbUser.id,
+      clerkUserId: dbUser.clerkUserId,
+      email: dbUser.email,
+      name: dbUser.name,
+      role: dbUser.role,
+      organizationIds: orgRows.map((r) => r.organizationId),
+      active: dbUser.active,
+    };
+
+    userCache.set(userId, { user, expiresAt: now + USER_CACHE_TTL_MS });
   }
 
-  const orgRows = await db
-    .select({ organizationId: userOrganizations.organizationId })
-    .from(userOrganizations)
-    .where(eq(userOrganizations.userId, dbUser.id));
-
-  const user: User = {
-    id: dbUser.id,
-    clerkUserId: dbUser.clerkUserId,
-    email: dbUser.email,
-    name: dbUser.name,
-    role: dbUser.role,
-    organizationIds: orgRows.map((r) => r.organizationId),
-    active: dbUser.active,
-  };
+  // Role check runs against cached OR fresh user — cheap and cache-safe.
+  if (requiredRole && user.role !== requiredRole) {
+    throw new Error("Kräver admin-behörighet");
+  }
+  if (!user.active) throw new Error("Kontot är inaktiverat");
 
   return { user, db };
 }
