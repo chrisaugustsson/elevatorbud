@@ -393,6 +393,17 @@ async function confirmFn(
       perOrgCounts[orgId].updated++;
     }
 
+    const touchedOrgIds = Object.keys(perOrgCounts);
+    if (touchedOrgIds.length > 0) {
+      const orgRows = await tx
+        .select({ id: organizations.id, name: organizations.name })
+        .from(organizations)
+        .where(inArray(organizations.id, touchedOrgIds));
+      for (const o of orgRows) {
+        if (perOrgCounts[o.id]) perOrgCounts[o.id]!.orgName = o.name;
+      }
+    }
+
     return { created, updated, perOrgCounts };
   });
 }

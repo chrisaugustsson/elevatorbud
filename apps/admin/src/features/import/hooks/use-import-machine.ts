@@ -375,7 +375,9 @@ export function useImportMachine() {
           nameById.set(id, name);
         }
         for (const [orgId, counts] of Object.entries(result.perOrgCounts)) {
-          counts.orgName = nameById.get(orgId) ?? orgId;
+          if (!counts.orgName) {
+            counts.orgName = nameById.get(orgId) ?? orgId;
+          }
         }
       }
 

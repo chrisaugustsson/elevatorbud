@@ -467,12 +467,18 @@ function EditUserDialogInner({
   }, [selectedOrgIds, childrenByParent, orgMap]);
 
   const availableOrgs = useMemo(() => {
+    const parentIdsOfSelected = new Set<string>();
+    for (const id of selectedOrgIds) {
+      const org = orgMap.get(id);
+      if (org?.parentId) parentIdsOfSelected.add(org.parentId);
+    }
     return (allOrgs ?? []).filter((org) => {
       if (selectedOrgIds.includes(org.id)) return false;
       if (org.parentId && selectedOrgIds.includes(org.parentId)) return false;
+      if (parentIdsOfSelected.has(org.id)) return false;
       return true;
     });
-  }, [allOrgs, selectedOrgIds]);
+  }, [allOrgs, selectedOrgIds, orgMap]);
 
   const handleAddOrg = (orgId: string) => {
     setSelectedOrgIds((prev) => [...prev, orgId]);
@@ -678,13 +684,16 @@ function EditUserDialogInner({
                                 <CollapsibleContent>
                                   <div className="ml-6 mt-1 space-y-1">
                                     {impliedChildren.map((child) => (
-                                      <div key={child.id} className="flex items-center gap-2 rounded-md border border-dashed px-3 py-1.5 opacity-70">
+                                      <div key={child.id} className="flex items-center gap-2 rounded-md border border-dashed px-3 py-1.5">
                                         <Unlink
                                           className="mr-1 size-4 shrink-0 text-muted-foreground"
                                           aria-hidden="true"
                                         />
-                                        <span className="text-sm flex-1 truncate">{child.name}</span>
-                                        <Badge variant="outline" className="text-xs shrink-0">via {org?.name}</Badge>
+                                        <span className="text-sm flex-1 truncate text-muted-foreground">{child.name}</span>
+                                        <Badge variant="outline" className="text-xs shrink-0">
+                                          <span className="sr-only">Ärvd åtkomst </span>
+                                          via {org?.name}
+                                        </Badge>
                                       </div>
                                     ))}
                                   </div>
