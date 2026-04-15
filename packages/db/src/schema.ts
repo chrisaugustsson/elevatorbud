@@ -168,11 +168,11 @@ export const elevators = pgTable(
     status: text("status", { enum: ["active", "demolished", "archived"] })
       .notNull()
       .default("active"),
-    createdBy: uuid("created_by").references(() => users.id),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    lastUpdatedBy: uuid("last_updated_by").references(() => users.id),
+    lastUpdatedBy: uuid("last_updated_by").references(() => users.id, { onDelete: "set null" }),
     lastUpdatedAt: timestamp("last_updated_at", { withTimezone: true }),
   },
   (t) => [
@@ -292,7 +292,7 @@ export const elevatorBudgets = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    createdBy: uuid("created_by").references(() => users.id),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [
     index("elevator_budgets_elevator_id_idx").on(t.elevatorId),

@@ -81,10 +81,72 @@ const confirmImportSchema = z.object({
       // Resolved org ID from mapping step
       _organizationId: z.string(),
       _source_row: z.number().optional(),
+      _source_sheet: z.string().optional(),
       }),
     )
     .max(MAX_IMPORT_ROWS),
 });
+
+/**
+ * Build a descriptive error string pointing at the exact Excel row that
+ * broke the import, so the admin can fix it without guessing. Keeps the
+ * transaction-rolled-back reminder from the UI copy so the two messages
+ * stay consistent.
+ */
+function formatRowError(
+  row: { elevator_number: string; _source_row?: number; _source_sheet?: string },
+  field: string | null,
+  cause: unknown,
+): Error {
+  const causeMsg = cause instanceof Error ? cause.message : String(cause);
+  const sheet = row._source_sheet ? `arket "${row._source_sheet}"` : "okänt ark";
+  const rowRef = row._source_row ? `rad ${row._source_row}` : "okänd rad";
+  const fieldRef = field ? ` (fält: ${field})` : "";
+  return new Error(
+    `Importen misslyckades på ${sheet}, ${rowRef}, hiss "${row.elevator_number}"${fieldRef}: ${causeMsg}. Transaktionen har rullats tillbaka — inga rader har skapats eller ändrats.`,
+  );
+}
+
+/**
+ * After a bulk insert fails, retry each row individually inside a savepoint
+ * to find the exact offending row, so the admin sees "rad 47" instead of
+ * "rad 1". The savepoint is always rolled back (we're about to throw anyway),
+ * so this adds no writes — it's purely diagnostic. If the per-row probe
+ * somehow succeeds for every row (race or transient), fall back to the
+ * original bulk error pointing at row 0.
+ */
+type TxLike = {
+  transaction: <T>(fn: (tx: TxLike) => Promise<T>) => Promise<T>;
+};
+
+async function findFailingRow<R extends { elevator_number: string; _source_row?: number; _source_sheet?: string }>(
+  tx: TxLike,
+  rows: R[],
+  perRowInsert: (row: R, index: number) => Promise<unknown>,
+  field: string | null,
+  originalError: unknown,
+): Promise<Error> {
+  for (let i = 0; i < rows.length; i++) {
+    try {
+      await tx.transaction(async () => {
+        await perRowInsert(rows[i]!, i);
+        // Force the savepoint to roll back so no row is actually written.
+        throw new RollbackProbe();
+      });
+    } catch (e) {
+      if (e instanceof RollbackProbe) continue;
+      return formatRowError(rows[i]!, field, e);
+    }
+  }
+  return formatRowError(rows[0]!, field, originalError);
+}
+
+class RollbackProbe extends Error {
+  constructor() {
+    super("rollback-probe");
+    this.name = "RollbackProbe";
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Inlined query logic — no org scoping (import is admin-only).
@@ -178,7 +240,9 @@ async function analyzeFn(
   };
 }
 
-async function confirmFn(
+// Exported so integration tests can call it directly with a test DB,
+// bypassing the server-fn wrapper and auth middleware.
+export async function confirmFn(
   db: Database,
   userId: string,
   input: z.infer<typeof confirmImportSchema>,
@@ -271,42 +335,91 @@ async function confirmFn(
       existingMap.has(keyFor(r._organizationId, r.elevator_number)),
     );
 
+    // Pre-check for duplicate (org, number) within the input itself — two
+    // Excel rows with the same elevator number for the same org would pass
+    // the existingMap filter but fail the composite unique index with a
+    // first-row-blaming "duplicate key" error. Catch this before the bulk
+    // insert so we can point at the actual duplicate row instead of row 1.
+    const createKeys = new Map<string, number>();
+    for (let i = 0; i < toCreate.length; i++) {
+      const r = toCreate[i]!;
+      const key = keyFor(r._organizationId, r.elevator_number);
+      const prior = createKeys.get(key);
+      if (prior !== undefined) {
+        throw formatRowError(
+          r,
+          null,
+          new Error(
+            `Hiss "${r.elevator_number}" förekommer flera gånger i samma organisation (tidigare rad: ${toCreate[prior]!._source_row ?? "?"}).`,
+          ),
+        );
+      }
+      createKeys.set(key, i);
+    }
+
     // 2. Bulk insert new elevators
+    //
+    // On DB error, fall back to per-row inserts in a savepoint to isolate
+    // the exact failing row, so the admin gets "row 47" rather than "row 1".
+    // The savepoint is always rolled back (we're going to throw anyway) so
+    // this adds no writes — it's purely diagnostic.
     let created = 0;
     if (toCreate.length > 0) {
-      const insertedElevators = await tx
-        .insert(elevators)
-        .values(
-          toCreate.map((r) => ({
-            elevatorNumber: r.elevator_number,
-            address: r.address,
-            elevatorClassification: r.elevator_classification,
-            district: r.district,
-            elevatorType: r.elevator_type,
-            manufacturer: r.manufacturer,
-            buildYear: r.build_year,
-            inspectionAuthority: r.inspection_authority,
-            inspectionMonth: r.inspection_month,
-            maintenanceCompany: r.maintenance_company,
-            modernizationYear: r.modernization_year,
-            needsUpgrade: r.needs_upgrade,
-            organizationId: r._organizationId,
-            contactPersonName: r.contact_person_name,
-            contactPersonPhone: r.contact_person_phone,
-            contactPersonEmail: r.contact_person_email,
-            status: "active" as const,
-            createdBy: userId,
-          })),
-        )
-        .returning({ id: elevators.id });
+      let insertedElevators: { id: string }[];
+      const toElevatorInsert = (r: (typeof toCreate)[number]) => ({
+        elevatorNumber: r.elevator_number,
+        address: r.address,
+        elevatorClassification: r.elevator_classification,
+        district: r.district,
+        elevatorType: r.elevator_type,
+        manufacturer: r.manufacturer,
+        buildYear: r.build_year,
+        inspectionAuthority: r.inspection_authority,
+        inspectionMonth: r.inspection_month,
+        maintenanceCompany: r.maintenance_company,
+        modernizationYear: r.modernization_year,
+        needsUpgrade: r.needs_upgrade,
+        organizationId: r._organizationId,
+        contactPersonName: r.contact_person_name,
+        contactPersonPhone: r.contact_person_phone,
+        contactPersonEmail: r.contact_person_email,
+        status: "active" as const,
+        createdBy: userId,
+      });
+      try {
+        insertedElevators = await tx
+          .insert(elevators)
+          .values(toCreate.map(toElevatorInsert))
+          .returning({ id: elevators.id });
+      } catch (bulkErr) {
+        throw await findFailingRow(tx, toCreate, (r) =>
+          tx.insert(elevators).values(toElevatorInsert(r)),
+          null,
+          bulkErr,
+        );
+      }
 
       // Bulk insert details for new elevators
-      await tx.insert(elevatorDetails).values(
-        insertedElevators.map((e, idx) => ({
-          elevatorId: e.id,
-          ...toDetailData(toCreate[idx]!),
-        })),
-      );
+      try {
+        await tx.insert(elevatorDetails).values(
+          insertedElevators.map((e, idx) => ({
+            elevatorId: e.id,
+            ...toDetailData(toCreate[idx]!),
+          })),
+        );
+      } catch (bulkErr) {
+        throw await findFailingRow(
+          tx,
+          toCreate,
+          (r, idx) =>
+            tx.insert(elevatorDetails).values({
+              elevatorId: insertedElevators[idx]!.id,
+              ...toDetailData(r),
+            }),
+          "tekniska detaljer",
+          bulkErr,
+        );
+      }
 
       // Bulk insert budgets for new elevators that have budget data
       const budgetRows = insertedElevators
@@ -327,7 +440,27 @@ async function confirmFn(
         .filter((r): r is NonNullable<typeof r> => r !== null);
 
       if (budgetRows.length > 0) {
-        await tx.insert(elevatorBudgets).values(budgetRows);
+        try {
+          await tx.insert(elevatorBudgets).values(budgetRows);
+        } catch (bulkErr) {
+          // Map budget rows back to their source toCreate row so the error
+          // points at the Excel row, not the dense budget-array index.
+          const budgetRowToSource: number[] = [];
+          insertedElevators.forEach((_, idx) => {
+            const d = toCreate[idx]!;
+            if (d.recommended_modernization_year || d.budget_amount) {
+              budgetRowToSource.push(idx);
+            }
+          });
+          throw await findFailingRow(
+            tx,
+            budgetRowToSource.map((i) => toCreate[i]!),
+            (_r, denseIdx) =>
+              tx.insert(elevatorBudgets).values(budgetRows[denseIdx]!),
+            "modernisering/budget",
+            bulkErr,
+          );
+        }
       }
 
       // Bulk insert suggested values
@@ -370,52 +503,59 @@ async function confirmFn(
           keyFor(r._organizationId, r.elevator_number),
         )!;
 
-        await tx
-          .update(elevators)
-          .set({
-            address: r.address,
-            district: r.district,
-            elevatorType: r.elevator_type,
-            manufacturer: r.manufacturer,
-            buildYear: r.build_year,
-            inspectionAuthority: r.inspection_authority,
-            inspectionMonth: r.inspection_month,
-            maintenanceCompany: r.maintenance_company,
-            modernizationYear: r.modernization_year,
-            needsUpgrade: r.needs_upgrade,
-            organizationId: r._organizationId,
-            contactPersonName: r.contact_person_name,
-            contactPersonPhone: r.contact_person_phone,
-            contactPersonEmail: r.contact_person_email,
-            lastUpdatedAt: now,
-            lastUpdatedBy: userId,
-          })
-          .where(eq(elevators.id, existing.id));
-
-        const detailData = toDetailData(r);
-        const existingDetailId = existingDetailsMap.get(existing.id);
-        if (existingDetailId) {
+        // Per-row try/catch lets the admin see exactly which Excel row
+        // broke the update (sheet + row number + field), instead of a raw
+        // Postgres constraint message.
+        try {
           await tx
-            .update(elevatorDetails)
-            .set(detailData)
-            .where(eq(elevatorDetails.id, existingDetailId));
-        } else {
-          await tx
-            .insert(elevatorDetails)
-            .values({ elevatorId: existing.id, ...detailData });
-        }
+            .update(elevators)
+            .set({
+              address: r.address,
+              district: r.district,
+              elevatorType: r.elevator_type,
+              manufacturer: r.manufacturer,
+              buildYear: r.build_year,
+              inspectionAuthority: r.inspection_authority,
+              inspectionMonth: r.inspection_month,
+              maintenanceCompany: r.maintenance_company,
+              modernizationYear: r.modernization_year,
+              needsUpgrade: r.needs_upgrade,
+              organizationId: r._organizationId,
+              contactPersonName: r.contact_person_name,
+              contactPersonPhone: r.contact_person_phone,
+              contactPersonEmail: r.contact_person_email,
+              lastUpdatedAt: now,
+              lastUpdatedBy: userId,
+            })
+            .where(eq(elevators.id, existing.id));
 
-        if (r.recommended_modernization_year || r.budget_amount) {
-          await tx.insert(elevatorBudgets).values({
-            elevatorId: existing.id,
-            revisionYear: r.revision_year ?? currentYear,
-            recommendedModernizationYear: r.recommended_modernization_year,
-            budgetAmount:
-              r.budget_amount != null ? String(r.budget_amount) : undefined,
-            measures: r.measures ?? r.modernization_measures,
-            warranty: r.warranty,
-            createdBy: userId,
-          });
+          const detailData = toDetailData(r);
+          const existingDetailId = existingDetailsMap.get(existing.id);
+          if (existingDetailId) {
+            await tx
+              .update(elevatorDetails)
+              .set(detailData)
+              .where(eq(elevatorDetails.id, existingDetailId));
+          } else {
+            await tx
+              .insert(elevatorDetails)
+              .values({ elevatorId: existing.id, ...detailData });
+          }
+
+          if (r.recommended_modernization_year || r.budget_amount) {
+            await tx.insert(elevatorBudgets).values({
+              elevatorId: existing.id,
+              revisionYear: r.revision_year ?? currentYear,
+              recommendedModernizationYear: r.recommended_modernization_year,
+              budgetAmount:
+                r.budget_amount != null ? String(r.budget_amount) : undefined,
+              measures: r.measures ?? r.modernization_measures,
+              warranty: r.warranty,
+              createdBy: userId,
+            });
+          }
+        } catch (e) {
+          throw formatRowError(r, null, e);
         }
 
         updated++;
@@ -454,11 +594,18 @@ async function confirmFn(
 // ---------------------------------------------------------------------------
 
 const extractOrgNamesSchema = z.object({
-  rows: z.array(
-    z.object({
-      _organisation_namn: z.string().optional(),
-    }).passthrough(),
-  ),
+  rows: z
+    .array(
+      z
+        .object({
+          _organisation_namn: z.string().optional(),
+        })
+        .passthrough(),
+    )
+    // Match the confirmImport bound — an admin can't submit a larger import
+    // than they can actually execute, and this prevents unbounded JSON
+    // payloads from exhausting server memory on parse.
+    .max(MAX_IMPORT_ROWS),
 });
 
 function extractOrgNamesFn(input: z.infer<typeof extractOrgNamesSchema>) {

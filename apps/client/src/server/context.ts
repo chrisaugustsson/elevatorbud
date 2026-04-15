@@ -6,6 +6,17 @@ import { organizations } from "@elevatorbud/db/schema";
 import { authMiddleware } from "./auth";
 import type { Database } from "@elevatorbud/db";
 
+/**
+ * Resolves the set of org IDs accessible within a given parent context —
+ * the parent itself plus its direct children.
+ *
+ * PRD US-025a explicitly allows `parentOrgId` to be a child org when that is
+ * the user's only direct grant: "A user with a direct grant on a child org
+ * only (not its parent) treats that child as their context, as if it were a
+ * root." In that case the child has no children of its own (one-level-deep
+ * invariant), so we return just `[parentOrgId]`. This is by design — do not
+ * add a `parentId IS NULL` assertion here.
+ */
 export async function getContextOrgIds(
   db: Database,
   user: { organizationIds: string[] },

@@ -176,6 +176,27 @@ describeIfDb("getEffectiveOrganizationIds (real SQL)", () => {
     expect(new Set(result).size).toBe(result.length);
   });
 
+  it("deduplicates when a user has direct grants on both a parent and one of its children", async () => {
+    // The FR-33 server check should prevent this grant combination from
+    // being created in the first place, but the dedupe in the self-join is
+    // the last line of defence — a legacy row or a hand-written grant
+    // should still produce a clean result, not duplicates.
+    const userId = "00000000-0000-0000-0000-000000000001";
+    const parent = "11111111-1111-1111-1111-111111111111";
+    const child = "11111111-1111-1111-1111-1111111111a1";
+    await insertUser(db, userId);
+    await insertOrg(db, parent);
+    await insertOrg(db, child, parent);
+    await grant(db, userId, parent);
+    await grant(db, userId, child);
+    const result = await getEffectiveOrganizationIds(
+      db as unknown as Database,
+      userId,
+    );
+    expect(result.sort()).toEqual([parent, child].sort());
+    expect(new Set(result).size).toBe(result.length);
+  });
+
   it("isolates grants per user — user A's orgs do not leak to user B", async () => {
     const userA = "00000000-0000-0000-0000-00000000000a";
     const userB = "00000000-0000-0000-0000-00000000000b";

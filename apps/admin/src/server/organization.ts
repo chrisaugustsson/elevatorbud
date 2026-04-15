@@ -182,7 +182,35 @@ const previewParentChangeSchema = z.object({
   newParentId: z.string().uuid().nullable(),
 });
 
-type AffectedUser = { id: string; name: string; email: string };
+export type AffectedUser = { id: string; name: string; email: string };
+
+/**
+ * Pure partition logic — extracted so the dedupe can be unit-tested without
+ * spinning up a DB. A user who holds direct grants on BOTH the old and the
+ * new parent has no net access change (they inherit the moved org via the
+ * new parent exactly as they previously did via the old one). A user with a
+ * direct grant on the moved org itself also has no net change — direct
+ * always beats inherited. Without this dedupe such users would double-report
+ * in both gained AND lost.
+ */
+export function partitionParentChangeImpact(
+  oldParentUsers: AffectedUser[],
+  newParentUsers: AffectedUser[],
+  directUserIds: Iterable<string>,
+): { gained: AffectedUser[]; lost: AffectedUser[] } {
+  const directSet = new Set(directUserIds);
+  const oldIds = new Set(oldParentUsers.map((u) => u.id));
+  const newIds = new Set(newParentUsers.map((u) => u.id));
+
+  const lost = oldParentUsers.filter(
+    (u) => !directSet.has(u.id) && !newIds.has(u.id),
+  );
+  const gained = newParentUsers.filter(
+    (u) => !directSet.has(u.id) && !oldIds.has(u.id),
+  );
+
+  return { gained, lost };
+}
 
 async function computeParentChangeImpact(
   db: Database,
@@ -196,7 +224,6 @@ async function computeParentChangeImpact(
     .select({ userId: userOrganizations.userId })
     .from(userOrganizations)
     .where(eq(userOrganizations.organizationId, orgId));
-  const directUserIdSet = new Set(directGrantUserIds.map((r) => r.userId));
 
   let oldParentUsers: AffectedUser[] = [];
   let newParentUsers: AffectedUser[] = [];
@@ -217,22 +244,11 @@ async function computeParentChangeImpact(
       .where(eq(userOrganizations.organizationId, newParentId));
   }
 
-  // A user who holds direct grants on BOTH the old and the new parent has
-  // no net access change — they inherit the moved org via the new parent
-  // exactly as they previously did via the old one. Without this dedupe
-  // they would show up in both "gained" and "lost", double-reporting
-  // impact to the admin.
-  const oldIds = new Set(oldParentUsers.map((u) => u.id));
-  const newIds = new Set(newParentUsers.map((u) => u.id));
-
-  const lost = oldParentUsers.filter(
-    (u) => !directUserIdSet.has(u.id) && !newIds.has(u.id),
+  return partitionParentChangeImpact(
+    oldParentUsers,
+    newParentUsers,
+    directGrantUserIds.map((r) => r.userId),
   );
-  const gained = newParentUsers.filter(
-    (u) => !directUserIdSet.has(u.id) && !oldIds.has(u.id),
-  );
-
-  return { gained, lost };
 }
 
 export const previewParentChange = createServerFn({ method: "POST" })

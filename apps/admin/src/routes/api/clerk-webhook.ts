@@ -3,6 +3,7 @@ import { Webhook } from "svix";
 import { createDb } from "@elevatorbud/db";
 import { users } from "@elevatorbud/db/schema";
 import { eq } from "drizzle-orm";
+import { invalidateUserCacheByClerkId } from "@elevatorbud/auth/middleware";
 
 let _db: ReturnType<typeof createDb> | null = null;
 function getDb() {
@@ -13,7 +14,8 @@ function getDb() {
 type ClerkUserEvent = {
   data: {
     id: string;
-    email_addresses: { email_address: string }[];
+    email_addresses: { id: string; email_address: string }[];
+    primary_email_address_id: string | null;
     first_name: string | null;
     last_name: string | null;
   };
@@ -45,7 +47,14 @@ async function handleWebhook(request: Request): Promise<Response> {
   const db = getDb();
 
   if (type === "user.created" || type === "user.updated") {
-    const email = data.email_addresses[0]?.email_address ?? "";
+    // Clerk does not guarantee that email_addresses[0] is the primary.
+    // Prefer the one matching primary_email_address_id; fall back to the
+    // first entry only if the lookup fails (e.g. the primary id is absent).
+    const primary = data.primary_email_address_id
+      ? data.email_addresses.find((e) => e.id === data.primary_email_address_id)
+      : undefined;
+    const email =
+      primary?.email_address ?? data.email_addresses[0]?.email_address ?? "";
     const name = [data.first_name, data.last_name].filter(Boolean).join(" ") || email;
 
     const existing = await db.query.users.findFirst({
@@ -62,6 +71,7 @@ async function handleWebhook(request: Request): Promise<Response> {
         .insert(users)
         .values({ clerkUserId: data.id, email, name, role: "customer", active: true });
     }
+    invalidateUserCacheByClerkId(data.id);
   }
 
   if (type === "user.deleted") {
@@ -71,6 +81,7 @@ async function handleWebhook(request: Request): Promise<Response> {
     if (existing) {
       await db.delete(users).where(eq(users.id, existing.id));
     }
+    invalidateUserCacheByClerkId(data.id);
   }
 
   return new Response("OK", { status: 200 });

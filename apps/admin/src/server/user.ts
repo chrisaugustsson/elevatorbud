@@ -5,7 +5,11 @@ import { eq, and, inArray } from "drizzle-orm";
 import { createClerkClient } from "@clerk/backend";
 import { users, userOrganizations, organizations } from "@elevatorbud/db/schema";
 import type { Database } from "@elevatorbud/db";
-import { adminMiddleware } from "./auth";
+import {
+  adminMiddleware,
+  invalidateUserCacheByDbId,
+  invalidateUserCacheByClerkId,
+} from "./auth";
 
 function getClerkClient() {
   return createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
@@ -98,6 +102,19 @@ async function assertNoParentChildOverlap(
   organizationIds: string[],
 ) {
   if (organizationIds.length < 2) return;
+
+  // Lock the candidate org rows in FOR SHARE mode so a concurrent admin
+  // cannot change any `parentId` in this set between the overlap check and
+  // the userOrganizations insert. FOR SHARE blocks writers but allows
+  // concurrent readers (other FR-33 checks), and the ORDER BY id gives a
+  // canonical lock order so two concurrent overlap checks cannot deadlock.
+  await tx
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(inArray(organizations.id, organizationIds))
+    .orderBy(organizations.id)
+    .for("share");
+
   const overlap = await tx
     .select({ id: organizations.id })
     .from(organizations)
@@ -136,6 +153,13 @@ async function updateUserFn(
       .where(eq(users.id, id))
       .returning();
 
+    // Guard against touching userOrganizations for a user that no longer
+    // exists — otherwise the delete silently runs against an absent userId
+    // and a subsequent insert would FK-fail without a clear message.
+    if (!user) {
+      throw new Error("Användaren hittades inte");
+    }
+
     if (organizationIds !== undefined) {
       await tx
         .delete(userOrganizations)
@@ -151,6 +175,10 @@ async function updateUserFn(
       }
     }
 
+    // Role, active flag, or org grants just changed. Drop the cached User
+    // so the next server-fn call on this worker reflects the change instead
+    // of waiting out the 5s TTL.
+    invalidateUserCacheByDbId(user.id);
     return user;
   });
 }
@@ -161,6 +189,7 @@ async function deactivateUserFn(db: Database, id: string) {
     .set({ active: false })
     .where(eq(users.id, id))
     .returning();
+  if (user) invalidateUserCacheByDbId(user.id);
   return user;
 }
 
@@ -170,6 +199,7 @@ async function activateUserFn(db: Database, id: string) {
     .set({ active: true })
     .where(eq(users.id, id))
     .returning();
+  if (user) invalidateUserCacheByDbId(user.id);
   return user;
 }
 
@@ -225,6 +255,8 @@ async function deleteUserFn(db: Database, id: string) {
   const clerk = getClerkClient();
   await clerk.users.deleteUser(dbUser.clerkUserId);
   await db.delete(users).where(eq(users.id, id));
+  invalidateUserCacheByClerkId(dbUser.clerkUserId);
+  invalidateUserCacheByDbId(dbUser.id);
   return { deleted: true };
 }
 

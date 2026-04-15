@@ -17,10 +17,31 @@ function getDb() {
 // usually fires several server fns in rapid succession, and caching for 5s
 // collapses those to one Clerk+DB hit while keeping the staleness window far
 // shorter than any meaningful permission change. Active/role changes take
-// effect at most 5s later on the next server-fn call.
+// effect at most 5s later on the next server-fn call (sooner when the
+// mutating server-fn explicitly invalidates — see invalidateUserCacheByDbId).
 const USER_CACHE_TTL_MS = 5_000;
 type CachedUser = { user: User; expiresAt: number };
 const userCache = new Map<string, CachedUser>();
+
+/**
+ * Drop the cache entry for one user, keyed by their internal DB id. Call this
+ * from any server-fn that mutates the user row or their org grants so the
+ * same worker serves fresh data on the next request instead of waiting out
+ * the 5s TTL. Other workers still wait out the TTL — this is a fast-path
+ * invalidation, not a distributed one, and the short TTL is the real ceiling.
+ */
+export function invalidateUserCacheByDbId(dbUserId: string): void {
+  for (const [clerkId, entry] of userCache) {
+    if (entry.user.id === dbUserId) {
+      userCache.delete(clerkId);
+    }
+  }
+}
+
+/** Drop the cache entry by Clerk user ID (used by Clerk webhooks). */
+export function invalidateUserCacheByClerkId(clerkUserId: string): void {
+  userCache.delete(clerkUserId);
+}
 
 async function resolveUser(requiredRole?: "admin" | "customer") {
   const { userId } = await auth();

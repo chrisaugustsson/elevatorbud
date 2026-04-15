@@ -56,7 +56,7 @@ import {
   TooltipTrigger,
 } from "@elevatorbud/ui/components/ui/tooltip";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus, Building2, UserPlus, Check, ChevronsUpDown, X, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Pencil } from "lucide-react";
+import { Plus, Building2, UserPlus, Check, ChevronsUpDown, X, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Pencil, Loader2 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -593,13 +593,17 @@ function ParentChangeWarningDialog({
             {impact.gained.length > 0 && (
               <Badge variant="outline" className="gap-1.5 border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
                 <ArrowUp className="size-3" />
-                {impact.gained.length} {impact.gained.length === 1 ? "användare får" : "användare får"} åtkomst
+                {impact.gained.length === 1
+                  ? "1 användare får åtkomst"
+                  : `${impact.gained.length} användare får åtkomst`}
               </Badge>
             )}
             {impact.lost.length > 0 && (
               <Badge variant="outline" className="gap-1.5 border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
                 <ArrowDown className="size-3" />
-                {impact.lost.length} {impact.lost.length === 1 ? "användare förlorar" : "användare förlorar"} åtkomst
+                {impact.lost.length === 1
+                  ? "1 användare förlorar åtkomst"
+                  : `${impact.lost.length} användare förlorar åtkomst`}
               </Badge>
             )}
           </div>
@@ -874,6 +878,12 @@ function EditOrgDialogInner({
               >
                 {([canSubmit, isSubmitting]) => (
                   <Button type="submit" disabled={!canSubmit}>
+                    {isSubmitting && (
+                      <Loader2
+                        className="mr-2 size-4 animate-spin motion-reduce:animate-none"
+                        aria-hidden="true"
+                      />
+                    )}
                     {isSubmitting ? "Sparar..." : "Spara"}
                   </Button>
                 )}

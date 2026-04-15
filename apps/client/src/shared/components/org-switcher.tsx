@@ -117,18 +117,19 @@ export function OrgSwitcher() {
   }
 
   if (orgs.length === 1) {
+    // aria-label on a non-focusable wrapper is unreliable across screen
+    // readers — announce the role via sr-only text instead, and let the
+    // visible span be the accessible name.
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div
-              className="flex items-center gap-2 text-sm"
-              aria-label={`Aktiv organisation: ${currentOrg?.name ?? ""}`}
-            >
+            <div className="flex items-center gap-2 text-sm">
               <Building2
                 className="size-4 shrink-0 text-muted-foreground"
                 aria-hidden
               />
+              <span className="sr-only">Aktiv organisation: </span>
               <span className="max-w-[200px] truncate font-medium text-foreground">
                 {currentOrg?.name ?? "Laddar..."}
               </span>
@@ -141,11 +142,15 @@ export function OrgSwitcher() {
   }
 
   // FR-37: trigger is ≥44×44. Use h-11 (44px) with extra horizontal padding.
+  // Use the listbox ARIA pattern (aria-haspopup="listbox" + option/aria-selected
+  // in the dropdown) because cmdk's primitives are already listbox-shaped and
+  // the menu-radio variant produces axe warnings about menuitemradio living
+  // inside a non-menu parent.
   const triggerButton = (
     <Button
       variant="ghost"
       className="flex h-11 min-h-11 items-center gap-2 px-3"
-      aria-haspopup="menu"
+      aria-haspopup="listbox"
       aria-expanded={open}
       aria-label={`Byt organisation. Nuvarande: ${currentOrg?.name ?? ""}`}
     >
@@ -170,9 +175,10 @@ export function OrgSwitcher() {
   /**
    * cmdk's `Command` primitive provides arrow-key navigation, Home/End,
    * roving tabindex, Enter/Space to activate, and Escape to close — the
-   * full FR-30 keyboard model for free. Items use `role="menuitemradio"`
-   * with `aria-checked` so the single-selection semantics are correct
-   * (WAI-ARIA pattern), while keeping a visible checkmark.
+   * full FR-30 keyboard model for free. Items are left in their default
+   * listbox/option shape (cmdk's own ARIA) with `aria-selected` on the
+   * current org and a visible checkmark so single selection is conveyed
+   * by both semantics and icon (not color alone).
    */
   const orgList = (
     <Command
@@ -187,7 +193,7 @@ export function OrgSwitcher() {
           aria-label="Filtrera organisationer"
         />
       )}
-      <CommandList role="menu" aria-label="Välj organisation">
+      <CommandList aria-label="Välj organisation">
         <CommandEmpty>Inga organisationer matchar</CommandEmpty>
         <CommandGroup>
           {orgs.map((org) => {
@@ -196,8 +202,7 @@ export function OrgSwitcher() {
               <CommandItem
                 key={org.id}
                 value={org.name}
-                role="menuitemradio"
-                aria-checked={isSelected}
+                aria-selected={isSelected}
                 aria-current={isSelected ? "true" : undefined}
                 onSelect={() => handleSelect(org.id)}
                 className="flex items-center gap-2 py-2"

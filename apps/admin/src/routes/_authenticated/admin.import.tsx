@@ -4,6 +4,15 @@ import {
   Card,
   CardContent,
 } from "@elevatorbud/ui/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@elevatorbud/ui/components/ui/dialog";
+import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import { UploadZone } from "@elevatorbud/ui/components/ui/upload-zone";
 import { Loader2 } from "lucide-react";
@@ -69,15 +78,15 @@ function ImportPage() {
 
   const hasUnsavedState = status !== "idle" && status !== "complete";
 
-  useBlocker({
-    shouldBlockFn: () =>
-      window.confirm(
-        "Du har en pågående import. Om du lämnar sidan kommer alla val och mappningar att gå förlorade. Vill du verkligen lämna?",
-      )
-        ? false
-        : true,
+  // Use the resolver form so we can render a styled dialog instead of the
+  // native browser prompt. `enableBeforeUnload` still fires a native confirm
+  // on tab-close / refresh because the browser does not allow custom UI for
+  // those — that's a platform constraint, not an app choice.
+  const blocker = useBlocker({
+    shouldBlockFn: () => hasUnsavedState,
     enableBeforeUnload: () => hasUnsavedState,
     disabled: !hasUnsavedState,
+    withResolver: true,
   });
 
   return (
@@ -95,8 +104,10 @@ function ImportPage() {
         <UploadZone
           onFileSelect={handleFileSelect}
           accept=".xlsx,.xls"
+          acceptedExtensions={[".xlsx", ".xls"]}
+          maxSizeMB={10}
           title="Dra och släpp en Excel-fil här"
-          subtitle="eller klicka för att välja fil (.xlsx)"
+          subtitle="eller klicka för att välja fil (.xlsx, max 10 MB)"
           error={parseError}
         >
           <p className="text-xs text-muted-foreground">
@@ -195,30 +206,32 @@ function ImportPage() {
                   aria-hidden="true"
                 />
                 <span className="font-medium">
-                  Importerar {importProgress.total} hissar...
+                  Bearbetar {importProgress.total} hissar…
                 </span>
               </div>
               <div className="space-y-2">
                 {/*
-                  Server does not stream per-batch progress yet — the bar is
-                  indeterminate but the visible numeric label tells the admin
-                  how many rows are in flight so the operation doesn't feel
-                  like a black box (US-028). Switch to determinate once
-                  streaming is wired.
+                  The server runs the import as a single transaction; no
+                  per-batch progress is streamed. The indicator is
+                  intentionally indeterminate — we use aria-busy instead
+                  of a misleading aria-valuenow so screen readers don't
+                  announce a phantom percentage. Copy avoids "X of Y" so
+                  the visual never implies progress we don't have. Switch
+                  to role="progressbar" + valuenow if the server ever
+                  streams progress.
                 */}
                 <div
-                  role="progressbar"
+                  role="status"
                   aria-busy="true"
-                  aria-label={`Importerar ${importProgress.total} hissar`}
+                  aria-live="polite"
+                  aria-label={`Bearbetar import av ${importProgress.total} hissar`}
                   className="relative h-2 w-full overflow-hidden rounded-full bg-muted"
                 >
                   <div className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-primary animate-pulse motion-reduce:w-full motion-reduce:animate-none motion-reduce:opacity-70" />
                 </div>
                 <p className="text-center text-sm text-muted-foreground">
-                  {importProgress.current > 0 &&
-                  importProgress.current >= importProgress.total
-                    ? `${importProgress.total} av ${importProgress.total} importerade`
-                    : `${importProgress.total} hissar importeras...`}
+                  Importen körs som en enda transaktion — det här kan ta
+                  upp till en minut för stora filer. Lämna inte sidan.
                 </p>
               </div>
             </div>
@@ -238,6 +251,34 @@ function ImportPage() {
           headingRef={errorHeadingRef}
         />
       )}
+
+      <Dialog
+        open={blocker.status === "blocked"}
+        onOpenChange={(open) => {
+          if (!open) blocker.reset?.();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lämna importen?</DialogTitle>
+            <DialogDescription>
+              Du har en pågående import. Om du lämnar sidan kommer alla val
+              och mappningar att gå förlorade.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => blocker.reset?.()}>
+              Stanna kvar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => blocker.proceed?.()}
+            >
+              Lämna ändå
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

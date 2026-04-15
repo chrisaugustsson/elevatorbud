@@ -8,23 +8,32 @@ import { cn } from "@elevatorbud/ui/lib/utils";
 export function HissnummerField({
   field,
   currentHissId,
+  organizationId,
 }: {
   field: {
     state: { value: string };
     handleChange: (value: string) => void;
   };
   currentHissId: string;
+  organizationId: string;
 }) {
   const elevatorNumber = field.state.value;
+  const hasOrg = !!organizationId;
   const { data: checkResult } = useQuery({
-    queryKey: ["elevator", "checkElevatorNumber", { elevatorNumber, excludeId: currentHissId }],
-    queryFn: () => checkElevatorNumber({
-      data: {
-        elevatorNumber: elevatorNumber!,
-        excludeId: currentHissId,
-      },
-    }),
-    enabled: !!elevatorNumber,
+    queryKey: [
+      "elevator",
+      "checkElevatorNumber",
+      { elevatorNumber, organizationId, excludeId: currentHissId },
+    ],
+    queryFn: () =>
+      checkElevatorNumber({
+        data: {
+          elevatorNumber: elevatorNumber!,
+          organizationId: organizationId || undefined,
+          excludeId: currentHissId,
+        },
+      }),
+    enabled: !!elevatorNumber && hasOrg,
   });
   const isDuplicate = checkResult?.exists === true;
 
@@ -39,11 +48,16 @@ export function HissnummerField({
         placeholder="Ange hissnummer..."
         value={elevatorNumber}
         onChange={(e) => field.handleChange(e.target.value)}
+        aria-invalid={isDuplicate}
+        aria-describedby={isDuplicate ? "elevator_number-error" : undefined}
       />
       {isDuplicate && (
-        <p className="flex items-center gap-1 text-sm text-destructive">
+        <p
+          id="elevator_number-error"
+          className="flex items-center gap-1 text-sm text-destructive"
+        >
           <AlertCircle className="size-4" />
-          Hissnumret finns redan i registret
+          Hissnumret finns redan i organisationen
         </p>
       )}
     </div>

@@ -141,24 +141,30 @@ export function PreviewSection({
       {/* Warnings */}
       {hasWarnings && (
         <Card>
-          <CardHeader
-            className="cursor-pointer pb-3"
-            onClick={() => setShowWarnings(!showWarnings)}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <CardHeader className="p-0">
+            <button
+              type="button"
+              aria-expanded={showWarnings}
+              aria-controls="import-warnings-panel"
+              onClick={() => setShowWarnings(!showWarnings)}
+              className="flex w-full items-center justify-between gap-2 rounded-xl px-6 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <span className="flex items-center gap-2">
+                <AlertTriangle
+                  className="h-4 w-4 text-amber-500"
+                  aria-hidden="true"
+                />
                 <CardTitle className="text-base">
                   Varningar ({parseResult.warnings.length})
                 </CardTitle>
-              </div>
+              </span>
               <span className="text-xs text-muted-foreground">
                 {showWarnings ? "Dölj" : "Visa"}
               </span>
-            </div>
+            </button>
           </CardHeader>
           {showWarnings && (
-            <CardContent>
+            <CardContent id="import-warnings-panel">
               <div className="max-h-60 space-y-1 overflow-y-auto">
                 {parseResult.warnings.map((w, i) => (
                   <div
@@ -181,24 +187,30 @@ export function PreviewSection({
       {/* Invalid rows */}
       {hasInvalidRows && (
         <Card>
-          <CardHeader
-            className="cursor-pointer pb-3"
-            onClick={() => setShowInvalidRows(!showInvalidRows)}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-destructive" />
+          <CardHeader className="p-0">
+            <button
+              type="button"
+              aria-expanded={showInvalidRows}
+              aria-controls="import-invalid-rows-panel"
+              onClick={() => setShowInvalidRows(!showInvalidRows)}
+              className="flex w-full items-center justify-between gap-2 rounded-xl px-6 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <span className="flex items-center gap-2">
+                <XCircle
+                  className="h-4 w-4 text-destructive"
+                  aria-hidden="true"
+                />
                 <CardTitle className="text-base">
                   Ogiltiga rader ({parseResult.invalidRows.length})
                 </CardTitle>
-              </div>
+              </span>
               <span className="text-xs text-muted-foreground">
                 {showInvalidRows ? "Dölj" : "Visa"}
               </span>
-            </div>
+            </button>
           </CardHeader>
           {showInvalidRows && (
-            <CardContent>
+            <CardContent id="import-invalid-rows-panel">
               <div className="max-h-60 space-y-1 overflow-y-auto">
                 {parseResult.invalidRows.map((r, i) => (
                   <div

@@ -324,11 +324,19 @@ async function getLatestBudgetFn(db: Database, elevatorId: string) {
 async function checkElevatorNumberFn(
   db: Database,
   elevatorNumber: string,
+  organizationId: string | undefined,
   excludeId?: string,
 ) {
-  if (!elevatorNumber) return { exists: false };
+  // Uniqueness is scoped to (organizationId, elevatorNumber) per the
+  // elevators_organization_id_elevator_number_unique composite index. A
+  // cross-org check would flag "H1" in org B as a duplicate of an unrelated
+  // "H1" in org A, which would not actually conflict on save.
+  if (!elevatorNumber || !organizationId) return { exists: false };
   const existing = await db.query.elevators.findFirst({
-    where: eq(elevators.elevatorNumber, elevatorNumber),
+    where: and(
+      eq(elevators.elevatorNumber, elevatorNumber),
+      eq(elevators.organizationId, organizationId),
+    ),
   });
   if (!existing) return { exists: false };
   if (excludeId && existing.id === excludeId) return { exists: false };
@@ -787,6 +795,7 @@ export const checkElevatorNumber = createServerFn()
   .inputValidator(
     z.object({
       elevatorNumber: z.string(),
+      organizationId: z.string().uuid().optional(),
       excludeId: z.string().uuid().optional(),
     }),
   )
@@ -794,6 +803,7 @@ export const checkElevatorNumber = createServerFn()
     return checkElevatorNumberFn(
       context.db,
       data.elevatorNumber,
+      data.organizationId,
       data.excludeId,
     );
   });

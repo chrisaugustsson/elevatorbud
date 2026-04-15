@@ -57,10 +57,13 @@ export function TimelineChart({ data, onYearClick, selectedYear }: TimelineChart
     [onYearClick, data],
   );
 
+  // Dim unselected bars to ~40% opacity (0x66). 0x40 (~25%) is too faint
+  // in dark mode to stay perceivable. Selection is also conveyed by the
+  // border below, so this alpha value is the secondary cue.
   const backgroundColors = useMemo(
     () =>
       data.map((d) =>
-        selectedYear && d.name !== selectedYear ? d.fill + "40" : d.fill,
+        selectedYear && d.name !== selectedYear ? d.fill + "66" : d.fill,
       ),
     [data, selectedYear],
   );
@@ -97,7 +100,7 @@ export function TimelineChart({ data, onYearClick, selectedYear }: TimelineChart
             Inga hissar med rekommenderat moderniseringsår.
           </p>
         ) : (
-          <div className="h-[300px] w-full overflow-hidden">
+          <div className="h-[300px] w-full overflow-hidden rounded-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
             <Bar
               ref={chartRef}
               data={{

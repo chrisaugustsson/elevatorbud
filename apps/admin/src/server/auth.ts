@@ -1,1 +1,6 @@
-export { adminMiddleware, getAuthUser } from "@elevatorbud/auth/middleware";
+export {
+  adminMiddleware,
+  getAuthUser,
+  invalidateUserCacheByDbId,
+  invalidateUserCacheByClerkId,
+} from "@elevatorbud/auth/middleware";

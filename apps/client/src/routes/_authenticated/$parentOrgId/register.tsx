@@ -427,15 +427,6 @@ function RegisterPage() {
         subOrgId={subOrgId}
         onSubOrgChange={setSubOrg}
       />
-      {subOrgId && selectedSubOrgName && totalCount === 0 && (
-        <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground">
-          <Building2 className="size-8" />
-          <p>Inga hissar i {selectedSubOrgName}</p>
-          <Button variant="outline" size="sm" onClick={() => setSubOrg(undefined)}>
-            Rensa filter
-          </Button>
-        </div>
-      )}
       <div aria-live="polite" className="sr-only">
         {hasChildOrgs && totalCount !== undefined
           ? selectedSubOrgName
@@ -451,6 +442,21 @@ function RegisterPage() {
         page={page}
         pageSize={limit}
         showSubOrg={hasChildOrgs}
+        emptyMessage={
+          subOrgId && selectedSubOrgName ? (
+            <div className="flex flex-col items-center gap-3 text-muted-foreground">
+              <Building2 className="size-8" />
+              <p>Inga hissar i {selectedSubOrgName}.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSubOrg(undefined)}
+              >
+                Rensa filter
+              </Button>
+            </div>
+          ) : undefined
+        }
       />
       <RegisterPagination
         totalCount={totalCount}

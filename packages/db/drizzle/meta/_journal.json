@@ -50,6 +50,20 @@
       "when": 1776246635538,
       "tag": "0006_wild_cerebro",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776500000000,
+      "tag": "0007_stale_spiral",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776251232256,
+      "tag": "0008_dizzy_paibok",
+      "breakpoints": true
     }
   ]
 }
