@@ -328,3 +328,39 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - `XLSX.utils.sheet_to_json(sheet, { header: 1 })` returns an array of row arrays — `length - 1` gives data row count (excluding header)
   - When removing a public export, grep for all consumers before deleting — in this case `validateWorkbookSheets` had zero external consumers
 ---
+
+## 2026-04-15 - US-016
+- Deleted `parse-emergency-phone-sheet.ts` and `parse-demolished-sheet.ts` entirely
+- Removed `parseEmergencyPhone` function from `parsers.ts`
+- Removed `EMERGENCY_PHONE_COLUMNS` and `RIVNA_ELEVATOR_COLUMNS` from `column-mappings.ts`
+- Removed emergency phone column (AH) from `ELEVATOR_COLUMNS`
+- Removed `compound_emergency_phone` parser cases from `parse-elevator-sheet.ts` (both fixed and mapping-based parsers)
+- Removed nödtelefon header alias and target field from `header-aliases.ts`
+- Removed `EmergencyPhoneEntry`, `EmergencyPhoneParseResult` types and emergency phone fields from `ParsedElevator`
+- Simplified `FullImportResult`: removed `demolished`, `combined` fields and `emergencyPhones`/`demolished` sheet metadata
+- Removed `joinEmergencyPhones` function from both `index.ts` and `parse-excel-import-with-mapping.ts`
+- Updated `parseExcelImport` and `parseExcelImportWithMapping` to only handle elevator sheets
+- Removed emergency phone fields from admin `import.ts` Zod schema and `toDetailData` mapping
+- Removed `has_emergency_phone` from elevator insert/update in import
+- Removed Nödtelefoner and Rivna hissar SheetCards from `preview-section.tsx`
+- Updated `use-import-machine.ts`: `result.combined` → `result.elevators`, `parseResult.combined` → `parseResult.elevators`
+- Updated barrel exports in `packages/utils/src/index.ts`
+- Files changed:
+  - `packages/utils/src/excel-import/types.ts`
+  - `packages/utils/src/excel-import/column-mappings.ts`
+  - `packages/utils/src/excel-import/header-aliases.ts`
+  - `packages/utils/src/excel-import/parsers.ts`
+  - `packages/utils/src/excel-import/parse-elevator-sheet.ts`
+  - `packages/utils/src/excel-import/index.ts`
+  - `packages/utils/src/excel-import/parse-excel-import-with-mapping.ts`
+  - `packages/utils/src/excel-import/parse-emergency-phone-sheet.ts` (deleted)
+  - `packages/utils/src/excel-import/parse-demolished-sheet.ts` (deleted)
+  - `packages/utils/src/index.ts`
+  - `apps/admin/src/server/import.ts`
+  - `apps/admin/src/features/import/components/preview-section.tsx`
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+- **Learnings for future iterations:**
+  - When removing a feature that spans types → parsers → join logic → UI, work bottom-up (types/parsers first, then consumers)
+  - `FullImportResult.combined` was used in the import machine hook — grep for all field references before changing a shared type shape
+  - 693 lines deleted — feature removal is high-leverage cleanup
+---
