@@ -364,3 +364,21 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - `FullImportResult.combined` was used in the import machine hook — grep for all field references before changing a shared type shape
   - 693 lines deleted — feature removal is high-leverage cleanup
 ---
+
+## 2026-04-15 - US-017
+- Added `sheet-selection` state to import machine between `parsing` and `mapping`
+- After file upload, `getWorkbookSheetInfo()` extracts metadata for all sheets in workbook
+- Created `SheetSelectionSection` component with checkboxes, row counts, first-row preview, and empty-sheet warnings
+- All sheets selected by default; at least one must be selected to proceed
+- On confirm, first selected sheet is auto-mapped and passed to existing mapping step
+- Removed outdated Nödtelefoner/Rivna hissar references from upload zone description
+- Updated `handleHeaderRowChange` to use selected sheet name instead of hardcoded "Hissar"
+- Files changed:
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `apps/admin/src/features/import/components/sheet-selection-section.tsx` (new)
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+- **Learnings for future iterations:**
+  - `getWorkbookSheetInfo` already existed from US-015 — reused directly in the import machine
+  - Sheet selection state (`selectedSheets`) needs to persist across steps for use in later stories (US-019 per-sheet mapping, US-020 merge)
+  - Import machine currently only maps the first selected sheet; US-019 will add per-sheet sequential mapping
+---
