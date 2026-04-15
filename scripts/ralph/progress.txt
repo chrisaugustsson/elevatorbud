@@ -565,3 +565,18 @@ Started: tis 14 apr. 2026 21:13:58 CEST
 - **Learnings for future iterations:**
   - Check existing implementations before coding — most of US-026 was already done across US-017 and US-019
 ---
+
+## 2026-04-15 - US-027
+- Added `useBlocker` from TanStack Router to import page for route change protection
+- `shouldBlockFn` shows `window.confirm` dialog when navigating away with in-progress import state
+- `enableBeforeUnload` handles tab close/refresh with browser's native "Leave site?" dialog
+- Blocker disabled when status is `idle` (no file uploaded) or `complete` (import finished)
+- Dialog text clearly states that import progress will be lost
+- Files changed:
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+  - `scripts/ralph/prd.json`
+- **Learnings for future iterations:**
+  - TanStack Router's `useBlocker` with `enableBeforeUnload` handles both route changes and tab close/refresh in one hook
+  - `shouldBlockFn` returning `false` (from confirm OK) allows navigation; `true` blocks it
+  - `disabled` prop prevents the blocker from firing at all when not needed — cleaner than conditional shouldBlockFn
+---

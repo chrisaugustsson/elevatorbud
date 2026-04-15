@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useBlocker } from "@tanstack/react-router";
 import {
   Card,
   CardContent,
@@ -45,6 +45,19 @@ function ImportPage() {
     handleBackToMapping,
     handleBackToOrgMapping,
   } = useImportMachine();
+
+  const hasUnsavedState = status !== "idle" && status !== "complete";
+
+  useBlocker({
+    shouldBlockFn: () =>
+      window.confirm(
+        "Du har en pågående import. Om du lämnar sidan kommer alla val och mappningar att gå förlorade. Vill du verkligen lämna?",
+      )
+        ? false
+        : true,
+    enableBeforeUnload: () => hasUnsavedState,
+    disabled: !hasUnsavedState,
+  });
 
   return (
     <div className="space-y-6">
