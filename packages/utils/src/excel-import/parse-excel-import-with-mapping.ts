@@ -1,56 +1,63 @@
 import type {
-  ParsedElevator,
   ImportWarning,
-  ElevatorParseResult,
   FullImportResult,
   ColumnMapping,
+  SheetMappingConfig,
 } from "./types";
 import { parseElevatorSheetWithMapping } from "./parse-elevator-sheet";
 
-/**
- * Parses an Excel import using user-confirmed column mappings for the Hissar sheet.
- */
 export function parseExcelImportWithMapping(
   workbook: import("xlsx").WorkBook,
-  mappings: ColumnMapping[],
-  headerRowIndex: number,
+  mappingsOrConfigs: ColumnMapping[] | SheetMappingConfig[],
+  headerRowIndex?: number,
 ): FullImportResult {
-  const sheetNames = workbook.SheetNames;
-  const hasHissar = sheetNames.includes("Hissar");
+  const configs = isSheetMappingConfigs(mappingsOrConfigs)
+    ? mappingsOrConfigs
+    : [
+        {
+          sheetName: workbook.SheetNames.includes("Hissar")
+            ? "Hissar"
+            : workbook.SheetNames[0],
+          mappings: mappingsOrConfigs,
+          headerRowIndex: headerRowIndex ?? 0,
+        },
+      ];
 
   const allWarnings: ImportWarning[] = [];
   const allInvalidRows: { row: number; sheet: string; reason: string }[] = [];
+  const allElevators: import("./types").ParsedElevator[] = [];
+  let totalFound = 0;
 
-  let hissarResult: ElevatorParseResult;
-  if (hasHissar) {
-    hissarResult = parseElevatorSheetWithMapping(
+  for (const config of configs) {
+    if (!workbook.SheetNames.includes(config.sheetName)) continue;
+
+    const result = parseElevatorSheetWithMapping(
       workbook,
-      "Hissar",
-      mappings,
-      headerRowIndex,
+      config.sheetName,
+      config.mappings,
+      config.headerRowIndex,
     );
-    allWarnings.push(...hissarResult.warnings);
+
+    allElevators.push(...result.elevators);
+    allWarnings.push(...result.warnings);
     allInvalidRows.push(
-      ...hissarResult.invalidRows.map((r) => ({ ...r, sheet: "Hissar" })),
+      ...result.invalidRows.map((r) => ({ ...r, sheet: config.sheetName })),
     );
-  } else {
-    hissarResult = {
-      elevators: [],
-      warnings: [],
-      invalidRows: [],
-      sheetName: "Hissar",
-    };
+    totalFound += result.elevators.length;
   }
 
   return {
-    elevators: hissarResult.elevators,
+    elevators: allElevators,
     warnings: allWarnings,
     invalidRows: allInvalidRows,
     sheets: {
-      elevators: {
-        found: hasHissar,
-        count: hissarResult.elevators.length,
-      },
+      elevators: { found: configs.length > 0, count: totalFound },
     },
   };
+}
+
+function isSheetMappingConfigs(
+  input: ColumnMapping[] | SheetMappingConfig[],
+): input is SheetMappingConfig[] {
+  return input.length > 0 && "sheetName" in input[0];
 }

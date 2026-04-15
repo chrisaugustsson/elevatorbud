@@ -76,6 +76,12 @@ export type ColumnDef = {
   parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_daylight_opening" | "build_year" | "modernization_year" | "boolean" | "number" | "budget";
 };
 
+export type SheetMappingConfig = {
+  sheetName: string;
+  mappings: ColumnMapping[];
+  headerRowIndex: number;
+};
+
 export type FullImportResult = {
   elevators: ParsedElevator[];
   warnings: ImportWarning[];

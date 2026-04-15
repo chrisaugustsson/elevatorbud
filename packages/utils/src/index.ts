@@ -24,6 +24,7 @@ export type {
   ElevatorParseResult,
   FullImportResult,
   SheetInfo,
+  SheetMappingConfig,
   ColumnDef,
   ColumnMapping,
   AutoMapResult,

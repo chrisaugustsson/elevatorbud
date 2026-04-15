@@ -35,12 +35,16 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 export function ColumnMappingSection({
   autoMapResult,
   sheetData,
+  sheetName,
+  sheetProgress,
   onConfirm,
   onHeaderRowChange,
   onCancel,
 }: {
   autoMapResult: AutoMapResult;
   sheetData: unknown[][];
+  sheetName?: string;
+  sheetProgress?: { current: number; total: number };
   onConfirm: (mappings: ColumnMapping[]) => void;
   onHeaderRowChange: (rowIndex: number) => void;
   onCancel: () => void;
@@ -115,6 +119,30 @@ export function ColumnMappingSection({
 
   return (
     <div className="space-y-4">
+      {/* Sheet progress indicator */}
+      {sheetProgress && sheetProgress.total > 1 && (
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="text-sm font-medium">
+            Ark {sheetProgress.current} av {sheetProgress.total}
+            {sheetName ? `: ${sheetName}` : ""}
+          </Badge>
+          <div className="flex gap-1">
+            {Array.from({ length: sheetProgress.total }, (_, i) => (
+              <div
+                key={i}
+                className={`h-2 w-8 rounded-full ${
+                  i < sheetProgress.current - 1
+                    ? "bg-primary"
+                    : i === sheetProgress.current - 1
+                      ? "bg-primary/60"
+                      : "bg-muted"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Header row selector */}
       <Card>
         <CardContent className="flex items-center gap-4 pt-6">
@@ -154,18 +182,20 @@ export function ColumnMappingSection({
 
       {/* Missing mandatory warning */}
       {missingMandatory.length > 0 && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950">
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
           <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertTriangle className="mt-0.5 h-4 w-4 text-red-600 dark:text-red-400" />
             <div>
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+              <p className="text-sm font-medium text-red-800 dark:text-red-200">
                 Obligatoriska fält saknar mappning
               </p>
-              <ul className="mt-1 space-y-0.5 text-xs text-amber-700 dark:text-amber-300">
+              <div className="mt-1 flex flex-wrap gap-1">
                 {missingMandatory.map((t) => (
-                  <li key={t.field}>• {t.label}</li>
+                  <Badge key={t.field} variant="destructive" className="text-xs">
+                    {t.label}
+                  </Badge>
                 ))}
-              </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -288,7 +318,14 @@ export function ColumnMappingSection({
         <Button variant="outline" onClick={onCancel}>
           Avbryt
         </Button>
-        <Button onClick={handleConfirm}>Bekräfta mappning</Button>
+        <Button
+          onClick={handleConfirm}
+          disabled={missingMandatory.length > 0}
+        >
+          {sheetProgress && sheetProgress.current < sheetProgress.total
+            ? "Nästa ark"
+            : "Bekräfta mappning"}
+        </Button>
       </div>
     </div>
   );

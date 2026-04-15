@@ -28,6 +28,7 @@ function ImportPage() {
     sheetData,
     sheetInfos,
     selectedSheets,
+    currentSheetIndex,
     handleFileSelect,
     handleSheetSelectionConfirm,
     handleHeaderRowChange,
@@ -79,9 +80,14 @@ function ImportPage() {
 
       {status === "mapping" && autoMapResult && (
         <ColumnMappingSection
-          key={autoMapResult.headerRowIndex}
+          key={`${selectedSheets[currentSheetIndex]}-${autoMapResult.headerRowIndex}`}
           autoMapResult={autoMapResult}
           sheetData={sheetData}
+          sheetName={selectedSheets[currentSheetIndex]}
+          sheetProgress={{
+            current: currentSheetIndex + 1,
+            total: selectedSheets.length,
+          }}
           onConfirm={handleMappingConfirm}
           onHeaderRowChange={handleHeaderRowChange}
           onCancel={handleReset}

@@ -13,6 +13,7 @@ import {
   type AutoMapResult,
   type ColumnMapping,
   type SheetInfo,
+  type SheetMappingConfig,
 } from "@elevatorbud/utils";
 
 export type AnalysisResult = {
@@ -70,11 +71,15 @@ export function useImportMachine() {
   const [sheetInfos, setSheetInfos] = useState<SheetInfo[]>([]);
   const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
 
-  // Mapping step state
+  // Per-sheet mapping state
   const [autoMapResult, setAutoMapResult] = useState<AutoMapResult | null>(
     null,
   );
   const [sheetData, setSheetData] = useState<unknown[][]>([]);
+  const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
+  const [sheetMappings, setSheetMappings] = useState<
+    Map<string, { mappings: ColumnMapping[]; headerRowIndex: number }>
+  >(new Map());
 
   const { data: currentUser } = useQuery(getMeOptions()) as { data: { email?: string } | undefined };
 
@@ -125,31 +130,90 @@ export function useImportMachine() {
     }
   }, []);
 
-  const handleSheetSelectionConfirm = useCallback((sheets: string[]) => {
-    const wb = workbookRef.current;
-    if (!wb || sheets.length === 0) return;
+  const loadSheetForMapping = useCallback(
+    (sheetName: string, inheritedMappings?: ColumnMapping[]) => {
+      const wb = workbookRef.current;
+      if (!wb) return false;
 
-    setSelectedSheets(sheets);
+      const mapResult = autoMapSheet(wb, sheetName);
+      if (!mapResult) {
+        setParseError(`Kunde inte läsa arket '${sheetName}'`);
+        setStatus("idle");
+        return false;
+      }
 
-    const firstSheet = sheets[0];
-    const mapResult = autoMapSheet(wb, firstSheet);
-    if (!mapResult) {
-      setParseError(`Kunde inte läsa arket '${firstSheet}'`);
-      setStatus("idle");
-      return;
-    }
+      if (inheritedMappings && inheritedMappings.length > 0) {
+        const inheritedByHeader = new Map(
+          inheritedMappings.map((m) => [m.sourceHeader.toLowerCase().trim(), m]),
+        );
+        const newMapped: ColumnMapping[] = [];
+        const newUnmapped: number[] = [];
 
-    const data = getSheetData(wb, firstSheet);
-    setSheetData(data);
-    setAutoMapResult(mapResult);
-    setStatus("mapping");
-  }, []);
+        for (let i = 0; i < mapResult.sourceHeaders.length; i++) {
+          const header = mapResult.sourceHeaders[i];
+          if (!header || !header.trim()) continue;
+
+          const autoMatch = mapResult.mapped.find((m) => m.sourceIndex === i);
+          const inherited = inheritedByHeader.get(header.toLowerCase().trim());
+
+          if (autoMatch) {
+            newMapped.push(autoMatch);
+          } else if (inherited) {
+            newMapped.push({
+              sourceIndex: i,
+              sourceHeader: header,
+              field: inherited.field,
+              parser: inherited.parser,
+              autoMatched: false,
+            });
+          } else {
+            newUnmapped.push(i);
+          }
+        }
+
+        const mappedFields = new Set(newMapped.map((m) => m.field));
+        const missingMandatory = mapResult.missingMandatory.filter(
+          (f) => !mappedFields.has(f),
+        );
+
+        setAutoMapResult({
+          ...mapResult,
+          mapped: newMapped,
+          unmappedIndices: newUnmapped,
+          missingMandatory,
+        });
+      } else {
+        setAutoMapResult(mapResult);
+      }
+
+      const data = getSheetData(wb, sheetName);
+      setSheetData(data);
+      return true;
+    },
+    [],
+  );
+
+  const handleSheetSelectionConfirm = useCallback(
+    (sheets: string[]) => {
+      if (sheets.length === 0) return;
+
+      setSelectedSheets(sheets);
+      setCurrentSheetIndex(0);
+      setSheetMappings(new Map());
+
+      if (loadSheetForMapping(sheets[0])) {
+        setStatus("mapping");
+      }
+    },
+    [loadSheetForMapping],
+  );
 
   const handleHeaderRowChange = useCallback(
     (rowIndex: number) => {
       const wb = workbookRef.current;
       if (!wb || selectedSheets.length === 0) return;
-      const data = getSheetData(wb, selectedSheets[0]);
+      const currentSheet = selectedSheets[currentSheetIndex];
+      const data = getSheetData(wb, currentSheet);
       if (rowIndex < 0 || rowIndex >= data.length) return;
 
       const headerRow = data[rowIndex] || [];
@@ -158,7 +222,7 @@ export function useImportMachine() {
       setAutoMapResult(result);
       setSheetData(data);
     },
-    [selectedSheets],
+    [selectedSheets, currentSheetIndex],
   );
 
   const handleMappingConfirm = useCallback(
@@ -166,12 +230,32 @@ export function useImportMachine() {
       const wb = workbookRef.current;
       if (!wb || !autoMapResult) return;
 
+      const currentSheet = selectedSheets[currentSheetIndex];
+      const updatedMappings = new Map(sheetMappings);
+      updatedMappings.set(currentSheet, {
+        mappings,
+        headerRowIndex: autoMapResult.headerRowIndex,
+      });
+      setSheetMappings(updatedMappings);
+
+      const nextIndex = currentSheetIndex + 1;
+      if (nextIndex < selectedSheets.length) {
+        setCurrentSheetIndex(nextIndex);
+        loadSheetForMapping(selectedSheets[nextIndex], mappings);
+        return;
+      }
+
       try {
-        const result = parseExcelImportWithMapping(
-          wb,
-          mappings,
-          autoMapResult.headerRowIndex,
-        );
+        const allConfigs: SheetMappingConfig[] = [];
+        for (const [sheetName, config] of updatedMappings) {
+          allConfigs.push({
+            sheetName,
+            mappings: config.mappings,
+            headerRowIndex: config.headerRowIndex,
+          });
+        }
+
+        const result = parseExcelImportWithMapping(wb, allConfigs);
         setParseResult(result);
 
         const elevatorNumberList = [
@@ -194,7 +278,7 @@ export function useImportMachine() {
         setStatus("idle");
       }
     },
-    [autoMapResult],
+    [autoMapResult, selectedSheets, currentSheetIndex, sheetMappings, loadSheetForMapping],
   );
 
   const handleConfirm = useCallback(async () => {
@@ -284,6 +368,8 @@ export function useImportMachine() {
     setSheetData([]);
     setSheetInfos([]);
     setSelectedSheets([]);
+    setCurrentSheetIndex(0);
+    setSheetMappings(new Map());
     workbookRef.current = null;
   }, []);
 
@@ -299,6 +385,8 @@ export function useImportMachine() {
     sheetData,
     sheetInfos,
     selectedSheets,
+    currentSheetIndex,
+    sheetMappings,
     extractedOrgData,
     handleFileSelect,
     handleSheetSelectionConfirm,
