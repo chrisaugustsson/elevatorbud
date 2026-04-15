@@ -268,3 +268,21 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - For conditional columns in TanStack Table, use spread + ternary in the columns array and re-memoize on the toggle
   - Sub-org filter uses `__all__` as sentinel value for "all" in Select since shadcn Select doesn't support empty string values
 ---
+
+## 2026-04-15 - US-013
+- Split monolithic `getChartData` server function into parameterized `getSingleChartData` accepting a `chartType` enum
+- Each chart now loads independently via its own `singleChartOptions(parentOrgId, chartType)` query
+- Added `ChartErrorBoundary` (class component) wrapping each chart — shows retry button on failure, invalidates the specific chart query
+- Added `ChartWithBoundary` wrapper combining Suspense (with `ChartSkeleton`) + `ChartErrorBoundary` per chart
+- Added `EmptyChart` component showing "Ingen data ännu" with icon when a chart has zero data points
+- Removed the `stats.totalCount === 0` guard that hid all charts — each chart now independently handles empty state
+- Dashboard still uses `currentContextOrgIds` (parent + children) — no sub-org filter on dashboard
+- Chart drill-downs preserved: clicking bars/slices navigates to register/modernisering with relevant filters
+- Files changed:
+  - `apps/client/src/server/analytics.ts`
+  - `apps/client/src/routes/_authenticated/$parentOrgId/dashboard.tsx`
+- **Learnings for future iterations:**
+  - Parameterized server function with enum input is cleaner than 6 separate functions for independent chart loading
+  - React class component ErrorBoundary is still required — no hook equivalent for `getDerivedStateFromError`
+  - `queryClient.invalidateQueries` with specific query key is the retry mechanism for error boundaries
+---

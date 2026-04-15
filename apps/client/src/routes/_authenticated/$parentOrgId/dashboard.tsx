@@ -1,15 +1,25 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
+import { Suspense, useCallback, Component } from "react";
+import type { ReactNode, ErrorInfo } from "react";
 import { meOptions } from "../../../server/user";
-import { statsOptions, chartDataOptions } from "../../../server/analytics";
+import { statsOptions, singleChartOptions } from "../../../server/analytics";
+import type { ChartType } from "../../../server/analytics";
 import { KpiCards } from "@elevatorbud/ui/components/dashboard/kpi-cards";
 import type { KpiItem } from "@elevatorbud/ui/components/dashboard/kpi-cards";
 import {
   DashboardBarChart,
   DashboardPieChart,
 } from "@elevatorbud/ui/components/dashboard/charts";
+import type { ChartDataPoint } from "@elevatorbud/ui/components/dashboard/charts";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
+import { Button } from "@elevatorbud/ui/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@elevatorbud/ui/components/ui/card";
 import {
   Building2,
   Calendar,
@@ -17,80 +27,400 @@ import {
   Hammer,
   TrendingUp,
   AlertTriangle,
+  RefreshCw,
+  BarChart3,
 } from "lucide-react";
+
+const CHART_TYPES: ChartType[] = [
+  "byDistrict",
+  "byElevatorType",
+  "topManufacturers",
+  "byMaintenanceCompany",
+  "ageDistribution",
+  "modernizationTimeline",
+];
 
 export const Route = createFileRoute("/_authenticated/$parentOrgId/dashboard")({
   loader: ({ context, params }) => {
     context.queryClient.prefetchQuery(meOptions());
     context.queryClient.prefetchQuery(statsOptions(params.parentOrgId));
-    context.queryClient.prefetchQuery(chartDataOptions(params.parentOrgId));
+    for (const chartType of CHART_TYPES) {
+      context.queryClient.prefetchQuery(
+        singleChartOptions(params.parentOrgId, chartType),
+      );
+    }
   },
   component: DashboardPage,
   pendingComponent: DashboardSkeleton,
 });
 
-function DashboardPage() {
-  const { parentOrgId } = Route.useParams();
-  const { data: stats } = useSuspenseQuery(statsOptions(parentOrgId));
+// --- Error Boundary ---
 
-  const { data: chartData } = useSuspenseQuery(chartDataOptions(parentOrgId));
+interface ChartErrorBoundaryProps {
+  children: ReactNode;
+  onRetry: () => void;
+  title: string;
+}
 
+interface ChartErrorBoundaryState {
+  hasError: boolean;
+}
+
+class ChartErrorBoundary extends Component<
+  ChartErrorBoundaryProps,
+  ChartErrorBoundaryState
+> {
+  constructor(props: ChartErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): ChartErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(_error: Error, _info: ErrorInfo) {
+    // Error logged by React
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{this.props.title}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex h-[300px] flex-col items-center justify-center gap-3 text-muted-foreground">
+              <AlertTriangle className="h-8 w-8" />
+              <p className="text-sm">Kunde inte ladda data</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  this.setState({ hasError: false });
+                  this.props.onRetry();
+                }}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Försök igen
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// --- Chart Skeleton ---
+
+function ChartSkeleton() {
+  return (
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-5 w-32" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-[300px] w-full rounded-lg" />
+      </CardContent>
+    </Card>
+  );
+}
+
+// --- Empty Chart ---
+
+function EmptyChart({ title }: { title: string }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex h-[300px] flex-col items-center justify-center gap-2 text-muted-foreground">
+          <BarChart3 className="h-8 w-8" />
+          <p className="text-sm">Ingen data ännu</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// --- Individual Chart Components ---
+
+function DistrictChart({ parentOrgId }: { parentOrgId: string }) {
+  const { data } = useSuspenseQuery(
+    singleChartOptions(parentOrgId, "byDistrict"),
+  );
+  if (data.length === 0) return <EmptyChart title="Hissar per distrikt" />;
+  return (
+    <DistrictChartInner data={data} parentOrgId={parentOrgId} />
+  );
+}
+
+function DistrictChartInner({
+  data,
+  parentOrgId,
+}: {
+  data: ChartDataPoint[];
+  parentOrgId: string;
+}) {
   const navigate = useNavigate();
-  const currentYear = new Date().getFullYear();
-
-  const goToRegister = useCallback(
-    (searchParams: Record<string, string | number | string[]>) => {
-      navigate({ to: "/$parentOrgId/register", params: { parentOrgId }, search: searchParams });
-    },
+  const handleClick = useCallback(
+    (label: string) =>
+      navigate({
+        to: "/$parentOrgId/register",
+        params: { parentOrgId },
+        search: { district: [label] },
+      }),
     [navigate, parentOrgId],
   );
-
-  const handleDistrictClick = useCallback(
-    (label: string) => goToRegister({ district: [label] }),
-    [goToRegister],
+  return (
+    <DashboardBarChart
+      title="Hissar per distrikt"
+      data={data}
+      color="var(--color-chart-1, #2563eb)"
+      onBarClick={handleClick}
+    />
   );
+}
 
-  const handleTypeClick = useCallback(
-    (label: string) => goToRegister({ elevatorType: [label] }),
-    [goToRegister],
+function AgeDistributionChart({ parentOrgId }: { parentOrgId: string }) {
+  const { data } = useSuspenseQuery(
+    singleChartOptions(parentOrgId, "ageDistribution"),
   );
-
-  const handleManufacturerClick = useCallback(
-    (label: string) => goToRegister({ manufacturer: [label] }),
-    [goToRegister],
+  if (data.length === 0)
+    return <EmptyChart title="Åldersfördelning" />;
+  return (
+    <AgeDistributionChartInner data={data} parentOrgId={parentOrgId} />
   );
+}
 
-  const handleMaintenanceCompanyClick = useCallback(
-    (label: string) => goToRegister({ maintenanceCompany: [label] }),
-    [goToRegister],
-  );
-
-  const handleAgeClick = useCallback(
+function AgeDistributionChartInner({
+  data,
+  parentOrgId,
+}: {
+  data: ChartDataPoint[];
+  parentOrgId: string;
+}) {
+  const navigate = useNavigate();
+  const currentYear = new Date().getFullYear();
+  const handleClick = useCallback(
     (label: string) => {
-      // Labels: "0-9 ar", "10-19 ar", ..., "50+ ar", "Okant"
       if (label === "Okant") return;
       if (label.startsWith("50+")) {
-        goToRegister({ buildYearMax: currentYear - 50 });
+        navigate({
+          to: "/$parentOrgId/register",
+          params: { parentOrgId },
+          search: { buildYearMax: currentYear - 50 },
+        });
         return;
       }
       const match = label.match(/^(\d+)-(\d+)/);
       if (!match) return;
       const minAge = parseInt(match[1], 10);
       const maxAge = parseInt(match[2], 10);
-      goToRegister({
-        buildYearMin: currentYear - maxAge,
-        buildYearMax: currentYear - minAge,
+      navigate({
+        to: "/$parentOrgId/register",
+        params: { parentOrgId },
+        search: { buildYearMin: currentYear - maxAge, buildYearMax: currentYear - minAge },
       });
     },
-    [goToRegister, currentYear],
+    [navigate, parentOrgId, currentYear],
   );
+  return (
+    <DashboardBarChart
+      title="Åldersfördelning"
+      data={data}
+      color="var(--color-chart-2, #16a34a)"
+      onBarClick={handleClick}
+    />
+  );
+}
 
-  const handleTimelineClick = useCallback(
-    (label: string) => {
-      navigate({ to: "/$parentOrgId/modernisering", params: { parentOrgId }, search: { year: label } });
-    },
+function ElevatorTypeChart({ parentOrgId }: { parentOrgId: string }) {
+  const { data } = useSuspenseQuery(
+    singleChartOptions(parentOrgId, "byElevatorType"),
+  );
+  if (data.length === 0) return <EmptyChart title="Hisstyper" />;
+  return <ElevatorTypeChartInner data={data} parentOrgId={parentOrgId} />;
+}
+
+function ElevatorTypeChartInner({
+  data,
+  parentOrgId,
+}: {
+  data: ChartDataPoint[];
+  parentOrgId: string;
+}) {
+  const navigate = useNavigate();
+  const handleClick = useCallback(
+    (label: string) =>
+      navigate({
+        to: "/$parentOrgId/register",
+        params: { parentOrgId },
+        search: { elevatorType: [label] },
+      }),
     [navigate, parentOrgId],
   );
+  return (
+    <DashboardPieChart title="Hisstyper" data={data} onSliceClick={handleClick} />
+  );
+}
+
+function ManufacturerChart({ parentOrgId }: { parentOrgId: string }) {
+  const { data } = useSuspenseQuery(
+    singleChartOptions(parentOrgId, "topManufacturers"),
+  );
+  if (data.length === 0)
+    return <EmptyChart title="Topp 10 fabrikat" />;
+  return <ManufacturerChartInner data={data} parentOrgId={parentOrgId} />;
+}
+
+function ManufacturerChartInner({
+  data,
+  parentOrgId,
+}: {
+  data: ChartDataPoint[];
+  parentOrgId: string;
+}) {
+  const navigate = useNavigate();
+  const handleClick = useCallback(
+    (label: string) =>
+      navigate({
+        to: "/$parentOrgId/register",
+        params: { parentOrgId },
+        search: { manufacturer: [label] },
+      }),
+    [navigate, parentOrgId],
+  );
+  return (
+    <DashboardBarChart
+      title="Topp 10 fabrikat"
+      data={data}
+      color="var(--color-chart-3, #d97706)"
+      onBarClick={handleClick}
+    />
+  );
+}
+
+function ModernizationTimelineChart({
+  parentOrgId,
+}: {
+  parentOrgId: string;
+}) {
+  const { data } = useSuspenseQuery(
+    singleChartOptions(parentOrgId, "modernizationTimeline"),
+  );
+  if (data.length === 0)
+    return <EmptyChart title="Moderniseringstidslinje" />;
+  return (
+    <ModernizationTimelineChartInner data={data} parentOrgId={parentOrgId} />
+  );
+}
+
+function ModernizationTimelineChartInner({
+  data,
+  parentOrgId,
+}: {
+  data: ChartDataPoint[];
+  parentOrgId: string;
+}) {
+  const navigate = useNavigate();
+  const handleClick = useCallback(
+    (label: string) =>
+      navigate({
+        to: "/$parentOrgId/modernisering",
+        params: { parentOrgId },
+        search: { year: label },
+      }),
+    [navigate, parentOrgId],
+  );
+  return (
+    <DashboardBarChart
+      title="Moderniseringstidslinje"
+      data={data}
+      color="var(--color-chart-4, #dc2626)"
+      onBarClick={handleClick}
+    />
+  );
+}
+
+function MaintenanceCompanyChart({
+  parentOrgId,
+}: {
+  parentOrgId: string;
+}) {
+  const { data } = useSuspenseQuery(
+    singleChartOptions(parentOrgId, "byMaintenanceCompany"),
+  );
+  if (data.length === 0)
+    return <EmptyChart title="Skötselföretag" />;
+  return (
+    <MaintenanceCompanyChartInner data={data} parentOrgId={parentOrgId} />
+  );
+}
+
+function MaintenanceCompanyChartInner({
+  data,
+  parentOrgId,
+}: {
+  data: ChartDataPoint[];
+  parentOrgId: string;
+}) {
+  const navigate = useNavigate();
+  const handleClick = useCallback(
+    (label: string) =>
+      navigate({
+        to: "/$parentOrgId/register",
+        params: { parentOrgId },
+        search: { maintenanceCompany: [label] },
+      }),
+    [navigate, parentOrgId],
+  );
+  return (
+    <DashboardPieChart
+      title="Skötselföretag"
+      data={data}
+      innerRadius={60}
+      onSliceClick={handleClick}
+    />
+  );
+}
+
+// --- Chart Wrapper ---
+
+function ChartWithBoundary({
+  title,
+  parentOrgId,
+  chartType,
+  children,
+}: {
+  title: string;
+  parentOrgId: string;
+  chartType: ChartType;
+  children: ReactNode;
+}) {
+  const queryClient = useQueryClient();
+  const handleRetry = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: ["analytics", "chart", parentOrgId, chartType],
+    });
+  }, [queryClient, parentOrgId, chartType]);
+
+  return (
+    <ChartErrorBoundary title={title} onRetry={handleRetry}>
+      <Suspense fallback={<ChartSkeleton />}>{children}</Suspense>
+    </ChartErrorBoundary>
+  );
+}
+
+// --- Main Dashboard ---
+
+function DashboardPage() {
+  const { parentOrgId } = Route.useParams();
+  const { data: stats } = useSuspenseQuery(statsOptions(parentOrgId));
 
   const kpiItems: KpiItem[] = [
     {
@@ -135,54 +465,55 @@ function DashboardPage() {
 
       <KpiCards items={kpiItems} />
 
-      {stats.totalCount === 0 ? (
-        <div className="py-12 text-center text-muted-foreground">
-          Inga hissar registrerade ännu.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <DashboardBarChart
-            title="Hissar per distrikt"
-            data={chartData.byDistrict}
-            color="var(--color-chart-1, #2563eb)"
-            onBarClick={handleDistrictClick}
-          />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <ChartWithBoundary
+          title="Hissar per distrikt"
+          parentOrgId={parentOrgId}
+          chartType="byDistrict"
+        >
+          <DistrictChart parentOrgId={parentOrgId} />
+        </ChartWithBoundary>
 
-          <DashboardBarChart
-            title="Åldersfördelning"
-            data={chartData.ageDistribution}
-            color="var(--color-chart-2, #16a34a)"
-            onBarClick={handleAgeClick}
-          />
+        <ChartWithBoundary
+          title="Åldersfördelning"
+          parentOrgId={parentOrgId}
+          chartType="ageDistribution"
+        >
+          <AgeDistributionChart parentOrgId={parentOrgId} />
+        </ChartWithBoundary>
 
-          <DashboardPieChart
-            title="Hisstyper"
-            data={chartData.byElevatorType}
-            onSliceClick={handleTypeClick}
-          />
+        <ChartWithBoundary
+          title="Hisstyper"
+          parentOrgId={parentOrgId}
+          chartType="byElevatorType"
+        >
+          <ElevatorTypeChart parentOrgId={parentOrgId} />
+        </ChartWithBoundary>
 
-          <DashboardBarChart
-            title="Topp 10 fabrikat"
-            data={chartData.topManufacturers}
-            color="var(--color-chart-3, #d97706)"
-            onBarClick={handleManufacturerClick}
-          />
+        <ChartWithBoundary
+          title="Topp 10 fabrikat"
+          parentOrgId={parentOrgId}
+          chartType="topManufacturers"
+        >
+          <ManufacturerChart parentOrgId={parentOrgId} />
+        </ChartWithBoundary>
 
-          <DashboardBarChart
-            title="Moderniseringstidslinje"
-            data={chartData.modernizationTimeline}
-            color="var(--color-chart-4, #dc2626)"
-            onBarClick={handleTimelineClick}
-          />
+        <ChartWithBoundary
+          title="Moderniseringstidslinje"
+          parentOrgId={parentOrgId}
+          chartType="modernizationTimeline"
+        >
+          <ModernizationTimelineChart parentOrgId={parentOrgId} />
+        </ChartWithBoundary>
 
-          <DashboardPieChart
-            title="Skötselföretag"
-            data={chartData.byMaintenanceCompany}
-            innerRadius={60}
-            onSliceClick={handleMaintenanceCompanyClick}
-          />
-        </div>
-      )}
+        <ChartWithBoundary
+          title="Skötselföretag"
+          parentOrgId={parentOrgId}
+          chartType="byMaintenanceCompany"
+        >
+          <MaintenanceCompanyChart parentOrgId={parentOrgId} />
+        </ChartWithBoundary>
+      </div>
     </div>
   );
 }
@@ -198,7 +529,7 @@ function DashboardSkeleton() {
       </div>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-[380px] rounded-xl" />
+          <ChartSkeleton key={i} />
         ))}
       </div>
     </div>
