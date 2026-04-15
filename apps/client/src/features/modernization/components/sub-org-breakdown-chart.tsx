@@ -9,6 +9,7 @@ import {
   sharedScaleOptions,
   sharedTooltipOptions,
   hoverColumnPlugin,
+  withAlpha,
 } from "@elevatorbud/ui/lib/chart-helpers";
 import { Bar } from "react-chartjs-2";
 import { Building2 } from "lucide-react";
@@ -67,7 +68,7 @@ export function SubOrgBreakdownChart({
     () =>
       data.map((d) =>
         selectedSubOrgId && d.orgId !== selectedSubOrgId
-          ? colors.chart3 + "40"
+          ? withAlpha(colors.chart3, 0.25)
           : colors.chart3,
       ),
     [data, selectedSubOrgId, colors.chart3],

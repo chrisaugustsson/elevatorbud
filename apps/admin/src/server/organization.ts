@@ -198,26 +198,39 @@ async function computeParentChangeImpact(
     .where(eq(userOrganizations.organizationId, orgId));
   const directUserIdSet = new Set(directGrantUserIds.map((r) => r.userId));
 
-  let lost: AffectedUser[] = [];
-  let gained: AffectedUser[] = [];
+  let oldParentUsers: AffectedUser[] = [];
+  let newParentUsers: AffectedUser[] = [];
 
   if (oldParentId) {
-    const oldParentUsers = await db
+    oldParentUsers = await db
       .select({ id: users.id, name: users.name, email: users.email })
       .from(users)
       .innerJoin(userOrganizations, eq(users.id, userOrganizations.userId))
       .where(eq(userOrganizations.organizationId, oldParentId));
-    lost = oldParentUsers.filter((u) => !directUserIdSet.has(u.id));
   }
 
   if (newParentId) {
-    const newParentUsers = await db
+    newParentUsers = await db
       .select({ id: users.id, name: users.name, email: users.email })
       .from(users)
       .innerJoin(userOrganizations, eq(users.id, userOrganizations.userId))
       .where(eq(userOrganizations.organizationId, newParentId));
-    gained = newParentUsers.filter((u) => !directUserIdSet.has(u.id));
   }
+
+  // A user who holds direct grants on BOTH the old and the new parent has
+  // no net access change — they inherit the moved org via the new parent
+  // exactly as they previously did via the old one. Without this dedupe
+  // they would show up in both "gained" and "lost", double-reporting
+  // impact to the admin.
+  const oldIds = new Set(oldParentUsers.map((u) => u.id));
+  const newIds = new Set(newParentUsers.map((u) => u.id));
+
+  const lost = oldParentUsers.filter(
+    (u) => !directUserIdSet.has(u.id) && !newIds.has(u.id),
+  );
+  const gained = newParentUsers.filter(
+    (u) => !directUserIdSet.has(u.id) && !oldIds.has(u.id),
+  );
 
   return { gained, lost };
 }

@@ -178,6 +178,7 @@ export function ColumnMappingSection({
           <Badge
             variant="outline"
             className="text-emerald-700 dark:text-emerald-400"
+            aria-label="Hög automatisk matchningsgrad"
           >
             <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
             Hög matchning
@@ -308,6 +309,7 @@ export function ColumnMappingSection({
                         <Badge
                           variant="secondary"
                           className="text-emerald-700 dark:text-emerald-400 text-xs"
+                          aria-label="Automatiskt matchad kolumn"
                         >
                           <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
                           Auto
@@ -317,6 +319,7 @@ export function ColumnMappingSection({
                         <Badge
                           variant="secondary"
                           className="text-sky-700 dark:text-sky-400 text-xs"
+                          aria-label="Manuellt mappad kolumn"
                         >
                           <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
                           Manuell
@@ -326,6 +329,7 @@ export function ColumnMappingSection({
                         <Badge
                           variant="outline"
                           className="text-muted-foreground text-xs"
+                          aria-label="Kolumn hoppas över"
                         >
                           — Hoppas över
                         </Badge>

@@ -22,7 +22,7 @@ import { BudgetOverview } from "../../../features/modernization/components/budge
 import { PriorityList } from "../../../features/modernization/components/priority-list";
 import { SubOrgBreakdownChart } from "../../../features/modernization/components/sub-org-breakdown-chart";
 import { ModernizationSkeleton } from "@elevatorbud/ui/components/modernization/modernization-skeleton";
-import { Badge } from "@elevatorbud/ui/components/ui/badge";
+import { FilterChip } from "../../../shared/components/filter-chip";
 
 type ModerniseringSearch = {
   period?: PeriodKey;
@@ -267,22 +267,12 @@ function ModerniseringPage() {
 
       {selectedSubOrgName && (
         <div className="flex items-center gap-2">
-          <Badge
-            variant="outline"
-            className="flex items-center gap-1 py-1 pl-2 pr-1 font-normal"
-          >
-            {selectedSubOrgName}
-            <button
-              type="button"
-              className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-muted-foreground/20 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => updateSearch({ subOrg: undefined, page: undefined })}
-              aria-label={`Rensa filter: ${selectedSubOrgName}`}
-            >
-              <span aria-hidden className="text-base leading-none">
-                ×
-              </span>
-            </button>
-          </Badge>
+          <FilterChip
+            label={selectedSubOrgName}
+            onRemove={() =>
+              updateSearch({ subOrg: undefined, page: undefined })
+            }
+          />
         </div>
       )}
 

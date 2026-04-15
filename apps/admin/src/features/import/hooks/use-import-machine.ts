@@ -149,11 +149,38 @@ export function useImportMachine() {
   }, []);
 
   const loadSheetForMapping = useCallback(
-    (sheetName: string, inheritedMappings?: ColumnMapping[]) => {
+    (
+      sheetName: string,
+      inheritedMappings?: ColumnMapping[],
+      inheritedHeaderRowIndex?: number,
+    ) => {
       const wb = workbookRef.current;
       if (!wb) return false;
 
-      const mapResult = autoMapSheet(wb, sheetName);
+      const data = getSheetData(wb, sheetName);
+
+      // If the previous sheet's header was on row N, try row N on this
+      // sheet too — but only if that row actually has non-empty cells,
+      // otherwise fall back to auto-detection. This keeps sheets with
+      // identical layouts from forcing the admin to re-pick the header
+      // row on every one.
+      let mapResult: AutoMapResult | null = null;
+      if (
+        inheritedHeaderRowIndex !== undefined &&
+        inheritedHeaderRowIndex >= 0 &&
+        inheritedHeaderRowIndex < data.length
+      ) {
+        const candidateRow = data[inheritedHeaderRowIndex] ?? [];
+        const headers = (candidateRow as unknown[]).map((c) =>
+          String(c ?? ""),
+        );
+        if (headers.some((h) => h.trim() !== "")) {
+          mapResult = autoMapColumns(headers, inheritedHeaderRowIndex);
+        }
+      }
+      if (!mapResult) {
+        mapResult = autoMapSheet(wb, sheetName);
+      }
       if (!mapResult) {
         setParseError(`Kunde inte läsa arket '${sheetName}'`);
         setStatus("idle");
@@ -204,7 +231,6 @@ export function useImportMachine() {
         setAutoMapResult(mapResult);
       }
 
-      const data = getSheetData(wb, sheetName);
       setSheetData(data);
       return true;
     },
@@ -264,17 +290,27 @@ export function useImportMachine() {
       if (!wb || !autoMapResult) return;
 
       const currentSheet = selectedSheets[currentSheetIndex];
+      const confirmedHeaderRowIndex = autoMapResult.headerRowIndex;
       const updatedMappings = new Map(sheetMappings);
       updatedMappings.set(currentSheet, {
         mappings,
-        headerRowIndex: autoMapResult.headerRowIndex,
+        headerRowIndex: confirmedHeaderRowIndex,
       });
       setSheetMappings(updatedMappings);
 
       const nextIndex = currentSheetIndex + 1;
       if (nextIndex < selectedSheets.length) {
         setCurrentSheetIndex(nextIndex);
-        loadSheetForMapping(selectedSheets[nextIndex], mappings);
+        // Pass the confirmed header row index from THIS sheet as the
+        // starting hint for the next sheet — if the next sheet's auto-
+        // detected header row is different, the user can still override,
+        // but starting from the same row matches the admin's mental
+        // model when sheets share structure.
+        loadSheetForMapping(
+          selectedSheets[nextIndex],
+          mappings,
+          confirmedHeaderRowIndex,
+        );
         return;
       }
 
@@ -435,7 +471,13 @@ export function useImportMachine() {
 
     const existing = sheetMappings.get(lastSheet);
     setCurrentSheetIndex(lastIndex);
-    if (loadSheetForMapping(lastSheet, existing?.mappings)) {
+    if (
+      loadSheetForMapping(
+        lastSheet,
+        existing?.mappings,
+        existing?.headerRowIndex,
+      )
+    ) {
       setStatus("mapping");
     }
   }, [selectedSheets, sheetMappings, loadSheetForMapping]);

@@ -62,6 +62,36 @@ export function resolveToHex(cssColor: string): string {
   return ctx.fillStyle;
 }
 
+/**
+ * Apply alpha to a color returned by `resolveToHex` / `useChartColors`.
+ *
+ * Canvas normalizes most inputs to `#rrggbb`, but on browsers that don't
+ * parse the input (e.g. legacy engines faced with oklch) it falls back to
+ * `rgb(r, g, b)`. Concatenating a two-character hex alpha onto a
+ * non-`#rrggbb` value produces invalid CSS, which is why we shouldn't
+ * hand-concat alpha anywhere. Use this helper instead.
+ */
+export function withAlpha(color: string, alpha: number): string {
+  const a = Math.max(0, Math.min(1, alpha));
+  // Most common case: canvas returned #rrggbb — append hex alpha.
+  if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+    const hex = Math.round(a * 255)
+      .toString(16)
+      .padStart(2, "0");
+    return `${color}${hex}`;
+  }
+  // rgb(r, g, b) → rgba(r, g, b, alpha)
+  const rgbMatch = color.match(
+    /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/,
+  );
+  if (rgbMatch) {
+    return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${a})`;
+  }
+  // Fallback for any other format (oklch, hsl, etc.): let the browser
+  // handle the blend. `color-mix` is baseline across Chrome/Safari/Firefox.
+  return `color-mix(in oklab, ${color} ${Math.round(a * 100)}%, transparent)`;
+}
+
 const defaultColors = {
   chart1: "#2563eb",
   chart2: "#16a34a",

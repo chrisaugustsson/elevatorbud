@@ -9,6 +9,7 @@ import {
   sharedScaleOptions,
   sharedTooltipOptions,
   hoverColumnPlugin,
+  withAlpha,
 } from "@elevatorbud/ui/lib/chart-helpers";
 import { Bar, Line } from "react-chartjs-2";
 import { TrendingUp } from "lucide-react";
@@ -82,7 +83,9 @@ function BudgetPerYearChart({
   const barBackgrounds = useMemo(
     () =>
       data.map((d) =>
-        selectedYear && d.name !== selectedYear ? colors.chart1 + "40" : colors.chart1,
+        selectedYear && d.name !== selectedYear
+          ? withAlpha(colors.chart1, 0.25)
+          : colors.chart1,
       ),
     [data, selectedYear, colors.chart1],
   );

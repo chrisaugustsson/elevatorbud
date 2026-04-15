@@ -39,6 +39,7 @@ import {
   Plus,
   Building2,
   Info,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@elevatorbud/ui/lib/utils";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
@@ -297,6 +298,11 @@ function OrgMappingRow({
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            aria-label={
+              isResolved
+                ? `Organisation mappad till ${selectedOrg?.name}`
+                : `Omappad organisation: ${mapping.excelName}. Välj organisation eller skapa ny.`
+            }
             title={selectedOrg?.name ?? undefined}
             className={cn(
               "w-full justify-between",
@@ -313,10 +319,13 @@ function OrgMappingRow({
                   {selectedOrg.name}
                 </span>
               ) : (
-                "Välj organisation..."
+                <span className="flex items-center gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                  Välj organisation...
+                </span>
               )}
             </span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" aria-hidden="true" />
           </Button>
         </PopoverTrigger>
         <PopoverContent

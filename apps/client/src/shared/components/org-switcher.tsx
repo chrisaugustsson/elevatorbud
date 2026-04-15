@@ -198,6 +198,7 @@ export function OrgSwitcher() {
                 value={org.name}
                 role="menuitemradio"
                 aria-checked={isSelected}
+                aria-current={isSelected ? "true" : undefined}
                 onSelect={() => handleSelect(org.id)}
                 className="flex items-center gap-2 py-2"
               >

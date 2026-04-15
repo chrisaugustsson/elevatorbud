@@ -13,6 +13,7 @@ import {
   sharedScaleOptions,
   hoverColumnPlugin,
   sharedTooltipOptions,
+  withAlpha,
 } from "@elevatorbud/ui/lib/chart-helpers";
 
 type BudgetYearItem = {
@@ -70,7 +71,9 @@ function BudgetPerYearChart({
   const barBackgrounds = useMemo(
     () =>
       data.map((d) =>
-        selectedYear && d.name !== selectedYear ? colors.chart1 + "40" : colors.chart1,
+        selectedYear && d.name !== selectedYear
+          ? withAlpha(colors.chart1, 0.25)
+          : colors.chart1,
       ),
     [data, selectedYear, colors.chart1],
   );

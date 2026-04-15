@@ -62,20 +62,22 @@ export function SheetSelectionSection({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex min-h-11 items-center gap-2">
-          <Checkbox
-            id="select-all"
-            checked={selected.size === sheetInfos.length}
-            onCheckedChange={toggleAll}
-            className="size-5"
-          />
-          <label
-            htmlFor="select-all"
-            className="flex min-h-11 flex-1 cursor-pointer items-center text-sm font-medium"
-          >
-            Markera alla
-          </label>
-        </div>
+        {sheetInfos.length > 1 && (
+          <div className="flex min-h-11 items-center gap-2">
+            <Checkbox
+              id="select-all"
+              checked={selected.size === sheetInfos.length}
+              onCheckedChange={toggleAll}
+              className="size-5"
+            />
+            <label
+              htmlFor="select-all"
+              className="flex min-h-11 flex-1 cursor-pointer items-center text-sm font-medium"
+            >
+              Markera alla
+            </label>
+          </div>
+        )}
 
         <div className="space-y-2">
           {sheetInfos.map((sheet) => {

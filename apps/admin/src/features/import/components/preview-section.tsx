@@ -86,50 +86,57 @@ export function PreviewSection({
         />
       </div>
 
-      {/* Server analysis */}
-      {analysisReady ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base" ref={headingRef} tabIndex={-1}>Granska & importera</CardTitle>
-            <CardDescription>
-              Jämförelse med befintlig data i systemet
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard
-                label="Nya hissar"
-                value={analysis.summary.newElevators}
-                variant="success"
+      {/* Server analysis — aria-live="polite" on the wrapper so the
+          completion of the analysis (skeleton → summary transition) is
+          announced to screen readers rather than happening silently. */}
+      <div aria-live="polite" aria-busy={!analysisReady}>
+        {analysisReady ? (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base" ref={headingRef} tabIndex={-1}>Granska & importera</CardTitle>
+              <CardDescription>
+                Jämförelse med befintlig data i systemet
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <StatCard
+                  label="Nya hissar"
+                  value={analysis.summary.newElevators}
+                  variant="success"
+                />
+                <StatCard
+                  label="Uppdateras"
+                  value={analysis.summary.updatedElevators}
+                  variant="warning"
+                />
+                <StatCard
+                  label="Matchade org."
+                  value={resolvedOrgMapping ? resolvedOrgMapping.matchedOrgs.length : analysis.summary.matchedOrgs}
+                  variant="default"
+                />
+                <StatCard
+                  label="Nya org."
+                  value={resolvedOrgMapping ? resolvedOrgMapping.newOrgNames.length : analysis.summary.newOrgs}
+                  variant="default"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="flex items-center justify-center py-8">
+              <Loader2
+                className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
               />
-              <StatCard
-                label="Uppdateras"
-                value={analysis.summary.updatedElevators}
-                variant="warning"
-              />
-              <StatCard
-                label="Matchade org."
-                value={resolvedOrgMapping ? resolvedOrgMapping.matchedOrgs.length : analysis.summary.matchedOrgs}
-                variant="default"
-              />
-              <StatCard
-                label="Nya org."
-                value={resolvedOrgMapping ? resolvedOrgMapping.newOrgNames.length : analysis.summary.newOrgs}
-                variant="default"
-              />
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="flex items-center justify-center py-8">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            <span className="text-sm text-muted-foreground">
-              Analyserar mot befintlig data...
-            </span>
-          </CardContent>
-        </Card>
-      )}
+              <span className="text-sm text-muted-foreground">
+                Analyserar mot befintlig data...
+              </span>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* Warnings */}
       {hasWarnings && (

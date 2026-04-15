@@ -4,6 +4,7 @@ import {
   Card,
   CardContent,
 } from "@elevatorbud/ui/components/ui/card";
+import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import { UploadZone } from "@elevatorbud/ui/components/ui/upload-zone";
 import { Loader2 } from "lucide-react";
 import { useImportMachine } from "../../features/import/hooks/use-import-machine";
@@ -50,12 +51,17 @@ function ImportPage() {
   } = useImportMachine();
 
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const errorHeadingRef = useRef<HTMLHeadingElement>(null);
   const prevStatusRef = useRef(status);
 
   useEffect(() => {
     if (prevStatusRef.current !== status && status !== "idle" && status !== "parsing") {
       requestAnimationFrame(() => {
-        stepHeadingRef.current?.focus();
+        // Route focus to the error heading when the import fails so screen
+        // readers land directly on the failure context, not the stepper.
+        const target =
+          status === "error" ? errorHeadingRef.current : stepHeadingRef.current;
+        target?.focus();
       });
     }
     prevStatusRef.current = status;
@@ -135,6 +141,26 @@ function ImportPage() {
         />
       )}
 
+      {status === "org-mapping" && parseResult && !extractedOrgData && (
+        <Card aria-busy="true" aria-live="polite">
+          <CardContent className="space-y-4 py-6">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2
+                className="h-4 w-4 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+              <span>Analyserar organisationer i filen...</span>
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {status === "org-mapping" && parseResult && extractedOrgData && (
         <OrgMappingSection
           orgNames={extractedOrgData.orgNames}
@@ -209,6 +235,7 @@ function ImportPage() {
           error={importError}
           onBackToMapping={handleBackToOrgMapping}
           onStartOver={handleReset}
+          headingRef={errorHeadingRef}
         />
       )}
     </div>
