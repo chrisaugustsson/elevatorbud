@@ -279,7 +279,7 @@ function Anvandare() {
               size="icon"
               className="size-8"
               onClick={() => setEditingUser(row)}
-              title="Redigera användare"
+              aria-label="Redigera användare"
             >
               <Pencil className="size-4" />
             </Button>

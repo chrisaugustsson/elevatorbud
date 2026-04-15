@@ -280,7 +280,7 @@ function ParentOrgSelect({
                   }
                 }}
               >
-                <X className="size-3" />
+                <X className="size-3" aria-hidden="true" />
               </span>
             )}
             <ChevronsUpDown className="size-4 opacity-50" />

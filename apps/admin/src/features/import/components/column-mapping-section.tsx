@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   TARGET_FIELDS,
   type AutoMapResult,
@@ -40,6 +40,7 @@ export function ColumnMappingSection({
   onConfirm,
   onHeaderRowChange,
   onBack,
+  headingRef,
 }: {
   autoMapResult: AutoMapResult;
   sheetData: unknown[][];
@@ -48,6 +49,7 @@ export function ColumnMappingSection({
   onConfirm: (mappings: ColumnMapping[]) => void;
   onHeaderRowChange: (rowIndex: number) => void;
   onBack: () => void;
+  headingRef?: React.RefObject<HTMLHeadingElement | null>;
 }) {
   // Build initial field map: sourceIndex -> field
   const [fieldMap, setFieldMap] = useState<Record<number, string>>(() => {
@@ -182,9 +184,9 @@ export function ColumnMappingSection({
 
       {/* Missing mandatory warning */}
       {missingMandatory.length > 0 && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950" aria-live="polite">
           <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 text-red-600 dark:text-red-400" />
+            <AlertTriangle className="mt-0.5 h-4 w-4 text-red-600 dark:text-red-400" aria-hidden="true" />
             <div>
               <p className="text-sm font-medium text-red-800 dark:text-red-200">
                 Obligatoriska fält saknar mappning
@@ -204,7 +206,7 @@ export function ColumnMappingSection({
       {/* Mapping table */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Kolumnmappning</CardTitle>
+          <CardTitle className="text-base" ref={headingRef} tabIndex={-1}>Kolumnmappning</CardTitle>
           <CardDescription>
             Koppla kolumner i filen till rätt fält. Automatiskt matchade
             kolumner är förvalda.
@@ -284,7 +286,7 @@ export function ColumnMappingSection({
                           variant="secondary"
                           className="text-green-600 text-xs"
                         >
-                          <CheckCircle2 className="mr-1 h-3 w-3" />
+                          <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
                           Auto
                         </Badge>
                       )}
@@ -293,6 +295,7 @@ export function ColumnMappingSection({
                           variant="secondary"
                           className="text-blue-600 text-xs"
                         >
+                          <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
                           Manuell
                         </Badge>
                       )}
@@ -301,7 +304,7 @@ export function ColumnMappingSection({
                           variant="outline"
                           className="text-muted-foreground text-xs"
                         >
-                          Hoppas över
+                          — Hoppas över
                         </Badge>
                       )}
                     </TableCell>

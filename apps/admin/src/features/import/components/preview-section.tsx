@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import type { FullImportResult } from "@elevatorbud/utils";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import {
@@ -26,6 +26,7 @@ export function PreviewSection({
   resolvedOrgMapping,
   onConfirm,
   onBack,
+  headingRef,
 }: {
   fileName: string;
   parseResult: FullImportResult;
@@ -33,6 +34,7 @@ export function PreviewSection({
   resolvedOrgMapping?: ResolvedOrgMapping | null;
   onConfirm: () => void;
   onBack: () => void;
+  headingRef?: React.RefObject<HTMLHeadingElement | null>;
 }) {
   const [showWarnings, setShowWarnings] = useState(false);
   const [showInvalidRows, setShowInvalidRows] = useState(false);
@@ -75,7 +77,7 @@ export function PreviewSection({
       {analysisReady ? (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Analys</CardTitle>
+            <CardTitle className="text-base" ref={headingRef} tabIndex={-1}>Granska & importera</CardTitle>
             <CardDescription>
               Jämförelse med befintlig data i systemet
             </CardDescription>

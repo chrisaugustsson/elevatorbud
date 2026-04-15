@@ -604,3 +604,33 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - Per-org counts computed inside the transaction by aggregating over create/update arrays
   - Org ID → name mapping done client-side from `resolvedOrgMapping` since server doesn't have display names
 ---
+
+## 2026-04-15 - US-029
+- Added focus management on import step advance: `stepHeadingRef` passed to each step component's CardTitle with `tabIndex={-1}`
+- `useEffect` moves focus to the step heading when status changes (except idle/parsing)
+- Added `headingRef` prop to SheetSelectionSection, ColumnMappingSection, OrgMappingSection, PreviewSection
+- Added `aria-live="polite"` to missing-mandatory-fields warning in column mapping and all-empty-sheets warning in sheet selection
+- Added `aria-hidden="true"` to decorative icons (AlertTriangle, CheckCircle2) throughout import flow
+- Added `aria-label` to icon-only buttons (Pencil edit buttons in anvandare.tsx and org-users-view.tsx)
+- Added `role="button"`, `tabIndex={0}`, `aria-label="Rensa val"` to clear-X span in org parent select
+- Made upload zone div keyboard-accessible: `role="button"`, `tabIndex={0}`, `aria-label`, `onKeyDown` for Enter/Space
+- Hard failure states use `role="alert"` (ImportErrorSection, UploadZone error)
+- Color is not sole indicator: column mapping badges have icons (CheckCircle2 for Auto/Manuell, — prefix for Hoppas över)
+- Radix Dialog (shadcn) already handles focus trapping and restoration for all modal dialogs
+- Files changed:
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+  - `apps/admin/src/features/import/components/sheet-selection-section.tsx`
+  - `apps/admin/src/features/import/components/column-mapping-section.tsx`
+  - `apps/admin/src/features/import/components/org-mapping-section.tsx`
+  - `apps/admin/src/features/import/components/preview-section.tsx`
+  - `apps/admin/src/routes/_authenticated/admin.anvandare.tsx`
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx`
+  - `apps/admin/src/features/organization/components/org-users-view.tsx`
+  - `packages/ui/src/components/ui/upload-zone.tsx`
+  - `scripts/ralph/prd.json`
+- **Learnings for future iterations:**
+  - `tabIndex={-1}` on headings makes them programmatically focusable without adding them to tab order
+  - `aria-hidden="true"` on decorative icons prevents screen readers from announcing icon names
+  - Radix-based shadcn Dialog already handles focus trap — no custom implementation needed
+  - `requestAnimationFrame` ensures focus moves after DOM update completes
+---

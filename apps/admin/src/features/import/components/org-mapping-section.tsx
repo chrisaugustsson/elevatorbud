@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "@tanstack/react-form";
 import {
@@ -56,11 +56,13 @@ export function OrgMappingSection({
   rowCount,
   onConfirm,
   onBack,
+  headingRef,
 }: {
   orgNames: string[];
   rowCount: number;
   onConfirm: (mappings: OrgMappingEntry[]) => void;
   onBack: () => void;
+  headingRef?: React.RefObject<HTMLHeadingElement | null>;
 }) {
   const queryClient = useQueryClient();
   const { data: existingOrgs = [] } = useQuery(listOrganizationsOptions());
@@ -128,7 +130,7 @@ export function OrgMappingSection({
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Organisationsmappning</CardTitle>
+          <CardTitle ref={headingRef} tabIndex={-1}>Organisationsmappning</CardTitle>
           <p className="text-sm text-muted-foreground">
             Mappa {orgNames.length} organisationsnamn från Excel-filen till
             befintliga organisationer i systemet. {rowCount} rader totalt.

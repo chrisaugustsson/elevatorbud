@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   Card,
   CardContent,
@@ -16,11 +16,13 @@ export function SheetSelectionSection({
   defaultSelected,
   onConfirm,
   onBack,
+  headingRef,
 }: {
   sheetInfos: SheetInfo[];
   defaultSelected: string[];
   onConfirm: (selectedSheets: string[]) => void;
   onBack: () => void;
+  headingRef?: React.RefObject<HTMLHeadingElement | null>;
 }) {
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(defaultSelected),
@@ -54,7 +56,7 @@ export function SheetSelectionSection({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2" ref={headingRef} tabIndex={-1}>
           <FileSpreadsheet className="h-5 w-5" />
           Välj ark att importera
         </CardTitle>
@@ -95,7 +97,7 @@ export function SheetSelectionSection({
                     </Badge>
                     {isEmpty && (
                       <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-                        <AlertTriangle className="h-3 w-3" />
+                        <AlertTriangle className="h-3 w-3" aria-hidden="true" />
                         Inga datarader
                       </span>
                     )}
@@ -115,8 +117,8 @@ export function SheetSelectionSection({
         </div>
 
         {allSelectedEmpty && (
-          <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
+          <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200" aria-live="polite">
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
             Alla valda ark saknar datarader. Välj minst ett ark som innehåller data.
           </div>
         )}

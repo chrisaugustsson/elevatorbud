@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { createFileRoute, useBlocker } from "@tanstack/react-router";
 import {
   Card,
@@ -47,6 +48,18 @@ function ImportPage() {
     handleBackToOrgMapping,
   } = useImportMachine();
 
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const prevStatusRef = useRef(status);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== status && status !== "idle" && status !== "parsing") {
+      requestAnimationFrame(() => {
+        stepHeadingRef.current?.focus();
+      });
+    }
+    prevStatusRef.current = status;
+  }, [status]);
+
   const hasUnsavedState = status !== "idle" && status !== "complete";
 
   useBlocker({
@@ -91,6 +104,7 @@ function ImportPage() {
           defaultSelected={selectedSheets}
           onConfirm={handleSheetSelectionConfirm}
           onBack={handleBackToUpload}
+          headingRef={stepHeadingRef}
         />
       )}
 
@@ -116,6 +130,7 @@ function ImportPage() {
           onConfirm={handleMappingConfirm}
           onHeaderRowChange={handleHeaderRowChange}
           onBack={handleBackToSheetSelection}
+          headingRef={stepHeadingRef}
         />
       )}
 
@@ -125,6 +140,7 @@ function ImportPage() {
           rowCount={parseResult.elevators.length}
           onConfirm={handleOrgMappingConfirm}
           onBack={handleBackToMapping}
+          headingRef={stepHeadingRef}
         />
       )}
 
@@ -136,6 +152,7 @@ function ImportPage() {
           resolvedOrgMapping={resolvedOrgMapping}
           onConfirm={handleConfirm}
           onBack={handleBackToOrgMapping}
+          headingRef={stepHeadingRef}
         />
       )}
 
