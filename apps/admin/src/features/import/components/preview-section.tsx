@@ -15,7 +15,6 @@ import {
   XCircle,
   Loader2,
   ArrowLeft,
-  Info,
 } from "lucide-react";
 import { SheetCard } from "./sheet-card";
 import type { AnalysisResult, ResolvedOrgMapping } from "../hooks/use-import-machine";
@@ -99,28 +98,11 @@ export function PreviewSection({
                 variant="default"
               />
               <StatCard
-                label="Nya org."
-                value={resolvedOrgMapping ? resolvedOrgMapping.newOrgNames.length : analysis.summary.newOrgs}
-                variant={(resolvedOrgMapping ? resolvedOrgMapping.newOrgNames.length : analysis.summary.newOrgs) > 0 ? "info" : "default"}
+                label="Organisationer"
+                value={resolvedOrgMapping ? resolvedOrgMapping.matchedOrgs.length : analysis.summary.matchedOrgs}
+                variant="default"
               />
             </div>
-            {(resolvedOrgMapping ? resolvedOrgMapping.newOrgNames : analysis.newOrgNames).length > 0 && (
-              <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950">
-                <div className="flex items-start gap-2">
-                  <Info className="mt-0.5 h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <div>
-                    <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                      Nya organisationer skapas automatiskt
-                    </p>
-                    <ul className="mt-1 space-y-0.5 text-xs text-blue-700 dark:text-blue-300">
-                      {(resolvedOrgMapping ? resolvedOrgMapping.newOrgNames : analysis.newOrgNames).map((name) => (
-                        <li key={name}>• {name}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
       ) : (

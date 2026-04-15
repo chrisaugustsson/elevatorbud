@@ -483,3 +483,27 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - `triggerRefMap` (Map<string, HTMLButtonElement>) pattern enables focus restoration across multiple rows without per-row state
   - Removing `CREATE_SENTINEL` simplifies the import machine — all org mappings are resolved to real IDs before proceeding
 ---
+
+## 2026-04-15 - US-023
+- Refactored `confirmImport` to use resolved org mapping — org IDs are passed per-row via `_organizationId`, no organizations created during import
+- Wrapped entire import in `db.transaction()` for all-or-nothing semantics (rollback on any failure)
+- Added `contactPersonName`, `contactPersonPhone`, `contactPersonEmail` to elevator insert/update in import
+- Added contact person fields to `ParsedElevator` type, header aliases (`kontaktperson`, `kontakt`, etc.), and `TARGET_FIELDS`
+- Added contact person fields to `confirmImportSchema` Zod validation
+- Simplified `ImportResult` type — removed `errors`, `orgsCreated`, `orgsCreatedIds`, `emailSent` (no longer relevant)
+- Updated `ResultSection` to show only created/updated counts (no org-creation or error details)
+- Updated `PreviewSection` to remove "new orgs will be created" banner (orgs are created inline in US-022)
+- Removed `IMPORT_BATCH_SIZE` — single transactional call replaces batched approach
+- Removed `getMeOptions`/`currentUser` dependency from import machine (admin email no longer passed)
+- Files changed:
+  - `packages/utils/src/excel-import/types.ts`
+  - `packages/utils/src/excel-import/header-aliases.ts`
+  - `apps/admin/src/server/import.ts`
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `apps/admin/src/features/import/components/result-section.tsx`
+  - `apps/admin/src/features/import/components/preview-section.tsx`
+- **Learnings for future iterations:**
+  - Neon HTTP driver + Drizzle supports `db.transaction()` — use `tx` instead of `db` inside the callback for transactional operations
+  - When resolved org mapping is built client-side (US-022 inline creation), the import server function can receive `_organizationId` per row and skip all org creation/lookup
+  - Removing batching simplifies error handling — a single transactional call means either everything succeeds or nothing does
+---

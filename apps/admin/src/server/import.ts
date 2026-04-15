@@ -6,7 +6,6 @@ import {
   elevators,
   elevatorDetails,
   elevatorBudgets,
-  organizations,
   suggestedValues,
 } from "@elevatorbud/db/schema";
 import type { Database } from "@elevatorbud/db";
@@ -60,6 +59,10 @@ const confirmImportSchema = z.object({
       control_system_type: z.string().nullish(),
       shaft_lighting: z.string().nullish(),
       comments: z.string().nullish(),
+      // Contact person
+      contact_person_name: z.string().nullish(),
+      contact_person_phone: z.string().nullish(),
+      contact_person_email: z.string().nullish(),
       // Budget
       revision_year: z.number().nullish(),
       recommended_modernization_year: z.string().nullish(),
@@ -67,15 +70,11 @@ const confirmImportSchema = z.object({
       measures: z.string().nullish(),
       modernization_measures: z.string().nullish(),
       warranty: z.boolean().nullish(),
-      // Org mapping
-      _organisation_namn: z.string().optional(),
+      // Resolved org ID from mapping step
+      _organizationId: z.string(),
       _source_row: z.number().optional(),
     }),
   ),
-  existingOrgMatchNames: z.array(z.string()),
-  existingOrgMatchIds: z.array(z.string()),
-  newOrgNames: z.array(z.string()),
-  adminEmail: z.string().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -173,238 +172,193 @@ async function confirmFn(
   userId: string,
   input: z.infer<typeof confirmImportSchema>,
 ) {
-  // 1. Create new organizations
-  const orgIdMap = new Map<string, string>();
-  for (let i = 0; i < input.existingOrgMatchNames.length; i++) {
-    orgIdMap.set(
-      input.existingOrgMatchNames[i]!.toLowerCase(),
-      input.existingOrgMatchIds[i]!,
-    );
-  }
+  return await db.transaction(async (tx) => {
+    const allRows = input.elevators;
 
-  const orgsCreated: string[] = [];
-  for (const name of input.newOrgNames) {
-    const [org] = await db
-      .insert(organizations)
-      .values({ name })
-      .returning();
-    orgIdMap.set(name.toLowerCase(), org.id);
-    orgsCreated.push(name);
-  }
+    // 1. Batch-lookup which elevator numbers already exist
+    const elevatorNumbers = allRows.map((r) => r.elevator_number);
+    const existingMap = new Map<string, { id: string }>();
 
-  // 2. Resolve orgs and split into valid / errored
-  const errors: { elevator_number: string; error: string }[] = [];
-  type ResolvedRow = {
-    data: z.infer<typeof confirmImportSchema>["elevators"][number];
-    organizationId: string;
-  };
-  const validRows: ResolvedRow[] = [];
-
-  for (const data of input.elevators) {
-    const orgName = (data._organisation_namn || "").toLowerCase();
-    const organizationId = orgIdMap.get(orgName);
-    if (!organizationId) {
-      errors.push({
-        elevator_number: data.elevator_number,
-        error: `Organisation "${data._organisation_namn ?? ""}" hittades inte`,
-      });
-      continue;
-    }
-    validRows.push({ data, organizationId });
-  }
-
-  // 3. Batch-lookup which elevator numbers already exist
-  const elevatorNumbers = validRows.map((r) => r.data.elevator_number);
-  const existingMap = new Map<string, { id: string }>();
-
-  for (let i = 0; i < elevatorNumbers.length; i += 100) {
-    const batch = elevatorNumbers.slice(i, i + 100);
-    const found = await db
-      .select({ id: elevators.id, elevatorNumber: elevators.elevatorNumber })
-      .from(elevators)
-      .where(inArray(elevators.elevatorNumber, batch));
-    for (const e of found) {
-      existingMap.set(e.elevatorNumber, { id: e.id });
-    }
-  }
-
-  // Also batch-lookup existing details for updates
-  const existingIds = [...existingMap.values()].map((e) => e.id);
-  const existingDetailsMap = new Map<string, string>();
-  for (let i = 0; i < existingIds.length; i += 100) {
-    const batch = existingIds.slice(i, i + 100);
-    const found = await db
-      .select({ id: elevatorDetails.id, elevatorId: elevatorDetails.elevatorId })
-      .from(elevatorDetails)
-      .where(inArray(elevatorDetails.elevatorId, batch));
-    for (const d of found) {
-      existingDetailsMap.set(d.elevatorId, d.id);
-    }
-  }
-
-  // Split into new vs update
-  const toCreate = validRows.filter((r) => !existingMap.has(r.data.elevator_number));
-  const toUpdate = validRows.filter((r) => existingMap.has(r.data.elevator_number));
-
-  // 4. Bulk insert new elevators
-  let created = 0;
-  if (toCreate.length > 0) {
-    const insertedElevators = await db
-      .insert(elevators)
-      .values(
-        toCreate.map((r) => ({
-          elevatorNumber: r.data.elevator_number,
-          address: r.data.address,
-          elevatorClassification: r.data.elevator_classification,
-          district: r.data.district,
-          elevatorType: r.data.elevator_type,
-          manufacturer: r.data.manufacturer,
-          buildYear: r.data.build_year,
-          inspectionAuthority: r.data.inspection_authority,
-          inspectionMonth: r.data.inspection_month,
-          maintenanceCompany: r.data.maintenance_company,
-          modernizationYear: r.data.modernization_year,
-          needsUpgrade: r.data.needs_upgrade,
-          organizationId: r.organizationId,
-          status: "active" as const,
-          createdBy: userId,
-        })),
-      )
-      .returning({ id: elevators.id });
-
-    // Bulk insert details for new elevators
-    await db.insert(elevatorDetails).values(
-      insertedElevators.map((e, idx) => ({
-        elevatorId: e.id,
-        ...toDetailData(toCreate[idx]!.data),
-      })),
-    );
-
-    // Bulk insert budgets for new elevators that have budget data
-    const budgetRows = insertedElevators
-      .map((e, idx) => {
-        const d = toCreate[idx]!.data;
-        if (!d.recommended_modernization_year && !d.budget_amount) return null;
-        return {
-          elevatorId: e.id,
-          revisionYear: d.revision_year ?? new Date().getFullYear(),
-          recommendedModernizationYear: d.recommended_modernization_year,
-          budgetAmount:
-            d.budget_amount != null ? String(d.budget_amount) : undefined,
-          measures: d.measures ?? d.modernization_measures,
-          warranty: d.warranty,
-          createdBy: userId,
-        };
-      })
-      .filter((r): r is NonNullable<typeof r> => r !== null);
-
-    if (budgetRows.length > 0) {
-      await db.insert(elevatorBudgets).values(budgetRows);
-    }
-
-    // Bulk insert suggested values
-    const svEntries: { category: string; value: string }[] = [];
-    const svSeen = new Set<string>();
-    for (const r of toCreate) {
-      const pairs: [string, string | null | undefined][] = [
-        ["elevator_type", r.data.elevator_type],
-        ["manufacturer", r.data.manufacturer],
-        ["district", r.data.district],
-        ["maintenance_company", r.data.maintenance_company],
-        ["inspection_authority", r.data.inspection_authority],
-        ["elevator_classification", r.data.elevator_classification],
-      ];
-      for (const [cat, val] of pairs) {
-        if (val && !svSeen.has(`${cat}:${val}`)) {
-          svSeen.add(`${cat}:${val}`);
-          svEntries.push({ category: cat, value: val });
-        }
+    for (let i = 0; i < elevatorNumbers.length; i += 100) {
+      const batch = elevatorNumbers.slice(i, i + 100);
+      const found = await tx
+        .select({ id: elevators.id, elevatorNumber: elevators.elevatorNumber })
+        .from(elevators)
+        .where(inArray(elevators.elevatorNumber, batch));
+      for (const e of found) {
+        existingMap.set(e.elevatorNumber, { id: e.id });
       }
     }
-    if (svEntries.length > 0) {
-      await db
-        .insert(suggestedValues)
-        .values(svEntries.map((e) => ({ ...e, active: true })))
-        .onConflictDoNothing();
+
+    // Batch-lookup existing details for updates
+    const existingIds = [...existingMap.values()].map((e) => e.id);
+    const existingDetailsMap = new Map<string, string>();
+    for (let i = 0; i < existingIds.length; i += 100) {
+      const batch = existingIds.slice(i, i + 100);
+      const found = await tx
+        .select({ id: elevatorDetails.id, elevatorId: elevatorDetails.elevatorId })
+        .from(elevatorDetails)
+        .where(inArray(elevatorDetails.elevatorId, batch));
+      for (const d of found) {
+        existingDetailsMap.set(d.elevatorId, d.id);
+      }
     }
 
-    created = toCreate.length;
-  }
+    // Split into new vs update
+    const toCreate = allRows.filter((r) => !existingMap.has(r.elevator_number));
+    const toUpdate = allRows.filter((r) => existingMap.has(r.elevator_number));
 
-  // 5. Update existing elevators (parallel per row)
-  let updated = 0;
-  if (toUpdate.length > 0) {
-    const now = new Date();
-    const currentYear = new Date().getFullYear();
+    // 2. Bulk insert new elevators
+    let created = 0;
+    if (toCreate.length > 0) {
+      const insertedElevators = await tx
+        .insert(elevators)
+        .values(
+          toCreate.map((r) => ({
+            elevatorNumber: r.elevator_number,
+            address: r.address,
+            elevatorClassification: r.elevator_classification,
+            district: r.district,
+            elevatorType: r.elevator_type,
+            manufacturer: r.manufacturer,
+            buildYear: r.build_year,
+            inspectionAuthority: r.inspection_authority,
+            inspectionMonth: r.inspection_month,
+            maintenanceCompany: r.maintenance_company,
+            modernizationYear: r.modernization_year,
+            needsUpgrade: r.needs_upgrade,
+            organizationId: r._organizationId,
+            contactPersonName: r.contact_person_name,
+            contactPersonPhone: r.contact_person_phone,
+            contactPersonEmail: r.contact_person_email,
+            status: "active" as const,
+            createdBy: userId,
+          })),
+        )
+        .returning({ id: elevators.id });
 
-    await Promise.all(
-      toUpdate.map(async (r) => {
-        try {
-          const existing = existingMap.get(r.data.elevator_number)!;
+      // Bulk insert details for new elevators
+      await tx.insert(elevatorDetails).values(
+        insertedElevators.map((e, idx) => ({
+          elevatorId: e.id,
+          ...toDetailData(toCreate[idx]!),
+        })),
+      );
 
-          // Update core elevator
-          await db
-            .update(elevators)
-            .set({
-              address: r.data.address,
-              district: r.data.district,
-              elevatorType: r.data.elevator_type,
-              manufacturer: r.data.manufacturer,
-              buildYear: r.data.build_year,
-              inspectionAuthority: r.data.inspection_authority,
-              inspectionMonth: r.data.inspection_month,
-              maintenanceCompany: r.data.maintenance_company,
-              modernizationYear: r.data.modernization_year,
-              needsUpgrade: r.data.needs_upgrade,
-              organizationId: r.organizationId,
-              lastUpdatedAt: now,
-              lastUpdatedBy: userId,
-            })
-            .where(eq(elevators.id, existing.id));
+      // Bulk insert budgets for new elevators that have budget data
+      const budgetRows = insertedElevators
+        .map((e, idx) => {
+          const d = toCreate[idx]!;
+          if (!d.recommended_modernization_year && !d.budget_amount) return null;
+          return {
+            elevatorId: e.id,
+            revisionYear: d.revision_year ?? new Date().getFullYear(),
+            recommendedModernizationYear: d.recommended_modernization_year,
+            budgetAmount:
+              d.budget_amount != null ? String(d.budget_amount) : undefined,
+            measures: d.measures ?? d.modernization_measures,
+            warranty: d.warranty,
+            createdBy: userId,
+          };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
 
-          // Upsert details
-          const detailData = toDetailData(r.data);
-          const existingDetailId = existingDetailsMap.get(existing.id);
-          if (existingDetailId) {
-            await db
-              .update(elevatorDetails)
-              .set(detailData)
-              .where(eq(elevatorDetails.id, existingDetailId));
-          } else {
-            await db
-              .insert(elevatorDetails)
-              .values({ elevatorId: existing.id, ...detailData });
+      if (budgetRows.length > 0) {
+        await tx.insert(elevatorBudgets).values(budgetRows);
+      }
+
+      // Bulk insert suggested values
+      const svEntries: { category: string; value: string }[] = [];
+      const svSeen = new Set<string>();
+      for (const r of toCreate) {
+        const pairs: [string, string | null | undefined][] = [
+          ["elevator_type", r.elevator_type],
+          ["manufacturer", r.manufacturer],
+          ["district", r.district],
+          ["maintenance_company", r.maintenance_company],
+          ["inspection_authority", r.inspection_authority],
+          ["elevator_classification", r.elevator_classification],
+        ];
+        for (const [cat, val] of pairs) {
+          if (val && !svSeen.has(`${cat}:${val}`)) {
+            svSeen.add(`${cat}:${val}`);
+            svEntries.push({ category: cat, value: val });
           }
+        }
+      }
+      if (svEntries.length > 0) {
+        await tx
+          .insert(suggestedValues)
+          .values(svEntries.map((e) => ({ ...e, active: true })))
+          .onConflictDoNothing();
+      }
 
-          // Add budget if present
-          if (r.data.recommended_modernization_year || r.data.budget_amount) {
-            await db.insert(elevatorBudgets).values({
-              elevatorId: existing.id,
-              revisionYear: r.data.revision_year ?? currentYear,
-              recommendedModernizationYear: r.data.recommended_modernization_year,
-              budgetAmount:
-                r.data.budget_amount != null
-                  ? String(r.data.budget_amount)
-                  : undefined,
-              measures: r.data.measures ?? r.data.modernization_measures,
-              warranty: r.data.warranty,
-              createdBy: userId,
-            });
-          }
+      created = toCreate.length;
+    }
 
-          updated++;
-        } catch (e) {
-          errors.push({
-            elevator_number: r.data.elevator_number,
-            error: e instanceof Error ? e.message : "Okänt fel",
+    // 3. Update existing elevators
+    let updated = 0;
+    if (toUpdate.length > 0) {
+      const now = new Date();
+      const currentYear = new Date().getFullYear();
+
+      for (const r of toUpdate) {
+        const existing = existingMap.get(r.elevator_number)!;
+
+        await tx
+          .update(elevators)
+          .set({
+            address: r.address,
+            district: r.district,
+            elevatorType: r.elevator_type,
+            manufacturer: r.manufacturer,
+            buildYear: r.build_year,
+            inspectionAuthority: r.inspection_authority,
+            inspectionMonth: r.inspection_month,
+            maintenanceCompany: r.maintenance_company,
+            modernizationYear: r.modernization_year,
+            needsUpgrade: r.needs_upgrade,
+            organizationId: r._organizationId,
+            contactPersonName: r.contact_person_name,
+            contactPersonPhone: r.contact_person_phone,
+            contactPersonEmail: r.contact_person_email,
+            lastUpdatedAt: now,
+            lastUpdatedBy: userId,
+          })
+          .where(eq(elevators.id, existing.id));
+
+        const detailData = toDetailData(r);
+        const existingDetailId = existingDetailsMap.get(existing.id);
+        if (existingDetailId) {
+          await tx
+            .update(elevatorDetails)
+            .set(detailData)
+            .where(eq(elevatorDetails.id, existingDetailId));
+        } else {
+          await tx
+            .insert(elevatorDetails)
+            .values({ elevatorId: existing.id, ...detailData });
+        }
+
+        if (r.recommended_modernization_year || r.budget_amount) {
+          await tx.insert(elevatorBudgets).values({
+            elevatorId: existing.id,
+            revisionYear: r.revision_year ?? currentYear,
+            recommendedModernizationYear: r.recommended_modernization_year,
+            budgetAmount:
+              r.budget_amount != null ? String(r.budget_amount) : undefined,
+            measures: r.measures ?? r.modernization_measures,
+            warranty: r.warranty,
+            createdBy: userId,
           });
         }
-      }),
-    );
-  }
 
-  const orgsCreatedIds = orgsCreated.map((name) => orgIdMap.get(name.toLowerCase())!);
-  return { created, updated, errors, orgsCreated, orgsCreatedIds };
+        updated++;
+      }
+    }
+
+    return { created, updated };
+  });
 }
 
 // ---------------------------------------------------------------------------

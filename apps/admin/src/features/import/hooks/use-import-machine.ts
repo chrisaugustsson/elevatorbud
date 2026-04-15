@@ -2,7 +2,6 @@ import { useState, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { analyzeImportOptions, extractOrgNamesOptions, confirmImport } from "~/server/import";
 import type { OrgMappingEntry } from "../components/org-mapping-section";
-import { getMeOptions } from "~/server/user";
 import {
   readWorkbook,
   getWorkbookSheetInfo,
@@ -38,10 +37,6 @@ export type ImportProgress = {
 export type ImportResult = {
   created: number;
   updated: number;
-  errors: { elevator_number: string; error: string }[];
-  orgsCreated: string[];
-  orgsCreatedIds: string[];
-  emailSent?: boolean;
 };
 
 export type ImportStatus =
@@ -53,8 +48,6 @@ export type ImportStatus =
   | "preview"
   | "importing"
   | "complete";
-
-const IMPORT_BATCH_SIZE = 50;
 
 export type ResolvedOrgMapping = {
   matchedOrgs: { name: string; id: string }[];
@@ -88,8 +81,6 @@ export function useImportMachine() {
     Map<string, { mappings: ColumnMapping[]; headerRowIndex: number }>
   >(new Map());
   const [resolvedOrgMapping, setResolvedOrgMapping] = useState<ResolvedOrgMapping | null>(null);
-
-  const { data: currentUser } = useQuery(getMeOptions()) as { data: { email?: string } | undefined };
 
   const { data: extractedOrgData } = useQuery(
     extractOrgNamesOptions(parseResult?.elevators ?? null),
@@ -311,78 +302,47 @@ export function useImportMachine() {
   );
 
   const handleConfirm = useCallback(async () => {
-    if (!parseResult || !analysis || !resolvedOrgMapping) return;
+    if (!parseResult || !resolvedOrgMapping) return;
 
     setStatus("importing");
 
-    const allElevators = parseResult.elevators;
-    const totalBatches = Math.ceil(allElevators.length / IMPORT_BATCH_SIZE);
-    setImportProgress({ current: 0, total: allElevators.length });
+    const orgIdByName = new Map<string, string>();
+    for (const { name, id } of resolvedOrgMapping.matchedOrgs) {
+      orgIdByName.set(name, id);
+    }
 
-    let totalCreated = 0;
-    let totalUpdated = 0;
-    const allErrors: { elevator_number: string; error: string }[] = [];
-    let allOrgsCreated: string[] = [];
+    const elevatorsWithOrgId = parseResult.elevators.map((e) => ({
+      ...e,
+      _organizationId: orgIdByName.get(e._organisation_namn ?? "") ?? "",
+    }));
 
-    let knownOrgNames = resolvedOrgMapping.matchedOrgs.map((o) => o.name);
-    let knownOrgIds = resolvedOrgMapping.matchedOrgs.map((o) => o.id);
+    const unresolved = elevatorsWithOrgId.filter((e) => !e._organizationId);
+    if (unresolved.length > 0) {
+      setImportResult(null);
+      setParseError(
+        `${unresolved.length} rader saknar organisationskoppling. Gå tillbaka och mappa alla organisationer.`,
+      );
+      setStatus("org-mapping");
+      return;
+    }
+
+    setImportProgress({ current: 0, total: elevatorsWithOrgId.length });
 
     try {
-      for (let i = 0; i < totalBatches; i++) {
-        const batch = allElevators.slice(
-          i * IMPORT_BATCH_SIZE,
-          (i + 1) * IMPORT_BATCH_SIZE,
-        );
-
-        const result = await confirmImport({
-          data: {
-            elevators: batch,
-            existingOrgMatchNames: knownOrgNames,
-            existingOrgMatchIds: knownOrgIds,
-            newOrgNames: i === 0 ? resolvedOrgMapping.newOrgNames : [],
-            adminEmail: currentUser?.email,
-          },
-        });
-
-        totalCreated += result.created;
-        totalUpdated += result.updated;
-        allErrors.push(...result.errors);
-
-        // After first batch, add newly created orgs to known list
-        if (i === 0 && result.orgsCreated.length > 0) {
-          allOrgsCreated = result.orgsCreated;
-          knownOrgNames = [...knownOrgNames, ...result.orgsCreated];
-          knownOrgIds = [...knownOrgIds, ...result.orgsCreatedIds];
-        }
-
-        setImportProgress({ current: Math.min((i + 1) * IMPORT_BATCH_SIZE, allElevators.length), total: allElevators.length });
-      }
-
-      setImportResult({
-        created: totalCreated,
-        updated: totalUpdated,
-        errors: allErrors,
-        orgsCreated: allOrgsCreated,
-        orgsCreatedIds: [],
+      const result = await confirmImport({
+        data: { elevators: elevatorsWithOrgId },
       });
+
+      setImportProgress({ current: elevatorsWithOrgId.length, total: elevatorsWithOrgId.length });
+      setImportResult(result);
       setStatus("complete");
     } catch (e) {
-      setImportResult({
-        created: totalCreated,
-        updated: totalUpdated,
-        errors: [
-          ...allErrors,
-          {
-            elevator_number: "",
-            error: e instanceof Error ? e.message : "Import misslyckades",
-          },
-        ],
-        orgsCreated: allOrgsCreated,
-        orgsCreatedIds: [],
-      });
-      setStatus("complete");
+      setParseError(
+        e instanceof Error ? e.message : "Import misslyckades — transaktionen har rullats tillbaka.",
+      );
+      setStatus("preview");
     }
-  }, [parseResult, analysis, resolvedOrgMapping, currentUser]);
+  }, [parseResult, resolvedOrgMapping]);
 
   const handleReset = useCallback(() => {
     setStatus("idle");

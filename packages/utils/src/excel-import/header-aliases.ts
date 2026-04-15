@@ -138,6 +138,17 @@ export const HEADER_ALIASES: HeaderAlias[] = [
   { header: "övriga kommentarer", field: "comments" },
   { header: "kommentarer", field: "comments" },
   { header: "kommentar", field: "comments" },
+
+  // --- Kontaktperson ---
+  { header: "kontaktperson", field: "contact_person_name" },
+  { header: "kontaktperson namn", field: "contact_person_name" },
+  { header: "kontakt", field: "contact_person_name" },
+  { header: "kontaktperson telefon", field: "contact_person_phone" },
+  { header: "kontakt telefon", field: "contact_person_phone" },
+  { header: "telefon kontaktperson", field: "contact_person_phone" },
+  { header: "kontaktperson e-post", field: "contact_person_email" },
+  { header: "kontaktperson epost", field: "contact_person_email" },
+  { header: "e-post kontaktperson", field: "contact_person_email" },
 ];
 
 /** All unique target fields that can be mapped to */
@@ -177,4 +188,7 @@ export const TARGET_FIELDS: { field: string; label: string; parser?: HeaderAlias
   { field: "budget_amount", label: "Budgetbelopp", parser: "budget" },
   { field: "modernization_measures", label: "Moderniseringsåtgärder" },
   { field: "comments", label: "Kommentarer" },
+  { field: "contact_person_name", label: "Kontaktperson" },
+  { field: "contact_person_phone", label: "Kontaktperson telefon" },
+  { field: "contact_person_email", label: "Kontaktperson e-post" },
 ];

@@ -49,6 +49,11 @@ export type ParsedElevator = {
   // Kommentarer
   comments?: string;
 
+  // Kontaktperson
+  contact_person_name?: string;
+  contact_person_phone?: string;
+  contact_person_email?: string;
+
   // Import metadata (not stored in DB, used during import processing)
   _organisation_namn?: string;
   _source_row: number;
