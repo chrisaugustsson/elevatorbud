@@ -48,6 +48,7 @@ export type ImportStatus =
   | "parsing"
   | "sheet-selection"
   | "mapping"
+  | "org-mapping"
   | "preview"
   | "importing"
   | "complete";
@@ -257,20 +258,7 @@ export function useImportMachine() {
 
         const result = parseExcelImportWithMapping(wb, allConfigs);
         setParseResult(result);
-
-        const elevatorNumberList = [
-          ...new Set(result.elevators.map((e) => e.elevator_number)),
-        ];
-        const orgNames = [
-          ...new Set(
-            result.elevators
-              .map((e) => e._organisation_namn)
-              .filter((n): n is string => !!n),
-          ),
-        ];
-
-        setAnalysisArgs({ elevatorNumberList, orgNames });
-        setStatus("preview");
+        setStatus("org-mapping");
       } catch (e) {
         setParseError(
           e instanceof Error ? e.message : "Kunde inte tolka filen",
@@ -280,6 +268,24 @@ export function useImportMachine() {
     },
     [autoMapResult, selectedSheets, currentSheetIndex, sheetMappings, loadSheetForMapping],
   );
+
+  const handleOrgMappingConfirm = useCallback(() => {
+    if (!parseResult) return;
+
+    const elevatorNumberList = [
+      ...new Set(parseResult.elevators.map((e) => e.elevator_number)),
+    ];
+    const orgNames = [
+      ...new Set(
+        parseResult.elevators
+          .map((e) => e._organisation_namn)
+          .filter((n): n is string => !!n),
+      ),
+    ];
+
+    setAnalysisArgs({ elevatorNumberList, orgNames });
+    setStatus("preview");
+  }, [parseResult]);
 
   const handleConfirm = useCallback(async () => {
     if (!parseResult || !analysis) return;
@@ -392,6 +398,7 @@ export function useImportMachine() {
     handleSheetSelectionConfirm,
     handleHeaderRowChange,
     handleMappingConfirm,
+    handleOrgMappingConfirm,
     handleConfirm,
     handleReset,
   };

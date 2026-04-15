@@ -2,7 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   Card,
   CardContent,
+  CardHeader,
+  CardTitle,
 } from "@elevatorbud/ui/components/ui/card";
+import { Button } from "@elevatorbud/ui/components/ui/button";
 import { UploadZone } from "@elevatorbud/ui/components/ui/upload-zone";
 import { FileSpreadsheet, Loader2 } from "lucide-react";
 import { useImportMachine } from "../../features/import/hooks/use-import-machine";
@@ -29,10 +32,12 @@ function ImportPage() {
     sheetInfos,
     selectedSheets,
     currentSheetIndex,
+    extractedOrgData,
     handleFileSelect,
     handleSheetSelectionConfirm,
     handleHeaderRowChange,
     handleMappingConfirm,
+    handleOrgMappingConfirm,
     handleConfirm,
     handleReset,
   } = useImportMachine();
@@ -92,6 +97,39 @@ function ImportPage() {
           onHeaderRowChange={handleHeaderRowChange}
           onCancel={handleReset}
         />
+      )}
+
+      {status === "org-mapping" && parseResult && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Organisationsmappning</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {parseResult.elevators.length} rader från{" "}
+              {[...new Set(parseResult.elevators.map((e) => e._source_sheet))].length}{" "}
+              ark har sammanfogats.
+              {extractedOrgData && (
+                <> {extractedOrgData.orgNames.length} unika organisationsnamn hittades.</>
+              )}
+            </p>
+          </CardHeader>
+          <CardContent>
+            {extractedOrgData && extractedOrgData.orgNames.length > 0 && (
+              <ul className="mb-4 list-inside list-disc text-sm text-muted-foreground">
+                {extractedOrgData.orgNames.map((name) => (
+                  <li key={name}>{name}</li>
+                ))}
+              </ul>
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleReset}>
+                Avbryt
+              </Button>
+              <Button onClick={handleOrgMappingConfirm}>
+                Fortsätt
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {status === "preview" && parseResult && (
