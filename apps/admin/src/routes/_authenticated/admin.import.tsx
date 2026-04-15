@@ -6,6 +6,7 @@ import {
 import { UploadZone } from "@elevatorbud/ui/components/ui/upload-zone";
 import { Loader2 } from "lucide-react";
 import { useImportMachine } from "../../features/import/hooks/use-import-machine";
+import { ImportStepper } from "../../features/import/components/import-stepper";
 import { SheetSelectionSection } from "../../features/import/components/sheet-selection-section";
 import { ColumnMappingSection } from "../../features/import/components/column-mapping-section";
 import { OrgMappingSection } from "../../features/import/components/org-mapping-section";
@@ -39,6 +40,10 @@ function ImportPage() {
     handleOrgMappingConfirm,
     handleConfirm,
     handleReset,
+    handleBackToUpload,
+    handleBackToSheetSelection,
+    handleBackToMapping,
+    handleBackToOrgMapping,
   } = useImportMachine();
 
   return (
@@ -49,6 +54,8 @@ function ImportPage() {
           Importera hissdata från Excel-fil
         </p>
       </div>
+
+      <ImportStepper status={status} />
 
       {status === "idle" && (
         <UploadZone
@@ -69,7 +76,7 @@ function ImportPage() {
           sheetInfos={sheetInfos}
           defaultSelected={selectedSheets}
           onConfirm={handleSheetSelectionConfirm}
-          onCancel={handleReset}
+          onBack={handleBackToUpload}
         />
       )}
 
@@ -94,7 +101,7 @@ function ImportPage() {
           }}
           onConfirm={handleMappingConfirm}
           onHeaderRowChange={handleHeaderRowChange}
-          onCancel={handleReset}
+          onBack={handleBackToSheetSelection}
         />
       )}
 
@@ -103,7 +110,7 @@ function ImportPage() {
           orgNames={extractedOrgData.orgNames}
           rowCount={parseResult.elevators.length}
           onConfirm={handleOrgMappingConfirm}
-          onCancel={handleReset}
+          onBack={handleBackToMapping}
         />
       )}
 
@@ -114,7 +121,7 @@ function ImportPage() {
           analysis={analysis}
           resolvedOrgMapping={resolvedOrgMapping}
           onConfirm={handleConfirm}
-          onCancel={handleReset}
+          onBack={handleBackToOrgMapping}
         />
       )}
 

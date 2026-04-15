@@ -55,12 +55,12 @@ export function OrgMappingSection({
   orgNames,
   rowCount,
   onConfirm,
-  onCancel,
+  onBack,
 }: {
   orgNames: string[];
   rowCount: number;
   onConfirm: (mappings: OrgMappingEntry[]) => void;
-  onCancel: () => void;
+  onBack: () => void;
 }) {
   const queryClient = useQueryClient();
   const { data: existingOrgs = [] } = useQuery(listOrganizationsOptions());
@@ -183,8 +183,8 @@ export function OrgMappingSection({
               {activeMappings.length} mappade
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={onCancel}>
-                Avbryt
+              <Button variant="outline" onClick={onBack}>
+                Tillbaka
               </Button>
               <Button
                 onClick={() => onConfirm(activeMappings)}

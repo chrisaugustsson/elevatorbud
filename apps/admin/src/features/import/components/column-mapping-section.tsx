@@ -39,7 +39,7 @@ export function ColumnMappingSection({
   sheetProgress,
   onConfirm,
   onHeaderRowChange,
-  onCancel,
+  onBack,
 }: {
   autoMapResult: AutoMapResult;
   sheetData: unknown[][];
@@ -47,7 +47,7 @@ export function ColumnMappingSection({
   sheetProgress?: { current: number; total: number };
   onConfirm: (mappings: ColumnMapping[]) => void;
   onHeaderRowChange: (rowIndex: number) => void;
-  onCancel: () => void;
+  onBack: () => void;
 }) {
   // Build initial field map: sourceIndex -> field
   const [fieldMap, setFieldMap] = useState<Record<number, string>>(() => {
@@ -315,8 +315,8 @@ export function ColumnMappingSection({
 
       {/* Actions */}
       <div className="flex gap-3">
-        <Button variant="outline" onClick={onCancel}>
-          Avbryt
+        <Button variant="outline" onClick={onBack}>
+          Tillbaka
         </Button>
         <Button
           onClick={handleConfirm}

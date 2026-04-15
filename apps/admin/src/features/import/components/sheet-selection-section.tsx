@@ -15,12 +15,12 @@ export function SheetSelectionSection({
   sheetInfos,
   defaultSelected,
   onConfirm,
-  onCancel,
+  onBack,
 }: {
   sheetInfos: SheetInfo[];
   defaultSelected: string[];
   onConfirm: (selectedSheets: string[]) => void;
-  onCancel: () => void;
+  onBack: () => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(defaultSelected),
@@ -112,8 +112,8 @@ export function SheetSelectionSection({
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onCancel}>
-            Avbryt
+          <Button variant="outline" onClick={onBack}>
+            Tillbaka
           </Button>
           <Button
             disabled={!canProceed}

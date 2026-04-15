@@ -25,14 +25,14 @@ export function PreviewSection({
   analysis,
   resolvedOrgMapping,
   onConfirm,
-  onCancel,
+  onBack,
 }: {
   fileName: string;
   parseResult: FullImportResult;
   analysis: AnalysisResult | undefined;
   resolvedOrgMapping?: ResolvedOrgMapping | null;
   onConfirm: () => void;
-  onCancel: () => void;
+  onBack: () => void;
 }) {
   const [showWarnings, setShowWarnings] = useState(false);
   const [showInvalidRows, setShowInvalidRows] = useState(false);
@@ -55,7 +55,7 @@ export function PreviewSection({
             </p>
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={onCancel}>
+        <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="mr-1 h-4 w-4" />
           Välj annan fil
         </Button>
@@ -197,8 +197,8 @@ export function PreviewSection({
 
       {/* Action buttons */}
       <div className="flex gap-3">
-        <Button variant="outline" onClick={onCancel}>
-          Avbryt
+        <Button variant="outline" onClick={onBack}>
+          Tillbaka
         </Button>
         <Button onClick={onConfirm} disabled={!analysisReady || !hasElevators}>
           Importera {parseResult.elevators.length} hissar

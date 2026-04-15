@@ -344,7 +344,7 @@ export function useImportMachine() {
     }
   }, [parseResult, resolvedOrgMapping]);
 
-  const handleReset = useCallback(() => {
+  const handleBackToUpload = useCallback(() => {
     setStatus("idle");
     setParseResult(null);
     setFileName("");
@@ -360,6 +360,37 @@ export function useImportMachine() {
     setResolvedOrgMapping(null);
     workbookRef.current = null;
   }, []);
+
+  const handleBackToSheetSelection = useCallback(() => {
+    setStatus("sheet-selection");
+    setAutoMapResult(null);
+    setSheetData([]);
+    setCurrentSheetIndex(0);
+    setSheetMappings(new Map());
+    setParseResult(null);
+    setResolvedOrgMapping(null);
+    setAnalysisArgs(null);
+  }, []);
+
+  const handleBackToMapping = useCallback(() => {
+    setCurrentSheetIndex(0);
+    setSheetMappings(new Map());
+    setParseResult(null);
+    setResolvedOrgMapping(null);
+    setAnalysisArgs(null);
+
+    if (loadSheetForMapping(selectedSheets[0])) {
+      setStatus("mapping");
+    }
+  }, [selectedSheets, loadSheetForMapping]);
+
+  const handleBackToOrgMapping = useCallback(() => {
+    setAnalysisArgs(null);
+    setResolvedOrgMapping(null);
+    setStatus("org-mapping");
+  }, []);
+
+  const handleReset = handleBackToUpload;
 
   return {
     status,
@@ -384,5 +415,9 @@ export function useImportMachine() {
     handleOrgMappingConfirm,
     handleConfirm,
     handleReset,
+    handleBackToUpload,
+    handleBackToSheetSelection,
+    handleBackToMapping,
+    handleBackToOrgMapping,
   };
 }
