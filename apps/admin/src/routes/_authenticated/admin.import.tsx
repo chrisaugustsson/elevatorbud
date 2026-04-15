@@ -11,7 +11,7 @@ import { SheetSelectionSection } from "../../features/import/components/sheet-se
 import { ColumnMappingSection } from "../../features/import/components/column-mapping-section";
 import { OrgMappingSection } from "../../features/import/components/org-mapping-section";
 import { PreviewSection } from "../../features/import/components/preview-section";
-import { ResultSection } from "../../features/import/components/result-section";
+import { ResultSection, ImportErrorSection } from "../../features/import/components/result-section";
 
 export const Route = createFileRoute("/_authenticated/admin/import")({
   component: ImportPage,
@@ -24,6 +24,7 @@ function ImportPage() {
     parseResult,
     fileName,
     parseError,
+    importError,
     importResult,
     analysis,
     resolvedOrgMapping,
@@ -149,16 +150,16 @@ function ImportPage() {
               <div className="space-y-2">
                 <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full rounded-full bg-primary transition-all duration-300"
+                    className="h-full animate-pulse rounded-full bg-primary transition-all duration-300"
                     style={{
-                      width: importProgress.total > 0
-                        ? `${Math.round((importProgress.current / importProgress.total) * 100)}%`
-                        : "0%",
+                      width: importProgress.total > 0 && importProgress.current > 0
+                        ? "100%"
+                        : "60%",
                     }}
                   />
                 </div>
                 <p className="text-center text-sm text-muted-foreground">
-                  {importProgress.current} av {importProgress.total} hissar
+                  Importerar {importProgress.total} hissar...
                 </p>
               </div>
             </div>
@@ -168,6 +169,14 @@ function ImportPage() {
 
       {status === "complete" && importResult && (
         <ResultSection result={importResult} onReset={handleReset} />
+      )}
+
+      {status === "error" && importError && (
+        <ImportErrorSection
+          error={importError}
+          onBackToMapping={handleBackToOrgMapping}
+          onStartOver={handleReset}
+        />
       )}
     </div>
   );

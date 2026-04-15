@@ -37,6 +37,7 @@ export type ImportProgress = {
 export type ImportResult = {
   created: number;
   updated: number;
+  perOrgCounts?: Record<string, { orgName: string; created: number; updated: number }>;
 };
 
 export type ImportStatus =
@@ -47,7 +48,8 @@ export type ImportStatus =
   | "org-mapping"
   | "preview"
   | "importing"
-  | "complete";
+  | "complete"
+  | "error";
 
 export type ResolvedOrgMapping = {
   matchedOrgs: { name: string; id: string }[];
@@ -61,6 +63,7 @@ export function useImportMachine() {
   const [fileName, setFileName] = useState("");
   const [parseError, setParseError] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const [analysisArgs, setAnalysisArgs] = useState<{
     elevatorNumberList: string[];
     orgNames: string[];
@@ -350,13 +353,24 @@ export function useImportMachine() {
       });
 
       setImportProgress({ current: elevatorsWithOrgId.length, total: elevatorsWithOrgId.length });
+
+      if (result.perOrgCounts) {
+        const nameById = new Map<string, string>();
+        for (const { name, id } of resolvedOrgMapping.matchedOrgs) {
+          nameById.set(id, name);
+        }
+        for (const [orgId, counts] of Object.entries(result.perOrgCounts)) {
+          counts.orgName = nameById.get(orgId) ?? orgId;
+        }
+      }
+
       setImportResult(result);
       setStatus("complete");
     } catch (e) {
-      setParseError(
+      setImportError(
         e instanceof Error ? e.message : "Import misslyckades — transaktionen har rullats tillbaka.",
       );
-      setStatus("preview");
+      setStatus("error");
     }
   }, [parseResult, resolvedOrgMapping]);
 
@@ -374,6 +388,7 @@ export function useImportMachine() {
     setCurrentSheetIndex(0);
     setSheetMappings(new Map());
     setResolvedOrgMapping(null);
+    setImportError(null);
     workbookRef.current = null;
   }, []);
 
@@ -414,6 +429,7 @@ export function useImportMachine() {
     parseResult,
     fileName,
     parseError,
+    importError,
     importResult,
     analysis,
     autoMapResult,

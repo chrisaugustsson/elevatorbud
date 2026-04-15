@@ -357,7 +357,19 @@ async function confirmFn(
       }
     }
 
-    return { created, updated };
+    const perOrgCounts: Record<string, { orgName: string; created: number; updated: number }> = {};
+    for (const r of toCreate) {
+      const orgId = r._organizationId;
+      if (!perOrgCounts[orgId]) perOrgCounts[orgId] = { orgName: "", created: 0, updated: 0 };
+      perOrgCounts[orgId].created++;
+    }
+    for (const r of toUpdate) {
+      const orgId = r._organizationId;
+      if (!perOrgCounts[orgId]) perOrgCounts[orgId] = { orgName: "", created: 0, updated: 0 };
+      perOrgCounts[orgId].updated++;
+    }
+
+    return { created, updated, perOrgCounts };
   });
 }
 

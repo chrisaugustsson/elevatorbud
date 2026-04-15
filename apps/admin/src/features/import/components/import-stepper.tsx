@@ -7,7 +7,7 @@ const STEPS = [
   { label: "Välj ark", statuses: ["sheet-selection"] },
   { label: "Mappa kolumner", statuses: ["mapping"] },
   { label: "Mappa organisationer", statuses: ["org-mapping"] },
-  { label: "Granska & importera", statuses: ["preview", "importing", "complete"] },
+  { label: "Granska & importera", statuses: ["preview", "importing", "complete", "error"] },
 ] as const;
 
 function getStepIndex(status: ImportStatus): number {
