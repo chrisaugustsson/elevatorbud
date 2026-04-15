@@ -7,9 +7,10 @@ import { getContextOrgIds } from "./context";
 
 export const getTimeline = createServerFn()
   .middleware([authMiddleware])
-  .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
+  .inputValidator(z.object({ parentOrgId: z.string().uuid(), subOrgId: z.string().uuid().optional() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
+    const filterOrgIds = data.subOrgId ? [data.subOrgId] : contextOrgIds;
 
     const result = await context.db.execute(sql`
       SELECT
@@ -24,7 +25,7 @@ export const getTimeline = createServerFn()
         LIMIT 1
       ) lb ON true
       WHERE e.status = 'active'
-        AND e.organization_id = ANY(${contextOrgIds})
+        AND e.organization_id = ANY(${filterOrgIds})
         AND lb.recommended_modernization_year IS NOT NULL
       GROUP BY lb.recommended_modernization_year
       ORDER BY lb.recommended_modernization_year
@@ -37,17 +38,18 @@ export const getTimeline = createServerFn()
     }));
   });
 
-export const timelineOptions = (parentOrgId: string) =>
+export const timelineOptions = (parentOrgId: string, subOrgId?: string) =>
   queryOptions({
-    queryKey: ["modernization", "timeline", parentOrgId],
-    queryFn: () => getTimeline({ data: { parentOrgId } }),
+    queryKey: ["modernization", "timeline", parentOrgId, subOrgId],
+    queryFn: () => getTimeline({ data: { parentOrgId, subOrgId } }),
   });
 
 export const getBudget = createServerFn()
   .middleware([authMiddleware])
-  .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
+  .inputValidator(z.object({ parentOrgId: z.string().uuid(), subOrgId: z.string().uuid().optional() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
+    const filterOrgIds = data.subOrgId ? [data.subOrgId] : contextOrgIds;
 
     const result = await context.db.execute(sql`
       SELECT
@@ -65,7 +67,7 @@ export const getBudget = createServerFn()
         LIMIT 1
       ) lb ON true
       WHERE e.status = 'active'
-        AND e.organization_id = ANY(${contextOrgIds})
+        AND e.organization_id = ANY(${filterOrgIds})
         AND lb.recommended_modernization_year IS NOT NULL
       GROUP BY lb.recommended_modernization_year, e.district, e.elevator_type
       ORDER BY lb.recommended_modernization_year
@@ -87,10 +89,10 @@ export const getBudget = createServerFn()
     }));
   });
 
-export const budgetOptions = (parentOrgId: string) =>
+export const budgetOptions = (parentOrgId: string, subOrgId?: string) =>
   queryOptions({
-    queryKey: ["modernization", "budget", parentOrgId],
-    queryFn: () => getBudget({ data: { parentOrgId } }),
+    queryKey: ["modernization", "budget", parentOrgId, subOrgId],
+    queryFn: () => getBudget({ data: { parentOrgId, subOrgId } }),
   });
 
 export const getPriorityList = createServerFn()
@@ -98,6 +100,7 @@ export const getPriorityList = createServerFn()
   .inputValidator(
     z.object({
       parentOrgId: z.string().uuid(),
+      subOrgId: z.string().uuid().optional(),
       yearFrom: z.number().optional(),
       yearTo: z.number().optional(),
       district: z.string().optional(),
@@ -107,6 +110,7 @@ export const getPriorityList = createServerFn()
   )
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
+    const filterOrgIds = data.subOrgId ? [data.subOrgId] : contextOrgIds;
     const page = data.page ?? 1;
     const pageSize = data.pageSize ?? 50;
     const offset = (page - 1) * pageSize;
@@ -141,7 +145,7 @@ export const getPriorityList = createServerFn()
         ) lb ON true
         LEFT JOIN organizations o ON o.id = e.organization_id
         WHERE e.status = 'active'
-          AND e.organization_id = ANY(${contextOrgIds})
+          AND e.organization_id = ANY(${filterOrgIds})
           AND lb.recommended_modernization_year IS NOT NULL
           ${yearFilter}
           ${districtFilter}
@@ -159,7 +163,7 @@ export const getPriorityList = createServerFn()
           LIMIT 1
         ) lb ON true
         WHERE e.status = 'active'
-          AND e.organization_id = ANY(${contextOrgIds})
+          AND e.organization_id = ANY(${filterOrgIds})
           AND lb.recommended_modernization_year IS NOT NULL
           ${yearFilter}
           ${districtFilter}
@@ -203,8 +207,50 @@ export const getPriorityList = createServerFn()
     };
   });
 
+export const getSubOrgBreakdown = createServerFn()
+  .middleware([authMiddleware])
+  .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
+
+    const result = await context.db.execute(sql`
+      SELECT
+        o.id as org_id,
+        o.name as org_name,
+        count(*)::int as count
+      FROM elevators e
+      JOIN LATERAL (
+        SELECT recommended_modernization_year
+        FROM elevator_budgets
+        WHERE elevator_id = e.id
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) lb ON true
+      JOIN organizations o ON o.id = e.organization_id
+      WHERE e.status = 'active'
+        AND e.organization_id = ANY(${contextOrgIds})
+        AND lb.recommended_modernization_year IS NOT NULL
+      GROUP BY o.id, o.name
+      ORDER BY o.name
+    `);
+
+    type BreakdownRow = { org_id: string; org_name: string; count: number };
+    return (result.rows as BreakdownRow[]).map((r) => ({
+      orgId: r.org_id,
+      orgName: r.org_name,
+      count: r.count,
+    }));
+  });
+
+export const subOrgBreakdownOptions = (parentOrgId: string) =>
+  queryOptions({
+    queryKey: ["modernization", "subOrgBreakdown", parentOrgId],
+    queryFn: () => getSubOrgBreakdown({ data: { parentOrgId } }),
+  });
+
 export const priorityListOptions = (filters: {
   parentOrgId: string;
+  subOrgId?: string;
   yearFrom?: number;
   yearTo?: number;
   district?: string;

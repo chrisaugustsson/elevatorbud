@@ -11,23 +11,27 @@ import {
   hoverColumnPlugin,
 } from "@elevatorbud/ui/lib/chart-helpers";
 import { Bar } from "react-chartjs-2";
-import { Calendar } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import type { ChartEvent, ActiveElement, Chart as ChartJS } from "chart.js";
 
-type TimelineDataItem = {
-  name: string;
+type SubOrgDataItem = {
+  orgId: string;
+  orgName: string;
   count: number;
-  fill: string;
 };
 
-type TimelineChartProps = {
-  data: TimelineDataItem[];
-  onYearClick?: (year: string) => void;
-  selectedYear?: string | null;
+type SubOrgBreakdownChartProps = {
+  data: SubOrgDataItem[];
+  onSubOrgClick?: (orgId: string) => void;
+  selectedSubOrgId?: string | null;
 };
 
-export function TimelineChart({ data, onYearClick, selectedYear }: TimelineChartProps) {
+export function SubOrgBreakdownChart({
+  data,
+  onSubOrgClick,
+  selectedSubOrgId,
+}: SubOrgBreakdownChartProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const colors = useChartColors();
@@ -35,34 +39,38 @@ export function TimelineChart({ data, onYearClick, selectedYear }: TimelineChart
 
   const handleClick = useCallback(
     (_event: ChartEvent, elements: ActiveElement[]) => {
-      if (!onYearClick || elements.length === 0) return;
+      if (!onSubOrgClick || elements.length === 0) return;
       const index = elements[0].index;
-      const year = data[index]?.name;
-      if (year) onYearClick(year);
+      const item = data[index];
+      if (item) onSubOrgClick(item.orgId);
     },
-    [onYearClick, data],
+    [onSubOrgClick, data],
   );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLCanvasElement>) => {
-      if (!onYearClick || !chartRef.current) return;
+      if (!onSubOrgClick || !chartRef.current) return;
       if (e.key !== "Enter" && e.key !== " ") return;
       e.preventDefault();
+
       const chart = chartRef.current;
       const active = chart.getActiveElements();
       if (active.length === 0) return;
-      const year = data[active[0].index]?.name;
-      if (year) onYearClick(year);
+      const index = active[0].index;
+      const item = data[index];
+      if (item) onSubOrgClick(item.orgId);
     },
-    [onYearClick, data],
+    [onSubOrgClick, data],
   );
 
   const backgroundColors = useMemo(
     () =>
       data.map((d) =>
-        selectedYear && d.name !== selectedYear ? d.fill + "40" : d.fill,
+        selectedSubOrgId && d.orgId !== selectedSubOrgId
+          ? colors.chart3 + "40"
+          : colors.chart3,
       ),
-    [data, selectedYear],
+    [data, selectedSubOrgId, colors.chart3],
   );
 
   if (!mounted) return null;
@@ -71,21 +79,21 @@ export function TimelineChart({ data, onYearClick, selectedYear }: TimelineChart
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Calendar className="h-4 w-4" />
-          Moderniseringstidslinje
+          <Building2 className="h-4 w-4" />
+          Hissar per organisation
         </CardTitle>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
           <p className="py-8 text-center text-muted-foreground">
-            Inga hissar med rekommenderat moderniseringsår.
+            Ingen organisationsdata tillgänglig.
           </p>
         ) : (
           <div className="h-[300px] w-full overflow-hidden">
             <Bar
               ref={chartRef}
               data={{
-                labels: data.map((d) => d.name),
+                labels: data.map((d) => d.orgName),
                 datasets: [
                   {
                     label: "Antal hissar",
@@ -104,7 +112,8 @@ export function TimelineChart({ data, onYearClick, selectedYear }: TimelineChart
                 onHover: (_event, elements) => {
                   const canvas = chartRef.current?.canvas;
                   if (canvas) {
-                    canvas.style.cursor = elements.length > 0 ? "pointer" : "default";
+                    canvas.style.cursor =
+                      elements.length > 0 ? "pointer" : "default";
                   }
                 },
                 plugins: {
@@ -121,7 +130,7 @@ export function TimelineChart({ data, onYearClick, selectedYear }: TimelineChart
               plugins={[hoverColumnPlugin]}
               tabIndex={0}
               role="img"
-              aria-label="Stapeldiagram över moderniseringstidslinje. Klicka på en stapel för att filtrera per år."
+              aria-label="Stapeldiagram över hissar per organisation. Klicka på en stapel för att filtrera."
               onKeyDown={handleKeyDown}
             />
           </div>

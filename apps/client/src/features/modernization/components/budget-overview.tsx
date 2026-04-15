@@ -66,6 +66,19 @@ function BudgetPerYearChart({
     [onYearClick, data],
   );
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLCanvasElement>) => {
+      if (!onYearClick || !chartRef.current) return;
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      const active = chartRef.current.getActiveElements();
+      if (active.length === 0) return;
+      const year = data[active[0].index]?.name;
+      if (year) onYearClick(year);
+    },
+    [onYearClick, data],
+  );
+
   const barBackgrounds = useMemo(
     () =>
       data.map((d) =>
@@ -112,6 +125,12 @@ function BudgetPerYearChart({
       maintainAspectRatio: false,
       interaction: { mode: "index" as const, intersect: false },
       onClick: handleClick,
+      onHover: (_event: ChartEvent, elements: ActiveElement[]) => {
+        const canvas = chartRef.current?.canvas;
+        if (canvas) {
+          canvas.style.cursor = elements.length > 0 ? "pointer" : "default";
+        }
+      },
       plugins: {
         legend: {
           position: "bottom" as const,
@@ -145,6 +164,10 @@ function BudgetPerYearChart({
         ref={chartRef}
         data={chartData as Parameters<typeof Line>[0]["data"]}
         options={options}
+        tabIndex={0}
+        role="img"
+        aria-label="Stapeldiagram över budget per år. Klicka på en stapel för att filtrera."
+        onKeyDown={handleKeyDown}
       />
     </div>
   );
@@ -162,12 +185,26 @@ function BudgetPerDistrictChart({
   selectedDistrict?: string | null;
 }) {
   const colors = useChartColors();
+  const districtChartRef = useRef<ChartJS<"bar">>(null);
 
   const handleClick = useCallback(
     (_event: ChartEvent, elements: ActiveElement[]) => {
       if (!onDistrictClick || elements.length === 0) return;
       const index = elements[0].index;
       const district = data[index]?.name;
+      if (district) onDistrictClick(district);
+    },
+    [onDistrictClick, data],
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLCanvasElement>) => {
+      if (!onDistrictClick || !districtChartRef.current) return;
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      const active = districtChartRef.current.getActiveElements();
+      if (active.length === 0) return;
+      const district = data[active[0].index]?.name;
       if (district) onDistrictClick(district);
     },
     [onDistrictClick, data],
@@ -203,6 +240,12 @@ function BudgetPerDistrictChart({
       maintainAspectRatio: false,
       interaction: { mode: "index" as const, intersect: false },
       onClick: handleClick,
+      onHover: (_event: ChartEvent, elements: ActiveElement[]) => {
+        const canvas = districtChartRef.current?.canvas;
+        if (canvas) {
+          canvas.style.cursor = elements.length > 0 ? "pointer" : "default";
+        }
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -220,7 +263,16 @@ function BudgetPerDistrictChart({
 
   return (
     <div className="h-[300px] w-full">
-      <Bar data={chartData} options={options} plugins={[hoverColumnPlugin]} />
+      <Bar
+        ref={districtChartRef}
+        data={chartData}
+        options={options}
+        plugins={[hoverColumnPlugin]}
+        tabIndex={0}
+        role="img"
+        aria-label="Stapeldiagram över budget per distrikt. Klicka på en stapel för att filtrera."
+        onKeyDown={handleKeyDown}
+      />
     </div>
   );
 }

@@ -6,7 +6,9 @@ import {
   timelineOptions,
   budgetOptions,
   priorityListOptions,
+  subOrgBreakdownOptions,
 } from "../../../server/modernization";
+import { childOrgsOptions } from "../../../server/context";
 import {
   PERIODS,
   getUrgencyColor,
@@ -18,12 +20,15 @@ import { PeriodSummaryCards } from "@elevatorbud/ui/components/modernization/per
 import { TimelineChart } from "../../../features/modernization/components/timeline-chart";
 import { BudgetOverview } from "../../../features/modernization/components/budget-overview";
 import { PriorityList } from "../../../features/modernization/components/priority-list";
+import { SubOrgBreakdownChart } from "../../../features/modernization/components/sub-org-breakdown-chart";
 import { ModernizationSkeleton } from "@elevatorbud/ui/components/modernization/modernization-skeleton";
+import { Badge } from "@elevatorbud/ui/components/ui/badge";
 
 type ModerniseringSearch = {
   period?: PeriodKey;
   year?: string;
   district?: string;
+  subOrg?: string;
   page?: number;
   pageSize?: number;
 };
@@ -42,6 +47,10 @@ export const Route = createFileRoute("/_authenticated/$parentOrgId/modernisering
       typeof search.district === "string" && search.district
         ? search.district
         : undefined,
+    subOrg:
+      typeof search.subOrg === "string" && search.subOrg
+        ? search.subOrg
+        : undefined,
     page: typeof search.page === "number" && search.page > 0 ? search.page : undefined,
     pageSize:
       typeof search.pageSize === "number" && [25, 50, 100].includes(search.pageSize)
@@ -53,6 +62,8 @@ export const Route = createFileRoute("/_authenticated/$parentOrgId/modernisering
     context.queryClient.prefetchQuery(timelineOptions(params.parentOrgId));
     context.queryClient.prefetchQuery(budgetOptions(params.parentOrgId));
     context.queryClient.prefetchQuery(priorityListOptions({ parentOrgId: params.parentOrgId, page: 1, pageSize: 25 }));
+    context.queryClient.prefetchQuery(childOrgsOptions(params.parentOrgId));
+    context.queryClient.prefetchQuery(subOrgBreakdownOptions(params.parentOrgId));
   },
   component: ModerniseringPage,
   pendingComponent: ModernizationSkeleton,
@@ -67,8 +78,21 @@ function ModerniseringPage() {
   const selectedPeriod: TimelinePeriod | null = getPeriodByKey(search.period);
   const selectedYear = search.year ?? null;
   const selectedDistrict = search.district ?? null;
+  const selectedSubOrg = search.subOrg ?? null;
   const page = (search.page ?? 1) - 1;
   const pageSize = search.pageSize ?? 25;
+
+  const { data: childOrgs } = useQuery(childOrgsOptions(parentOrgId));
+  const hasChildren = (childOrgs?.length ?? 0) > 0;
+  const { data: subOrgBreakdown } = useQuery({
+    ...subOrgBreakdownOptions(parentOrgId),
+    enabled: hasChildren,
+  });
+
+  const selectedSubOrgName = useMemo(() => {
+    if (!selectedSubOrg || !childOrgs) return null;
+    return childOrgs.find((o) => o.id === selectedSubOrg)?.name ?? null;
+  }, [selectedSubOrg, childOrgs]);
 
   const updateSearch = useCallback(
     (next: Partial<ModerniseringSearch>) => {
@@ -78,6 +102,7 @@ function ModerniseringPage() {
           if (!merged.period) delete merged.period;
           if (!merged.year) delete merged.year;
           if (!merged.district) delete merged.district;
+          if (!merged.subOrg) delete merged.subOrg;
           if (!merged.page || merged.page === 1) delete merged.page;
           if (!merged.pageSize || merged.pageSize === 25) delete merged.pageSize;
           return merged;
@@ -129,18 +154,29 @@ function ModerniseringPage() {
     [selectedDistrict, updateSearch, scrollToPriorityList],
   );
 
-  const { data: tidslinje } = useSuspenseQuery(timelineOptions(parentOrgId));
-  const { data: budget } = useSuspenseQuery(budgetOptions(parentOrgId));
+  const handleSubOrgClick = useCallback(
+    (orgId: string) => {
+      updateSearch({
+        subOrg: selectedSubOrg === orgId ? undefined : orgId,
+        page: undefined,
+      });
+    },
+    [selectedSubOrg, updateSearch],
+  );
+
+  const { data: tidslinje } = useSuspenseQuery(timelineOptions(parentOrgId, selectedSubOrg ?? undefined));
+  const { data: budget } = useSuspenseQuery(budgetOptions(parentOrgId, selectedSubOrg ?? undefined));
 
   const prioritetslistaArgs = useMemo(() => {
     const base: {
       parentOrgId: string;
+      subOrgId?: string;
       page: number;
       pageSize: number;
       yearFrom?: number;
       yearTo?: number;
       district?: string;
-    } = { parentOrgId, page: page + 1, pageSize };
+    } = { parentOrgId, page: page + 1, pageSize, subOrgId: selectedSubOrg ?? undefined };
     if (selectedYear) {
       const y = parseInt(selectedYear, 10);
       base.yearFrom = y;
@@ -153,7 +189,7 @@ function ModerniseringPage() {
       base.district = selectedDistrict;
     }
     return base;
-  }, [parentOrgId, selectedPeriod, selectedYear, selectedDistrict, page, pageSize]);
+  }, [parentOrgId, selectedPeriod, selectedYear, selectedDistrict, selectedSubOrg, page, pageSize]);
 
   const { data: prioritetslista, isLoading } = useQuery({
     ...priorityListOptions(prioritetslistaArgs),
@@ -226,6 +262,35 @@ function ModerniseringPage() {
         Moderniseringsplanering
       </h1>
 
+      {selectedSubOrgName && (
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="font-normal">
+            {selectedSubOrgName}
+            <button
+              className="ml-1 hover:text-destructive"
+              onClick={() => updateSearch({ subOrg: undefined, page: undefined })}
+              aria-label={`Ta bort filter för ${selectedSubOrgName}`}
+            >
+              ×
+            </button>
+          </Badge>
+        </div>
+      )}
+
+      <div aria-live="polite" className="sr-only">
+        {selectedSubOrgName
+          ? `Filtrerar på ${selectedSubOrgName}`
+          : "Visar alla organisationer"}
+      </div>
+
+      {hasChildren && subOrgBreakdown && (
+        <SubOrgBreakdownChart
+          data={subOrgBreakdown}
+          onSubOrgClick={handleSubOrgClick}
+          selectedSubOrgId={selectedSubOrg}
+        />
+      )}
+
       <PeriodSummaryCards
         periods={periodSummary}
         selectedPeriod={selectedPeriod}
@@ -260,9 +325,11 @@ function ModerniseringPage() {
           selectedPeriod={selectedPeriod}
           selectedYear={selectedYear}
           selectedDistrict={selectedDistrict}
+          selectedSubOrgName={selectedSubOrgName}
           onClearPeriod={() => updateSearch({ period: undefined, page: undefined })}
           onClearYear={() => updateSearch({ year: undefined, page: undefined })}
           onClearDistrict={() => updateSearch({ district: undefined, page: undefined })}
+          onClearSubOrg={() => updateSearch({ subOrg: undefined, page: undefined })}
           totalCount={totalCount}
           totalPages={totalPages}
           page={page}

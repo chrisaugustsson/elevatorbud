@@ -35,9 +35,11 @@ type PriorityListProps = {
   selectedPeriod: TimelinePeriod | null;
   selectedYear?: string | null;
   selectedDistrict?: string | null;
+  selectedSubOrgName?: string | null;
   onClearPeriod: () => void;
   onClearYear?: () => void;
   onClearDistrict?: () => void;
+  onClearSubOrg?: () => void;
   totalCount: number;
   totalPages: number;
   page: number;
@@ -94,9 +96,11 @@ export function PriorityList({
   selectedPeriod,
   selectedYear,
   selectedDistrict,
+  selectedSubOrgName,
   onClearPeriod,
   onClearYear,
   onClearDistrict,
+  onClearSubOrg,
   totalCount,
   totalPages,
   page,
@@ -293,6 +297,17 @@ export function PriorityList({
             </button>
           </Badge>
         )}
+        {selectedSubOrgName && (
+          <Badge variant="outline" className="font-normal">
+            {selectedSubOrgName}
+            <button
+              className="ml-1 hover:text-destructive"
+              onClick={onClearSubOrg}
+            >
+              ×
+            </button>
+          </Badge>
+        )}
         <span className="text-sm text-muted-foreground">
           ({totalCount} hissar)
         </span>
@@ -310,7 +325,8 @@ export function PriorityList({
               Inga hissar med rekommenderat moderniseringsår
               {selectedPeriod ? " i vald period" : ""}
               {selectedYear ? ` för ${selectedYear}` : ""}
-              {selectedDistrict ? ` i ${selectedDistrict}` : ""}.
+              {selectedDistrict ? ` i ${selectedDistrict}` : ""}
+              {selectedSubOrgName ? ` för ${selectedSubOrgName}` : ""}.
             </p>
           </div>
         }
