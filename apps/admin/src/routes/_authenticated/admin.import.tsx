@@ -6,6 +6,7 @@ import {
 import { UploadZone } from "@elevatorbud/ui/components/ui/upload-zone";
 import { FileSpreadsheet, Loader2 } from "lucide-react";
 import { useImportMachine } from "../../features/import/hooks/use-import-machine";
+import { SheetSelectionSection } from "../../features/import/components/sheet-selection-section";
 import { ColumnMappingSection } from "../../features/import/components/column-mapping-section";
 import { PreviewSection } from "../../features/import/components/preview-section";
 import { ResultSection } from "../../features/import/components/result-section";
@@ -25,7 +26,10 @@ function ImportPage() {
     analysis,
     autoMapResult,
     sheetData,
+    sheetInfos,
+    selectedSheets,
     handleFileSelect,
+    handleSheetSelectionConfirm,
     handleHeaderRowChange,
     handleMappingConfirm,
     handleConfirm,
@@ -49,25 +53,19 @@ function ImportPage() {
           subtitle="eller klicka för att välja fil (.xlsx)"
           error={parseError}
         >
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Stödda format</p>
-            <ul className="space-y-1 text-xs text-muted-foreground">
-              <li className="flex items-center gap-2">
-                <FileSpreadsheet className="h-3.5 w-3.5" />
-                <strong>Hissar</strong> — huvudark (obligatoriskt)
-              </li>
-              <li className="flex items-center gap-2">
-                <FileSpreadsheet className="h-3.5 w-3.5" />
-                <strong>Nodtelefoner</strong> — nödtelefondata (valfritt)
-              </li>
-              <li className="flex items-center gap-2">
-                <FileSpreadsheet className="h-3.5 w-3.5" />
-                <strong>Rivna hissar</strong> — rivna/arkiverade hissar
-                (valfritt)
-              </li>
-            </ul>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Du kan välja vilka ark som ska importeras i nästa steg.
+          </p>
         </UploadZone>
+      )}
+
+      {status === "sheet-selection" && (
+        <SheetSelectionSection
+          sheetInfos={sheetInfos}
+          defaultSelected={selectedSheets}
+          onConfirm={handleSheetSelectionConfirm}
+          onCancel={handleReset}
+        />
       )}
 
       {status === "parsing" && (

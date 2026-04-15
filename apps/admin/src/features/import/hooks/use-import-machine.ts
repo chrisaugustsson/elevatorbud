@@ -4,6 +4,7 @@ import { analyzeImportOptions, confirmImport } from "~/server/import";
 import { getMeOptions } from "~/server/user";
 import {
   readWorkbook,
+  getWorkbookSheetInfo,
   autoMapSheet,
   autoMapColumns,
   getSheetData,
@@ -11,6 +12,7 @@ import {
   type FullImportResult,
   type AutoMapResult,
   type ColumnMapping,
+  type SheetInfo,
 } from "@elevatorbud/utils";
 
 export type AnalysisResult = {
@@ -43,6 +45,7 @@ export type ImportResult = {
 export type ImportStatus =
   | "idle"
   | "parsing"
+  | "sheet-selection"
   | "mapping"
   | "preview"
   | "importing"
@@ -62,8 +65,12 @@ export function useImportMachine() {
     orgNames: string[];
   } | null>(null);
 
-  // Mapping step state
+  // Sheet selection state
   const workbookRef = useRef<ReturnType<typeof readWorkbook> | null>(null);
+  const [sheetInfos, setSheetInfos] = useState<SheetInfo[]>([]);
+  const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
+
+  // Mapping step state
   const [autoMapResult, setAutoMapResult] = useState<AutoMapResult | null>(
     null,
   );
@@ -96,18 +103,16 @@ export function useImportMachine() {
       const wb = readWorkbook(buffer);
       workbookRef.current = wb;
 
-      // Auto-map the Hissar sheet
-      const mapResult = autoMapSheet(wb, "Hissar");
-      if (!mapResult) {
-        setParseError("Kunde inte hitta eller läsa 'Hissar'-arket");
+      const infos = getWorkbookSheetInfo(wb);
+      if (infos.length === 0) {
+        setParseError("Filen innehåller inga ark");
         setStatus("idle");
         return;
       }
 
-      const data = getSheetData(wb, "Hissar");
-      setSheetData(data);
-      setAutoMapResult(mapResult);
-      setStatus("mapping");
+      setSheetInfos(infos);
+      setSelectedSheets(infos.map((s) => s.name));
+      setStatus("sheet-selection");
     } catch (e) {
       setParseError(
         e instanceof Error ? e.message : "Kunde inte läsa filen",
@@ -116,11 +121,31 @@ export function useImportMachine() {
     }
   }, []);
 
+  const handleSheetSelectionConfirm = useCallback((sheets: string[]) => {
+    const wb = workbookRef.current;
+    if (!wb || sheets.length === 0) return;
+
+    setSelectedSheets(sheets);
+
+    const firstSheet = sheets[0];
+    const mapResult = autoMapSheet(wb, firstSheet);
+    if (!mapResult) {
+      setParseError(`Kunde inte läsa arket '${firstSheet}'`);
+      setStatus("idle");
+      return;
+    }
+
+    const data = getSheetData(wb, firstSheet);
+    setSheetData(data);
+    setAutoMapResult(mapResult);
+    setStatus("mapping");
+  }, []);
+
   const handleHeaderRowChange = useCallback(
     (rowIndex: number) => {
       const wb = workbookRef.current;
-      if (!wb) return;
-      const data = getSheetData(wb, "Hissar");
+      if (!wb || selectedSheets.length === 0) return;
+      const data = getSheetData(wb, selectedSheets[0]);
       if (rowIndex < 0 || rowIndex >= data.length) return;
 
       const headerRow = data[rowIndex] || [];
@@ -129,7 +154,7 @@ export function useImportMachine() {
       setAutoMapResult(result);
       setSheetData(data);
     },
-    [],
+    [selectedSheets],
   );
 
   const handleMappingConfirm = useCallback(
@@ -253,6 +278,8 @@ export function useImportMachine() {
     setAnalysisArgs(null);
     setAutoMapResult(null);
     setSheetData([]);
+    setSheetInfos([]);
+    setSelectedSheets([]);
     workbookRef.current = null;
   }, []);
 
@@ -266,7 +293,10 @@ export function useImportMachine() {
     analysis,
     autoMapResult,
     sheetData,
+    sheetInfos,
+    selectedSheets,
     handleFileSelect,
+    handleSheetSelectionConfirm,
     handleHeaderRowChange,
     handleMappingConfirm,
     handleConfirm,
