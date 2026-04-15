@@ -2,15 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@elevatorbud/ui/components/ui/card";
-import { Button } from "@elevatorbud/ui/components/ui/button";
 import { UploadZone } from "@elevatorbud/ui/components/ui/upload-zone";
-import { FileSpreadsheet, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useImportMachine } from "../../features/import/hooks/use-import-machine";
 import { SheetSelectionSection } from "../../features/import/components/sheet-selection-section";
 import { ColumnMappingSection } from "../../features/import/components/column-mapping-section";
+import { OrgMappingSection } from "../../features/import/components/org-mapping-section";
 import { PreviewSection } from "../../features/import/components/preview-section";
 import { ResultSection } from "../../features/import/components/result-section";
 
@@ -27,6 +25,7 @@ function ImportPage() {
     parseError,
     importResult,
     analysis,
+    resolvedOrgMapping,
     autoMapResult,
     sheetData,
     sheetInfos,
@@ -99,37 +98,13 @@ function ImportPage() {
         />
       )}
 
-      {status === "org-mapping" && parseResult && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Organisationsmappning</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {parseResult.elevators.length} rader från{" "}
-              {[...new Set(parseResult.elevators.map((e) => e._source_sheet))].length}{" "}
-              ark har sammanfogats.
-              {extractedOrgData && (
-                <> {extractedOrgData.orgNames.length} unika organisationsnamn hittades.</>
-              )}
-            </p>
-          </CardHeader>
-          <CardContent>
-            {extractedOrgData && extractedOrgData.orgNames.length > 0 && (
-              <ul className="mb-4 list-inside list-disc text-sm text-muted-foreground">
-                {extractedOrgData.orgNames.map((name) => (
-                  <li key={name}>{name}</li>
-                ))}
-              </ul>
-            )}
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleReset}>
-                Avbryt
-              </Button>
-              <Button onClick={handleOrgMappingConfirm}>
-                Fortsätt
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      {status === "org-mapping" && parseResult && extractedOrgData && (
+        <OrgMappingSection
+          orgNames={extractedOrgData.orgNames}
+          rowCount={parseResult.elevators.length}
+          onConfirm={handleOrgMappingConfirm}
+          onCancel={handleReset}
+        />
       )}
 
       {status === "preview" && parseResult && (
@@ -137,6 +112,7 @@ function ImportPage() {
           fileName={fileName}
           parseResult={parseResult}
           analysis={analysis}
+          resolvedOrgMapping={resolvedOrgMapping}
           onConfirm={handleConfirm}
           onCancel={handleReset}
         />

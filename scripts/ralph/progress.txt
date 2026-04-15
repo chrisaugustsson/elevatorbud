@@ -441,3 +441,27 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - Splitting state transitions (mapping → org-mapping → preview) is cleaner than bundling parse + analysis in one handler
   - `extractOrgNamesOptions` query auto-fires when `parseResult` is set, so org names are ready by the time org-mapping renders
 ---
+
+## 2026-04-15 - US-021
+- Built `OrgMappingSection` component replacing the placeholder org-mapping step
+- Table UI: one row per distinct Excel org name, each with a searchable Popover+Command dropdown
+- Exact case-sensitive matches auto-selected from `listOrganizationsOptions` data
+- Unmatched rows show "Skapa organisation" option (using `__create__` sentinel)
+- "Fortsätt" button disabled until all rows have a resolved org ID or "create" selection
+- Info banner when no existing orgs exist at all
+- Added `resolvedOrgMapping` state to import machine: stores `matchedOrgs` (name+id pairs) and `newOrgNames`
+- `handleOrgMappingConfirm` now accepts `OrgMappingEntry[]` from the UI, builds resolved mapping
+- `handleConfirm` uses `resolvedOrgMapping` for org data instead of `analysis.orgMatch*`
+- Updated `PreviewSection` to show org counts from `resolvedOrgMapping` when available
+- Files changed:
+  - `apps/admin/src/features/import/components/org-mapping-section.tsx` (new)
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+  - `apps/admin/src/features/import/components/preview-section.tsx`
+  - `scripts/ralph/prd.json`
+- **Learnings for future iterations:**
+  - Popover+Command (cmdk) pattern reused from org management pages — consistent searchable-select UX
+  - `__create__` sentinel value distinguishes "create new" from "unresolved" (null) in org mapping
+  - Resolved org mapping stored client-side avoids modifying server-side `analyzeImport` — clean separation of user choices vs server analysis
+  - `listOrganizationsOptions` already exists in `organization.ts` — no new server function needed
+---

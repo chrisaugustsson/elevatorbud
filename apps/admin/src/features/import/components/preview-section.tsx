@@ -18,18 +18,20 @@ import {
   Info,
 } from "lucide-react";
 import { SheetCard } from "./sheet-card";
-import type { AnalysisResult } from "../hooks/use-import-machine";
+import type { AnalysisResult, ResolvedOrgMapping } from "../hooks/use-import-machine";
 
 export function PreviewSection({
   fileName,
   parseResult,
   analysis,
+  resolvedOrgMapping,
   onConfirm,
   onCancel,
 }: {
   fileName: string;
   parseResult: FullImportResult;
   analysis: AnalysisResult | undefined;
+  resolvedOrgMapping?: ResolvedOrgMapping | null;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -93,16 +95,16 @@ export function PreviewSection({
               />
               <StatCard
                 label="Matchade org."
-                value={analysis.summary.matchedOrgs}
+                value={resolvedOrgMapping ? resolvedOrgMapping.matchedOrgs.length : analysis.summary.matchedOrgs}
                 variant="default"
               />
               <StatCard
                 label="Nya org."
-                value={analysis.summary.newOrgs}
-                variant={analysis.summary.newOrgs > 0 ? "info" : "default"}
+                value={resolvedOrgMapping ? resolvedOrgMapping.newOrgNames.length : analysis.summary.newOrgs}
+                variant={(resolvedOrgMapping ? resolvedOrgMapping.newOrgNames.length : analysis.summary.newOrgs) > 0 ? "info" : "default"}
               />
             </div>
-            {analysis.newOrgNames.length > 0 && (
+            {(resolvedOrgMapping ? resolvedOrgMapping.newOrgNames : analysis.newOrgNames).length > 0 && (
               <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950">
                 <div className="flex items-start gap-2">
                   <Info className="mt-0.5 h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -111,7 +113,7 @@ export function PreviewSection({
                       Nya organisationer skapas automatiskt
                     </p>
                     <ul className="mt-1 space-y-0.5 text-xs text-blue-700 dark:text-blue-300">
-                      {analysis.newOrgNames.map((name) => (
+                      {(resolvedOrgMapping ? resolvedOrgMapping.newOrgNames : analysis.newOrgNames).map((name) => (
                         <li key={name}>• {name}</li>
                       ))}
                     </ul>

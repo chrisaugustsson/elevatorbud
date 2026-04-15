@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { analyzeImportOptions, extractOrgNamesOptions, confirmImport } from "~/server/import";
+import type { OrgMappingEntry } from "../components/org-mapping-section";
 import { getMeOptions } from "~/server/user";
 import {
   readWorkbook,
@@ -54,6 +55,12 @@ export type ImportStatus =
   | "complete";
 
 const IMPORT_BATCH_SIZE = 50;
+const CREATE_SENTINEL = "__create__";
+
+export type ResolvedOrgMapping = {
+  matchedOrgs: { name: string; id: string }[];
+  newOrgNames: string[];
+};
 
 export function useImportMachine() {
   const [status, setStatus] = useState<ImportStatus>("idle");
@@ -81,6 +88,7 @@ export function useImportMachine() {
   const [sheetMappings, setSheetMappings] = useState<
     Map<string, { mappings: ColumnMapping[]; headerRowIndex: number }>
   >(new Map());
+  const [resolvedOrgMapping, setResolvedOrgMapping] = useState<ResolvedOrgMapping | null>(null);
 
   const { data: currentUser } = useQuery(getMeOptions()) as { data: { email?: string } | undefined };
 
@@ -269,26 +277,42 @@ export function useImportMachine() {
     [autoMapResult, selectedSheets, currentSheetIndex, sheetMappings, loadSheetForMapping],
   );
 
-  const handleOrgMappingConfirm = useCallback(() => {
-    if (!parseResult) return;
+  const handleOrgMappingConfirm = useCallback(
+    (entries: OrgMappingEntry[]) => {
+      if (!parseResult) return;
 
-    const elevatorNumberList = [
-      ...new Set(parseResult.elevators.map((e) => e.elevator_number)),
-    ];
-    const orgNames = [
-      ...new Set(
-        parseResult.elevators
-          .map((e) => e._organisation_namn)
-          .filter((n): n is string => !!n),
-      ),
-    ];
+      const matchedOrgs: { name: string; id: string }[] = [];
+      const newOrgNames: string[] = [];
 
-    setAnalysisArgs({ elevatorNumberList, orgNames });
-    setStatus("preview");
-  }, [parseResult]);
+      for (const entry of entries) {
+        if (entry.orgId === CREATE_SENTINEL || entry.orgId === null) {
+          newOrgNames.push(entry.excelName);
+        } else {
+          matchedOrgs.push({ name: entry.excelName, id: entry.orgId });
+        }
+      }
+
+      setResolvedOrgMapping({ matchedOrgs, newOrgNames });
+
+      const elevatorNumberList = [
+        ...new Set(parseResult.elevators.map((e) => e.elevator_number)),
+      ];
+      const orgNames = [
+        ...new Set(
+          parseResult.elevators
+            .map((e) => e._organisation_namn)
+            .filter((n): n is string => !!n),
+        ),
+      ];
+
+      setAnalysisArgs({ elevatorNumberList, orgNames });
+      setStatus("preview");
+    },
+    [parseResult],
+  );
 
   const handleConfirm = useCallback(async () => {
-    if (!parseResult || !analysis) return;
+    if (!parseResult || !analysis || !resolvedOrgMapping) return;
 
     setStatus("importing");
 
@@ -301,9 +325,8 @@ export function useImportMachine() {
     const allErrors: { elevator_number: string; error: string }[] = [];
     let allOrgsCreated: string[] = [];
 
-    // Track all known org names → IDs (starts with pre-existing matches)
-    let knownOrgNames = [...analysis.orgMatchNames];
-    let knownOrgIds = [...analysis.orgMatchIds];
+    let knownOrgNames = resolvedOrgMapping.matchedOrgs.map((o) => o.name);
+    let knownOrgIds = resolvedOrgMapping.matchedOrgs.map((o) => o.id);
 
     try {
       for (let i = 0; i < totalBatches; i++) {
@@ -317,8 +340,7 @@ export function useImportMachine() {
             elevators: batch,
             existingOrgMatchNames: knownOrgNames,
             existingOrgMatchIds: knownOrgIds,
-            // Only create new orgs in the first batch
-            newOrgNames: i === 0 ? analysis.newOrgNames : [],
+            newOrgNames: i === 0 ? resolvedOrgMapping.newOrgNames : [],
             adminEmail: currentUser?.email,
           },
         });
@@ -361,7 +383,7 @@ export function useImportMachine() {
       });
       setStatus("complete");
     }
-  }, [parseResult, analysis, currentUser]);
+  }, [parseResult, analysis, resolvedOrgMapping, currentUser]);
 
   const handleReset = useCallback(() => {
     setStatus("idle");
@@ -376,6 +398,7 @@ export function useImportMachine() {
     setSelectedSheets([]);
     setCurrentSheetIndex(0);
     setSheetMappings(new Map());
+    setResolvedOrgMapping(null);
     workbookRef.current = null;
   }, []);
 
@@ -394,6 +417,7 @@ export function useImportMachine() {
     currentSheetIndex,
     sheetMappings,
     extractedOrgData,
+    resolvedOrgMapping,
     handleFileSelect,
     handleSheetSelectionConfirm,
     handleHeaderRowChange,
