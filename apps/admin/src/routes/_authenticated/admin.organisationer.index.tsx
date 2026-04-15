@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listOrganizationsOptions, createOrganization, updateOrganization, previewParentChange } from "~/server/organization";
@@ -56,7 +56,7 @@ import {
   TooltipTrigger,
 } from "@elevatorbud/ui/components/ui/tooltip";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus, Building2, UserPlus, Check, ChevronsUpDown, X, ChevronDown, AlertTriangle, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Building2, UserPlus, Check, ChevronsUpDown, X, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Pencil } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -65,9 +65,16 @@ import {
 import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 
+type OrgListSearch = { edit?: string };
+
 export const Route = createFileRoute(
   "/_authenticated/admin/organisationer/",
 )({
+  validateSearch: (search: Record<string, unknown>): OrgListSearch => {
+    const out: OrgListSearch = {};
+    if (typeof search.edit === "string") out.edit = search.edit;
+    return out;
+  },
   loader: ({ context }) => {
     context.queryClient.prefetchQuery(listOrganizationsOptions());
   },
@@ -85,28 +92,6 @@ type Organisation = {
 
 const columnHelper = createColumnHelper<Organisation>();
 
-const columns = [
-  columnHelper.accessor("name", {
-    size: 220,
-    header: ({ column }) => (
-      <DataGridColumnHeader title="Namn" column={column} />
-    ),
-    cell: (info) => (
-      <span className="font-medium">{info.getValue()}</span>
-    ),
-  }),
-  columnHelper.accessor("organizationNumber", {
-    size: 140,
-    header: ({ column }) => (
-      <DataGridColumnHeader title="Org.nummer" column={column} />
-    ),
-    enableSorting: false,
-    cell: (info) => (
-      <span className="tabular-nums">{info.getValue() || "—"}</span>
-    ),
-  }),
-];
-
 function validateOrganisationsnummer(value: string): string | undefined {
   if (!value) return undefined;
   if (!/^\d{6}-\d{4}$/.test(value)) {
@@ -118,6 +103,7 @@ function validateOrganisationsnummer(value: string): string | undefined {
 function Organisationer() {
   const queryClient = useQueryClient();
   const { data: orgs } = useSuspenseQuery(listOrganizationsOptions());
+  const { edit: editIdFromSearch } = Route.useSearch();
   const createOrg = useMutation({
     mutationFn: (input: { name: string; organizationNumber?: string; parentId?: string | null }) =>
       createOrganization({ data: input }),
@@ -134,6 +120,70 @@ function Organisationer() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editOrg, setEditOrg] = useState<Organisation | null>(null);
+
+  // Open the edit dialog when the URL contains ?edit=<id> (e.g. when
+  // navigating back from the detail page's edit button). Clears the
+  // param so the dialog doesn't reopen on subsequent re-renders.
+  useEffect(() => {
+    if (!editIdFromSearch) return;
+    const match = orgs.find((o) => o.id === editIdFromSearch);
+    if (match) setEditOrg(match);
+    navigate({
+      to: "/admin/organisationer",
+      search: {},
+      replace: true,
+    });
+  }, [editIdFromSearch, orgs, navigate]);
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("name", {
+        size: 220,
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Namn" column={column} />
+        ),
+        cell: (info) => (
+          <span className="font-medium">{info.getValue()}</span>
+        ),
+      }),
+      columnHelper.accessor("organizationNumber", {
+        size: 140,
+        header: ({ column }) => (
+          <DataGridColumnHeader title="Org.nummer" column={column} />
+        ),
+        enableSorting: false,
+        cell: (info) => (
+          <span className="tabular-nums">{info.getValue() || "—"}</span>
+        ),
+      }),
+      columnHelper.display({
+        id: "actions",
+        size: 60,
+        enableResizing: false,
+        header: "",
+        cell: (info) => {
+          const row = info.row.original;
+          return (
+            <div className="flex items-center justify-end">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                aria-label="Redigera organisation"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditOrg(row);
+                }}
+              >
+                <Pencil className="size-4" />
+              </Button>
+            </div>
+          );
+        },
+      }),
+    ],
+    [],
+  );
 
   const table = useReactTable({
     data: orgs,
@@ -248,71 +298,62 @@ function ParentOrgSelect({
 
   const selectedName = rootOrgs.find((o) => o.id === value)?.name;
 
+  const showClear = !!value && !disabled;
+
   const trigger = (
-    <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between font-normal"
-          disabled={disabled}
+    <div className="relative w-full">
+      <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className={`w-full justify-between font-normal ${showClear ? "pr-16" : "pr-9"}`}
+            disabled={disabled}
+          >
+            <span className="truncate">
+              {selectedName ?? "Ingen (toppnivå)"}
+            </span>
+            <ChevronsUpDown className="size-4 opacity-50 shrink-0 ml-2" aria-hidden="true" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Sök organisation..." />
+            <CommandList>
+              <CommandEmpty>Inga organisationer hittades.</CommandEmpty>
+              <CommandGroup>
+                {rootOrgs.map((org) => (
+                  <CommandItem
+                    key={org.id}
+                    value={org.name}
+                    onSelect={() => {
+                      onChange(org.id === value ? null : org.id);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={org.id === value ? "opacity-100" : "opacity-0"}
+                    />
+                    {org.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {showClear && (
+        <button
+          type="button"
+          aria-label="Rensa val"
+          onClick={() => onChange(null)}
+          className="absolute right-8 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
         >
-          <span className="truncate">
-            {selectedName ?? "Ingen (toppnivå)"}
-          </span>
-          <div className="flex items-center gap-1 ml-2 shrink-0">
-            {value && !disabled && (
-              <span
-                role="button"
-                tabIndex={0}
-                aria-label="Rensa val"
-                className="rounded-sm hover:bg-accent p-0.5"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onChange(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onChange(null);
-                  }
-                }}
-              >
-                <X className="size-3" aria-hidden="true" />
-              </span>
-            )}
-            <ChevronsUpDown className="size-4 opacity-50" />
-          </div>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Sök organisation..." />
-          <CommandList>
-            <CommandEmpty>Inga organisationer hittades.</CommandEmpty>
-            <CommandGroup>
-              {rootOrgs.map((org) => (
-                <CommandItem
-                  key={org.id}
-                  value={org.name}
-                  onSelect={() => {
-                    onChange(org.id === value ? null : org.id);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={org.id === value ? "opacity-100" : "opacity-0"}
-                  />
-                  {org.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+          <X className="size-3.5" aria-hidden="true" />
+        </button>
+      )}
+    </div>
   );
 
   if (disabled && disabledReason) {
@@ -652,6 +693,7 @@ function EditOrgDialogInner({
     parentId?: string | null;
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
 
   const form = useForm({
     defaultValues: {
@@ -702,9 +744,19 @@ function EditOrgDialogInner({
     }
   };
 
+  // Gate closing the dialog on a dirty form: open confirm dialog first.
+  const requestClose = () => {
+    const isDirty = form.state.isDirty;
+    if (isDirty) {
+      setDiscardConfirmOpen(true);
+      return;
+    }
+    onOpenChange(false);
+  };
+
   return (
     <>
-      <Dialog open onOpenChange={onOpenChange}>
+      <Dialog open onOpenChange={(next) => { if (!next) requestClose(); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Redigera organisation</DialogTitle>
@@ -813,7 +865,7 @@ function EditOrgDialogInner({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => onOpenChange(false)}
+                onClick={requestClose}
               >
                 Avbryt
               </Button>
@@ -846,6 +898,36 @@ function EditOrgDialogInner({
           isSubmitting={isSubmitting}
         />
       )}
+
+      <Dialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Avbryta ändringar?</DialogTitle>
+            <DialogDescription>
+              Dina ändringar sparas inte.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDiscardConfirmOpen(false)}
+            >
+              Fortsätt redigera
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setDiscardConfirmOpen(false);
+                onOpenChange(false);
+              }}
+            >
+              Avbryt ändringar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

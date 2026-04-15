@@ -1,14 +1,13 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useSuspenseQuery, useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { listUsersOptions, createUser as createUserFn, updateUser as updateUserFn, deactivateUser as deactivateUserFn, activateUser as activateUserFn, deleteUser as deleteUserFn, getChildOrganizationsOptions } from "~/server/user";
+import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { listUsersOptions, createUser as createUserFn, updateUser as updateUserFn, deactivateUser as deactivateUserFn, activateUser as activateUserFn, deleteUser as deleteUserFn } from "~/server/user";
 import { listOrganizationsOptions } from "~/server/organization";
 import { useForm } from "@tanstack/react-form";
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
-  getFilteredRowModel,
   createColumnHelper,
   type SortingState,
 } from "@tanstack/react-table";
@@ -66,11 +65,6 @@ import {
   DropdownMenuTrigger,
 } from "@elevatorbud/ui/components/ui/dropdown-menu";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@elevatorbud/ui/components/ui/collapsible";
-import {
   Plus,
   Users,
   Pencil,
@@ -78,16 +72,16 @@ import {
   UserX,
   UserCheck,
   Trash2,
-  X,
   Check,
   ChevronsUpDown,
-  ChevronRight,
-  Link,
-  Unlink,
+  X,
 } from "lucide-react";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import { useUser } from "@elevatorbud/auth";
-import { toast } from "sonner";
+import {
+  EditUserDialog,
+  type EditableUser,
+} from "~/features/user/components/edit-user-dialog";
 
 export const Route = createFileRoute("/_authenticated/admin/anvandare")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -101,22 +95,7 @@ export const Route = createFileRoute("/_authenticated/admin/anvandare")({
   pendingComponent: AnvandareSkeleton,
 });
 
-type Anvandare = {
-  id: string;
-  clerkUserId: string;
-  email: string;
-  name: string;
-  role: "admin" | "customer";
-  active: boolean;
-  createdAt: Date;
-  lastLogin: Date | null;
-  userOrganizations: Array<{
-    userId: string;
-    organizationId: string;
-    createdAt: Date;
-    organization: { id: string; name: string; organizationNumber: string | null; parentId: string | null; createdAt: Date };
-  }>;
-};
+type Anvandare = EditableUser;
 
 type Organisation = {
   id: string;
@@ -199,11 +178,6 @@ function Anvandare() {
   );
   const [deletingUser, setDeletingUser] = useState<Anvandare | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-
-  const orgMap = new Map<string, string>();
-  for (const org of orgs) {
-    orgMap.set(org.id, org.name);
-  }
 
   const columnHelper = createColumnHelper<Anvandare>();
 
@@ -367,19 +341,11 @@ function Anvandare() {
             <SelectItem value="customer">Kund</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={orgFilter} onValueChange={setOrgFilter}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Organisation" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="alla">Alla organisationer</SelectItem>
-            {orgs.map((org) => (
-              <SelectItem key={org.id} value={org.id}>
-                {org.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <OrgFilterCombobox
+          value={orgFilter}
+          onChange={setOrgFilter}
+          orgs={orgs}
+        />
         <p className="text-sm text-muted-foreground">
           {table.getRowModel().rows.length} användare
         </p>
@@ -415,6 +381,7 @@ function Anvandare() {
 
       <EditUserDialog
         user={editingUser}
+        open={!!editingUser}
         onOpenChange={(open) => {
           if (!open) setEditingUser(null);
         }}
@@ -737,21 +704,16 @@ function CreateUserDialogInner({
                         Organisation{" "}
                         <span className="text-destructive">*</span>
                       </Label>
-                      <Select
+                      <OrgCombobox
                         value={field.state.value}
-                        onValueChange={field.handleChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Välj organisation" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {orgs.map((org) => (
-                            <SelectItem key={org.id} value={org.id}>
-                              {org.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onChange={field.handleChange}
+                        orgs={orgs}
+                        placeholder="Välj organisation"
+                        invalid={
+                          field.state.meta.isTouched &&
+                          field.state.meta.errors.length > 0
+                        }
+                      />
                       {field.state.meta.isTouched &&
                         field.state.meta.errors.map((error, i) => (
                           <p key={i} className="text-sm text-destructive">
@@ -789,405 +751,150 @@ function CreateUserDialogInner({
   );
 }
 
-function EditUserDialog({
-  user,
-  onOpenChange,
-  allOrgs,
-  onSubmit,
+function OrgCombobox({
+  value,
+  onChange,
+  orgs,
+  placeholder,
+  invalid,
 }: {
-  user: Anvandare | null;
-  onOpenChange: (open: boolean) => void;
-  allOrgs: Organisation[];
-  onSubmit: (values: {
-    id: string;
-    name?: string;
-    email?: string;
-    role?: "admin" | "customer";
-    organizationIds?: string[];
-  }) => Promise<void>;
+  value: string;
+  onChange: (value: string) => void;
+  orgs: Organisation[];
+  placeholder: string;
+  invalid?: boolean;
 }) {
-  if (!user) return null;
-
+  const [open, setOpen] = useState(false);
+  const selected = orgs.find((o) => o.id === value);
   return (
-    <EditUserDialogInner
-      key={user.id}
-      user={user}
-      allOrgs={allOrgs}
-      onOpenChange={onOpenChange}
-      onSubmit={onSubmit}
-    />
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          aria-invalid={invalid}
+          className="w-full justify-between font-normal"
+        >
+          <span className="truncate">
+            {selected ? (
+              selected.name
+            ) : (
+              <span className="text-muted-foreground">{placeholder}</span>
+            )}
+          </span>
+          <ChevronsUpDown className="size-4 opacity-50 shrink-0 ml-2" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Sök organisation..." />
+          <CommandList>
+            <CommandEmpty>Inga organisationer hittades.</CommandEmpty>
+            <CommandGroup>
+              {orgs.map((org) => (
+                <CommandItem
+                  key={org.id}
+                  value={org.name}
+                  onSelect={() => {
+                    onChange(org.id);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={org.id === value ? "opacity-100" : "opacity-0"}
+                  />
+                  {org.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
-function EditUserDialogInner({
-  user,
-  allOrgs,
-  onOpenChange,
-  onSubmit,
+function OrgFilterCombobox({
+  value,
+  onChange,
+  orgs,
 }: {
-  user: Anvandare;
-  allOrgs: Organisation[];
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (values: {
-    id: string;
-    name?: string;
-    email?: string;
-    role?: "admin" | "customer";
-    organizationIds?: string[];
-  }) => Promise<void>;
+  /** "alla" or an org id */
+  value: string;
+  onChange: (value: string) => void;
+  orgs: Organisation[];
 }) {
-  const initialOrgIds = user.userOrganizations.map((uo) => uo.organizationId);
-  const [selectedOrgIds, setSelectedOrgIds] = useState<string[]>(initialOrgIds);
-  const [orgPickerOpen, setOrgPickerOpen] = useState(false);
-
-  const orgMap = useMemo(() => {
-    const m = new Map<string, Organisation>();
-    for (const org of allOrgs) m.set(org.id, org);
-    return m;
-  }, [allOrgs]);
-
-  const childrenByParent = useMemo(() => {
-    const m = new Map<string, Organisation[]>();
-    for (const org of allOrgs) {
-      if (org.parentId) {
-        const list = m.get(org.parentId) || [];
-        list.push(org);
-        m.set(org.parentId, list);
-      }
-    }
-    return m;
-  }, [allOrgs]);
-
-  const inheritedOrgs = useMemo(() => {
-    const inherited: Array<{ org: Organisation; viaParentName: string }> = [];
-    for (const directId of selectedOrgIds) {
-      const children = childrenByParent.get(directId) || [];
-      const parentOrg = orgMap.get(directId);
-      for (const child of children) {
-        if (!selectedOrgIds.includes(child.id)) {
-          inherited.push({ org: child, viaParentName: parentOrg?.name ?? "" });
-        }
-      }
-    }
-    return inherited;
-  }, [selectedOrgIds, childrenByParent, orgMap]);
-
-  const isRedundantGrant = (orgId: string) => {
-    const org = orgMap.get(orgId);
-    if (!org?.parentId) return false;
-    return selectedOrgIds.includes(org.parentId);
-  };
-
-  const availableOrgs = useMemo(() => {
-    return allOrgs.filter((org) => {
-      if (selectedOrgIds.includes(org.id)) return false;
-      if (org.parentId && selectedOrgIds.includes(org.parentId)) return false;
-      return true;
-    });
-  }, [allOrgs, selectedOrgIds]);
-
-  const handleAddOrg = (orgId: string) => {
-    setSelectedOrgIds((prev) => [...prev, orgId]);
-    setOrgPickerOpen(false);
-  };
-
-  const handleRemoveOrg = (orgId: string) => {
-    const org = orgMap.get(orgId);
-    const children = childrenByParent.get(orgId) || [];
-    const lostChildren = children.filter((c) => !selectedOrgIds.includes(c.id));
-
-    setSelectedOrgIds((prev) => prev.filter((id) => id !== orgId));
-
-    if (lostChildren.length > 0) {
-      toast.info(
-        `Åtkomst borttagen för ${org?.name ?? "organisation"} och ${lostChildren.length} underorganisation${lostChildren.length > 1 ? "er" : ""}: ${lostChildren.map((c) => c.name).join(", ")}`,
-      );
-    }
-  };
-
-  const form = useForm({
-    defaultValues: {
-      name: user.name,
-      email: user.email,
-      role: user.role as "admin" | "customer",
-    },
-    onSubmit: async ({ value }) => {
-      await onSubmit({
-        id: user.id,
-        name: value.name,
-        email: value.email,
-        role: value.role,
-        organizationIds: value.role === "customer" ? selectedOrgIds : [],
-      });
-      form.reset();
-    },
-  });
-
+  const [open, setOpen] = useState(false);
+  const selected = value !== "alla" ? orgs.find((o) => o.id === value) : undefined;
+  const isCleared = value === "alla";
   return (
-    <Dialog
-      open
-      onOpenChange={(next) => {
-        if (!next) form.reset();
-        onOpenChange(next);
-      }}
-    >
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Redigera användare</DialogTitle>
-          <DialogDescription>
-            Ändra uppgifter för {user.name}.
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            form.handleSubmit();
-          }}
-          className="space-y-4"
-        >
-          <form.Field
-            name="name"
-            validators={{
-              onChange: ({ value }) =>
-                !value.trim() ? "Namn krävs" : undefined,
-            }}
+    <div className="relative w-[200px]">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between font-normal pr-9"
           >
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>
-                  Namn <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder="Förnamn Efternamn"
-                  aria-invalid={
-                    field.state.meta.isTouched &&
-                    field.state.meta.errors.length > 0
-                  }
-                />
-                {field.state.meta.isTouched &&
-                  field.state.meta.errors.map((error, i) => (
-                    <p key={i} className="text-sm text-destructive">
-                      {error}
-                    </p>
-                  ))}
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field
-            name="email"
-            validators={{
-              onChange: ({ value }) => {
-                if (!value.trim()) return "E-post krävs";
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
-                  return "Ogiltig e-postadress";
-                return undefined;
-              },
-            }}
-          >
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>
-                  E-post <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id={field.name}
-                  type="email"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder="namn@foretag.se"
-                  aria-invalid={
-                    field.state.meta.isTouched &&
-                    field.state.meta.errors.length > 0
-                  }
-                />
-                {field.state.meta.isTouched &&
-                  field.state.meta.errors.map((error, i) => (
-                    <p key={i} className="text-sm text-destructive">
-                      {error}
-                    </p>
-                  ))}
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="role">
-            {(field) => (
-              <div className="space-y-2">
-                <Label>
-                  Roll <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={field.state.value}
-                  onValueChange={(val) => {
-                    field.handleChange(val as "admin" | "customer");
-                    if (val === "admin") {
-                      setSelectedOrgIds([]);
-                    }
+            <span className="truncate">
+              {selected ? selected.name : "Alla organisationer"}
+            </span>
+            <ChevronsUpDown className="size-4 opacity-50 shrink-0 ml-2" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Sök organisation..." />
+            <CommandList>
+              <CommandEmpty>Inga organisationer hittades.</CommandEmpty>
+              <CommandGroup>
+                <CommandItem
+                  value="Alla organisationer"
+                  onSelect={() => {
+                    onChange("alla");
+                    setOpen(false);
                   }}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="customer">Kund</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </form.Field>
-
-          <form.Subscribe selector={(state) => state.values.role}>
-            {(role) =>
-              role === "customer" ? (
-                <div className="space-y-3">
-                  <Label>Organisationer</Label>
-
-                  <p className="text-xs text-muted-foreground">
-                    Effektiv åtkomst: {selectedOrgIds.length + inheritedOrgs.length} organisationer
-                  </p>
-
-                  {selectedOrgIds.length > 0 && (
-                    <div className="space-y-1">
-                      {selectedOrgIds.map((orgId) => {
-                        const org = orgMap.get(orgId);
-                        const children = childrenByParent.get(orgId) || [];
-                        const impliedChildren = children.filter((c) => !selectedOrgIds.includes(c.id));
-                        return (
-                          <div key={orgId} className="space-y-1">
-                            {impliedChildren.length > 0 ? (
-                              <Collapsible>
-                                <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                                  <CollapsibleTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className="rounded-sm p-0.5 hover:bg-accent"
-                                      aria-label={`Visa underorganisationer för ${org?.name}`}
-                                    >
-                                      <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
-                                    </button>
-                                  </CollapsibleTrigger>
-                                  <Link className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                                  <span className="text-sm font-medium flex-1 truncate">{org?.name ?? orgId}</span>
-                                  <Badge variant="default" className="text-xs shrink-0">Direkt</Badge>
-                                  <span className="text-xs text-muted-foreground shrink-0">+{impliedChildren.length}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveOrg(orgId)}
-                                    className="rounded-sm p-0.5 hover:bg-accent"
-                                    aria-label={`Ta bort ${org?.name}`}
-                                  >
-                                    <X className="size-3.5" />
-                                  </button>
-                                </div>
-                                <CollapsibleContent>
-                                  <div className="ml-6 mt-1 space-y-1">
-                                    {impliedChildren.map((child) => (
-                                      <div key={child.id} className="flex items-center gap-2 rounded-md border border-dashed px-3 py-1.5 opacity-70">
-                                        <Unlink className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                                        <span className="text-sm flex-1 truncate">{child.name}</span>
-                                        <Badge variant="outline" className="text-xs shrink-0">via {org?.name}</Badge>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </CollapsibleContent>
-                              </Collapsible>
-                            ) : (
-                              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-                                <Link className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                                <span className="text-sm font-medium flex-1 truncate">{org?.name ?? orgId}</span>
-                                <Badge variant="default" className="text-xs shrink-0">Direkt</Badge>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveOrg(orgId)}
-                                  className="rounded-sm p-0.5 hover:bg-accent"
-                                  aria-label={`Ta bort ${org?.name}`}
-                                >
-                                  <X className="size-3.5" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {selectedOrgIds.length === 0 && (
-                    <p className="text-sm text-muted-foreground">Inga organisationer tilldelade.</p>
-                  )}
-
-                  <Popover open={orgPickerOpen} onOpenChange={setOrgPickerOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        role="combobox"
-                        aria-expanded={orgPickerOpen}
-                      >
-                        <Plus className="size-4 mr-1" />
-                        Lägg till organisation
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Sök organisation..." />
-                        <CommandList>
-                          <CommandEmpty>Inga organisationer hittades.</CommandEmpty>
-                          <CommandGroup>
-                            {availableOrgs.map((org) => (
-                              <CommandItem
-                                key={org.id}
-                                value={org.name}
-                                onSelect={() => handleAddOrg(org.id)}
-                              >
-                                {org.name}
-                                {org.parentId && (
-                                  <span className="ml-1 text-xs text-muted-foreground">
-                                    (under {orgMap.get(org.parentId)?.name})
-                                  </span>
-                                )}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              ) : null
-            }
-          </form.Subscribe>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Avbryt
-            </Button>
-            <form.Subscribe
-              selector={(state) => [state.canSubmit, state.isSubmitting]}
-            >
-              {([canSubmit, isSubmitting]) => (
-                <Button type="submit" disabled={!canSubmit}>
-                  {isSubmitting ? "Sparar..." : "Spara"}
-                </Button>
-              )}
-            </form.Subscribe>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+                  <Check
+                    className={isCleared ? "opacity-100" : "opacity-0"}
+                  />
+                  Alla organisationer
+                </CommandItem>
+                {orgs.map((org) => (
+                  <CommandItem
+                    key={org.id}
+                    value={org.name}
+                    onSelect={() => {
+                      onChange(org.id);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={org.id === value ? "opacity-100" : "opacity-0"}
+                    />
+                    {org.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {!isCleared && (
+        <button
+          type="button"
+          aria-label="Rensa val"
+          onClick={() => onChange("alla")}
+          className="absolute right-8 top-1/2 -translate-y-1/2 rounded-sm p-0.5 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring inline-flex size-8 items-center justify-center"
+        >
+          <X className="size-3.5" aria-hidden="true" />
+        </button>
+      )}
+    </div>
   );
 }
 
