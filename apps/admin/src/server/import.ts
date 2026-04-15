@@ -408,8 +408,49 @@ async function confirmFn(
 }
 
 // ---------------------------------------------------------------------------
+// Extract org names
+// ---------------------------------------------------------------------------
+
+const extractOrgNamesSchema = z.object({
+  rows: z.array(
+    z.object({
+      _organisation_namn: z.string().optional(),
+    }).passthrough(),
+  ),
+});
+
+function extractOrgNamesFn(input: z.infer<typeof extractOrgNamesSchema>) {
+  const seen = new Set<string>();
+  const orgNames: string[] = [];
+  for (const row of input.rows) {
+    const name = row._organisation_namn;
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      orgNames.push(name);
+    }
+  }
+  return { orgNames, rowCount: input.rows.length };
+}
+
+// ---------------------------------------------------------------------------
 // Server functions
 // ---------------------------------------------------------------------------
+
+export const extractOrgNames = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .inputValidator(extractOrgNamesSchema)
+  .handler(async ({ data }) => {
+    return extractOrgNamesFn(data);
+  });
+
+export const extractOrgNamesOptions = (
+  rows: z.infer<typeof extractOrgNamesSchema>["rows"] | null,
+) =>
+  queryOptions({
+    queryKey: ["import", "extractOrgNames", rows?.length ?? 0],
+    queryFn: () => extractOrgNames({ data: { rows: rows! } }),
+    enabled: !!rows && rows.length > 0,
+  });
 
 export const analyzeImport = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])

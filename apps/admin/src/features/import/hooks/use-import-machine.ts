@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { analyzeImportOptions, confirmImport } from "~/server/import";
+import { analyzeImportOptions, extractOrgNamesOptions, confirmImport } from "~/server/import";
 import { getMeOptions } from "~/server/user";
 import {
   readWorkbook,
@@ -77,6 +77,10 @@ export function useImportMachine() {
   const [sheetData, setSheetData] = useState<unknown[][]>([]);
 
   const { data: currentUser } = useQuery(getMeOptions()) as { data: { email?: string } | undefined };
+
+  const { data: extractedOrgData } = useQuery(
+    extractOrgNamesOptions(parseResult?.elevators ?? null),
+  );
 
   const { data: analysis, error: analysisError } = useQuery({
     ...analyzeImportOptions(analysisArgs!),
@@ -295,6 +299,7 @@ export function useImportMachine() {
     sheetData,
     sheetInfos,
     selectedSheets,
+    extractedOrgData,
     handleFileSelect,
     handleSheetSelectionConfirm,
     handleHeaderRowChange,
