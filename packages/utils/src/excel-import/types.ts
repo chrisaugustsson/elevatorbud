@@ -46,18 +46,8 @@ export type ParsedElevator = {
   budget_amount?: number;
   modernization_measures?: string;
 
-  // Nodtelefon
-  has_emergency_phone?: boolean;
-  emergency_phone_model?: string;
-  emergency_phone_type?: string;
-  needs_upgrade?: boolean;
-  emergency_phone_price?: number;
-
   // Kommentarer
   comments?: string;
-
-  // Status (set during import: 'aktiv' for Hissar, 'rivd' for Rivna hissar)
-  status?: "active" | "demolished" | "arkiverad";
 
   // Import metadata (not stored in DB, used during import processing)
   _organisation_namn?: string;
@@ -83,36 +73,15 @@ export type ColumnDef = {
   letter: string; // Excel column letter (for error messages)
   field: string; // Target field name or special parser key
   mandatory?: boolean;
-  parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_daylight_opening" | "compound_emergency_phone" | "build_year" | "modernization_year" | "boolean" | "number" | "budget";
-};
-
-export type EmergencyPhoneEntry = {
-  elevator_number: string;
-  district?: string;
-  has_emergency_phone?: boolean;
-  emergency_phone_model?: string;
-  emergency_phone_type?: string;
-  needs_upgrade?: boolean;
-  emergency_phone_price?: number;
-  _source_row: number;
-};
-
-export type EmergencyPhoneParseResult = {
-  entries: EmergencyPhoneEntry[];
-  warnings: ImportWarning[];
-  sheetName: string;
+  parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_daylight_opening" | "build_year" | "modernization_year" | "boolean" | "number" | "budget";
 };
 
 export type FullImportResult = {
   elevators: ParsedElevator[];
-  demolished: ParsedElevator[];
-  combined: ParsedElevator[];
   warnings: ImportWarning[];
   invalidRows: { row: number; sheet: string; reason: string }[];
   sheets: {
     elevators: { found: boolean; count: number };
-    emergencyPhones: { found: boolean; count: number; joined: number };
-    demolished: { found: boolean; count: number };
   };
 };
 

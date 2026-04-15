@@ -6,8 +6,6 @@ export type { ExportColumn } from "./export";
 export {
   parseElevatorSheet,
   parseElevatorSheetWithMapping,
-  parseEmergencyPhoneSheet,
-  parseDemolishedSheet,
   parseExcelImport,
   readWorkbook,
   getWorkbookSheetInfo,
@@ -24,7 +22,6 @@ export type {
   ParsedElevator,
   ImportWarning,
   ElevatorParseResult,
-  EmergencyPhoneParseResult,
   FullImportResult,
   SheetInfo,
   ColumnDef,

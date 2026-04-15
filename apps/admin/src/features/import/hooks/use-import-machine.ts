@@ -146,11 +146,11 @@ export function useImportMachine() {
         setParseResult(result);
 
         const elevatorNumberList = [
-          ...new Set(result.combined.map((e) => e.elevator_number)),
+          ...new Set(result.elevators.map((e) => e.elevator_number)),
         ];
         const orgNames = [
           ...new Set(
-            result.combined
+            result.elevators
               .map((e) => e._organisation_namn)
               .filter((n): n is string => !!n),
           ),
@@ -173,7 +173,7 @@ export function useImportMachine() {
 
     setStatus("importing");
 
-    const allElevators = parseResult.combined;
+    const allElevators = parseResult.elevators;
     const totalBatches = Math.ceil(allElevators.length / IMPORT_BATCH_SIZE);
     setImportProgress({ current: 0, total: allElevators.length });
 

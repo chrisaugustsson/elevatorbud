@@ -134,13 +134,6 @@ export const HEADER_ALIASES: HeaderAlias[] = [
   { header: "åtgärder vid modernisering", field: "modernization_measures" },
   { header: "moderniseringsåtgärder", field: "modernization_measures" },
 
-  // --- Nödtelefon ---
-  {
-    header: "nödtelefon",
-    field: "emergency_phone",
-    parser: "compound_emergency_phone",
-  },
-
   // --- Kommentarer ---
   { header: "övriga kommentarer", field: "comments" },
   { header: "kommentarer", field: "comments" },
@@ -183,6 +176,5 @@ export const TARGET_FIELDS: { field: string; label: string; parser?: HeaderAlias
   { field: "recommended_modernization_year", label: "Rekommenderat moderniseringsår" },
   { field: "budget_amount", label: "Budgetbelopp", parser: "budget" },
   { field: "modernization_measures", label: "Moderniseringsåtgärder" },
-  { field: "emergency_phone", label: "Nödtelefon", parser: "compound_emergency_phone" },
   { field: "comments", label: "Kommentarer" },
 ];

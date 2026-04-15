@@ -8,7 +8,6 @@ import {
   parseFloorsDoors,
   parseCabSize,
   parseDaylightOpening,
-  parseEmergencyPhone,
   parseModernizationYear,
   parseBoolean,
   parseBudgetAmount,
@@ -69,15 +68,6 @@ function parseElevatorRow(
       case "compound_daylight_opening": {
         const parsed = parseDaylightOpening(raw);
         if (parsed.daylight_opening !== undefined) result.daylight_opening = parsed.daylight_opening;
-        break;
-      }
-      case "compound_emergency_phone": {
-        const parsed = parseEmergencyPhone(raw);
-        if (parsed.has_emergency_phone !== undefined) result.has_emergency_phone = parsed.has_emergency_phone;
-        if (parsed.emergency_phone_model !== undefined) result.emergency_phone_model = parsed.emergency_phone_model;
-        if (parsed.emergency_phone_type !== undefined) result.emergency_phone_type = parsed.emergency_phone_type;
-        if (parsed.needs_upgrade !== undefined) result.needs_upgrade = parsed.needs_upgrade;
-        if (parsed.emergency_phone_price !== undefined) result.emergency_phone_price = parsed.emergency_phone_price;
         break;
       }
       case "modernization_year": {
@@ -283,15 +273,6 @@ function parseRowWithMapping(
       case "compound_daylight_opening": {
         const parsed = parseDaylightOpening(raw);
         if (parsed.daylight_opening !== undefined) result.daylight_opening = parsed.daylight_opening;
-        break;
-      }
-      case "compound_emergency_phone": {
-        const parsed = parseEmergencyPhone(raw);
-        if (parsed.has_emergency_phone !== undefined) result.has_emergency_phone = parsed.has_emergency_phone;
-        if (parsed.emergency_phone_model !== undefined) result.emergency_phone_model = parsed.emergency_phone_model;
-        if (parsed.emergency_phone_type !== undefined) result.emergency_phone_type = parsed.emergency_phone_type;
-        if (parsed.needs_upgrade !== undefined) result.needs_upgrade = parsed.needs_upgrade;
-        if (parsed.emergency_phone_price !== undefined) result.emergency_phone_price = parsed.emergency_phone_price;
         break;
       }
       case "modernization_year": {

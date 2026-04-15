@@ -36,9 +36,7 @@ const confirmImportSchema = z.object({
       inspection_month: z.string().nullish(),
       maintenance_company: z.string().nullish(),
       modernization_year: z.string().nullish(),
-      has_emergency_phone: z.boolean().nullish(),
       needs_upgrade: z.boolean().nullish(),
-      status: z.enum(["active", "demolished", "arkiverad"]).optional(),
       // Details
       speed: z.string().nullish(),
       lift_height: z.string().nullish(),
@@ -61,9 +59,6 @@ const confirmImportSchema = z.object({
       machine_type: z.string().nullish(),
       control_system_type: z.string().nullish(),
       shaft_lighting: z.string().nullish(),
-      emergency_phone_model: z.string().nullish(),
-      emergency_phone_type: z.string().nullish(),
-      emergency_phone_price: z.number().nullish(),
       comments: z.string().nullish(),
       // Budget
       revision_year: z.number().nullish(),
@@ -107,12 +102,6 @@ function toDetailData(data: z.infer<typeof confirmImportSchema>["elevators"][num
     machineType: data.machine_type,
     controlSystemType: data.control_system_type,
     shaftLighting: data.shaft_lighting,
-    emergencyPhoneModel: data.emergency_phone_model,
-    emergencyPhoneType: data.emergency_phone_type,
-    emergencyPhonePrice:
-      data.emergency_phone_price != null
-        ? String(data.emergency_phone_price)
-        : undefined,
     comments: data.comments,
   };
 }
@@ -208,7 +197,6 @@ async function confirmFn(
   type ResolvedRow = {
     data: z.infer<typeof confirmImportSchema>["elevators"][number];
     organizationId: string;
-    dbStatus: "active" | "demolished" | "archived";
   };
   const validRows: ResolvedRow[] = [];
 
@@ -222,8 +210,7 @@ async function confirmFn(
       });
       continue;
     }
-    const dbStatus = data.status === "arkiverad" ? "archived" as const : (data.status ?? "active");
-    validRows.push({ data, organizationId, dbStatus });
+    validRows.push({ data, organizationId });
   }
 
   // 3. Batch-lookup which elevator numbers already exist
@@ -277,10 +264,9 @@ async function confirmFn(
           inspectionMonth: r.data.inspection_month,
           maintenanceCompany: r.data.maintenance_company,
           modernizationYear: r.data.modernization_year,
-          hasEmergencyPhone: r.data.has_emergency_phone,
           needsUpgrade: r.data.needs_upgrade,
           organizationId: r.organizationId,
-          status: r.dbStatus,
+          status: "active" as const,
           createdBy: userId,
         })),
       )
@@ -369,7 +355,6 @@ async function confirmFn(
               inspectionMonth: r.data.inspection_month,
               maintenanceCompany: r.data.maintenance_company,
               modernizationYear: r.data.modernization_year,
-              hasEmergencyPhone: r.data.has_emergency_phone,
               needsUpgrade: r.data.needs_upgrade,
               organizationId: r.organizationId,
               lastUpdatedAt: now,

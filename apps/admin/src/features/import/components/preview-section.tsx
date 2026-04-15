@@ -38,7 +38,7 @@ export function PreviewSection({
 
   const hasWarnings = parseResult.warnings.length > 0;
   const hasInvalidRows = parseResult.invalidRows.length > 0;
-  const hasElevators = parseResult.combined.length > 0;
+  const hasElevators = parseResult.elevators.length > 0;
   const analysisReady = !!analysis;
 
   return (
@@ -50,7 +50,7 @@ export function PreviewSection({
           <div>
             <p className="font-medium">{fileName}</p>
             <p className="text-xs text-muted-foreground">
-              {parseResult.combined.length} hissar totalt
+              {parseResult.elevators.length} hissar totalt
             </p>
           </div>
         </div>
@@ -61,27 +61,12 @@ export function PreviewSection({
       </div>
 
       {/* Sheet summary cards */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-1">
         <SheetCard
           title="Hissar"
           found={parseResult.sheets.elevators.found}
           count={parseResult.sheets.elevators.count}
           required
-        />
-        <SheetCard
-          title="Nödtelefoner"
-          found={parseResult.sheets.emergencyPhones.found}
-          count={parseResult.sheets.emergencyPhones.count}
-          extra={
-            parseResult.sheets.emergencyPhones.joined > 0
-              ? `${parseResult.sheets.emergencyPhones.joined} kopplade`
-              : undefined
-          }
-        />
-        <SheetCard
-          title="Rivna hissar"
-          found={parseResult.sheets.demolished.found}
-          count={parseResult.sheets.demolished.count}
         />
       </div>
 
@@ -232,7 +217,7 @@ export function PreviewSection({
           Avbryt
         </Button>
         <Button onClick={onConfirm} disabled={!analysisReady || !hasElevators}>
-          Importera {parseResult.combined.length} hissar
+          Importera {parseResult.elevators.length} hissar
         </Button>
       </div>
     </div>
