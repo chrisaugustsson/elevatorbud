@@ -529,3 +529,25 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - `handleReset` can just alias `handleBackToUpload` since full reset = back to step 1
   - Step labels hidden on narrow screens via `hidden sm:inline` keeps stepper compact on mobile
 ---
+
+## 2026-04-15 - US-025
+- Enhanced UploadZone component with visible drag-over hover state (primary border + bg tint)
+- Added keyboard-accessible "Välj fil" Button inside the drop zone (stopPropagation to avoid double trigger)
+- Added `role="alert"` and `aria-live="assertive"` to error display for screen reader announcements
+- Styled error as a bordered alert box (bg-destructive/5 + border) instead of plain text
+- Added file size validation (10MB limit) with descriptive error including file size and recovery step
+- Improved all error messages to include cause AND recovery step:
+  - Non-Excel format: states accepted formats + "exportera från Excel och försök igen"
+  - File too large: states limit and actual size + "minska filstorleken eller dela upp"
+  - Zero sheets: "Kontrollera att Excel-filen har minst ett ark med data"
+  - Corrupt/unreadable: "Försök exportera filen på nytt" + original error message
+- Reset file input value after selection to allow re-uploading the same file
+- Files changed:
+  - `packages/ui/src/components/ui/upload-zone.tsx`
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `scripts/ralph/prd.json`
+- **Learnings for future iterations:**
+  - `e.target.value = ""` on file input onChange allows re-selecting the same file (otherwise browser skips the change event)
+  - `aria-live="assertive"` on error containers ensures screen readers announce errors immediately
+  - `e.stopPropagation()` on nested button inside clickable div prevents the parent's onClick from double-firing
+---

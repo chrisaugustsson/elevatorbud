@@ -95,9 +95,23 @@ export function useImportMachine() {
     console.error("analyzeImport failed:", analysisError);
   }
 
+  const MAX_FILE_SIZE_MB = 10;
+  const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
   const handleFileSelect = useCallback(async (file: File) => {
-    if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
-      setParseError("Filen måste vara i Excel-format (.xlsx)");
+    const ext = file.name.toLowerCase();
+    if (!ext.endsWith(".xlsx") && !ext.endsWith(".xls")) {
+      setParseError(
+        `Filen "${file.name}" är inte i Excel-format. Accepterade format: .xlsx och .xls — exportera från Excel och försök igen.`,
+      );
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      setParseError(
+        `Filen är för stor (${fileSizeMB} MB). Maximal filstorlek är ${MAX_FILE_SIZE_MB} MB — minska filstorleken eller dela upp i flera filer och försök igen.`,
+      );
       return;
     }
 
@@ -113,7 +127,9 @@ export function useImportMachine() {
 
       const infos = getWorkbookSheetInfo(wb);
       if (infos.length === 0) {
-        setParseError("Filen innehåller inga ark");
+        setParseError(
+          "Filen innehåller inga ark. Kontrollera att Excel-filen har minst ett ark med data och försök igen.",
+        );
         setStatus("idle");
         return;
       }
@@ -123,7 +139,7 @@ export function useImportMachine() {
       setStatus("sheet-selection");
     } catch (e) {
       setParseError(
-        e instanceof Error ? e.message : "Kunde inte läsa filen",
+        `Filen kunde inte läsas — den kan vara skadad eller i ett format som inte stöds. Försök exportera filen på nytt från Excel.${e instanceof Error ? ` (${e.message})` : ""}`,
       );
       setStatus("idle");
     }
