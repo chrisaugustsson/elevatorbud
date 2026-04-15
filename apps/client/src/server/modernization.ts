@@ -10,7 +10,12 @@ export const getTimeline = createServerFn()
   .inputValidator(z.object({ parentOrgId: z.string().uuid(), subOrgId: z.string().uuid().optional() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
-    const filterOrgIds = data.subOrgId ? [data.subOrgId] : contextOrgIds;
+    if (data.subOrgId && !contextOrgIds.includes(data.subOrgId)) {
+      throw new Error("Underorganisation hittades inte");
+    }
+    const subOrgFilter = data.subOrgId
+      ? sql`AND e.organization_id = ${data.subOrgId}`
+      : sql``;
 
     const result = await context.db.execute(sql`
       SELECT
@@ -25,7 +30,8 @@ export const getTimeline = createServerFn()
         LIMIT 1
       ) lb ON true
       WHERE e.status = 'active'
-        AND e.organization_id = ANY(${filterOrgIds})
+        AND e.organization_id = ANY(${contextOrgIds})
+        ${subOrgFilter}
         AND lb.recommended_modernization_year IS NOT NULL
       GROUP BY lb.recommended_modernization_year
       ORDER BY lb.recommended_modernization_year
@@ -49,7 +55,12 @@ export const getBudget = createServerFn()
   .inputValidator(z.object({ parentOrgId: z.string().uuid(), subOrgId: z.string().uuid().optional() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
-    const filterOrgIds = data.subOrgId ? [data.subOrgId] : contextOrgIds;
+    if (data.subOrgId && !contextOrgIds.includes(data.subOrgId)) {
+      throw new Error("Underorganisation hittades inte");
+    }
+    const subOrgFilter = data.subOrgId
+      ? sql`AND e.organization_id = ${data.subOrgId}`
+      : sql``;
 
     const result = await context.db.execute(sql`
       SELECT
@@ -67,7 +78,8 @@ export const getBudget = createServerFn()
         LIMIT 1
       ) lb ON true
       WHERE e.status = 'active'
-        AND e.organization_id = ANY(${filterOrgIds})
+        AND e.organization_id = ANY(${contextOrgIds})
+        ${subOrgFilter}
         AND lb.recommended_modernization_year IS NOT NULL
       GROUP BY lb.recommended_modernization_year, e.district, e.elevator_type
       ORDER BY lb.recommended_modernization_year
@@ -110,7 +122,12 @@ export const getPriorityList = createServerFn()
   )
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
-    const filterOrgIds = data.subOrgId ? [data.subOrgId] : contextOrgIds;
+    if (data.subOrgId && !contextOrgIds.includes(data.subOrgId)) {
+      throw new Error("Underorganisation hittades inte");
+    }
+    const subOrgFilter = data.subOrgId
+      ? sql`AND e.organization_id = ${data.subOrgId}`
+      : sql``;
     const page = data.page ?? 1;
     const pageSize = data.pageSize ?? 50;
     const offset = (page - 1) * pageSize;
@@ -145,7 +162,8 @@ export const getPriorityList = createServerFn()
         ) lb ON true
         LEFT JOIN organizations o ON o.id = e.organization_id
         WHERE e.status = 'active'
-          AND e.organization_id = ANY(${filterOrgIds})
+          AND e.organization_id = ANY(${contextOrgIds})
+          ${subOrgFilter}
           AND lb.recommended_modernization_year IS NOT NULL
           ${yearFilter}
           ${districtFilter}
@@ -163,7 +181,8 @@ export const getPriorityList = createServerFn()
           LIMIT 1
         ) lb ON true
         WHERE e.status = 'active'
-          AND e.organization_id = ANY(${filterOrgIds})
+          AND e.organization_id = ANY(${contextOrgIds})
+          ${subOrgFilter}
           AND lb.recommended_modernization_year IS NOT NULL
           ${yearFilter}
           ${districtFilter}

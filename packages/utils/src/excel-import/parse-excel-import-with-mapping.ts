@@ -11,13 +11,16 @@ export function parseExcelImportWithMapping(
   mappingsOrConfigs: ColumnMapping[] | SheetMappingConfig[],
   headerRowIndex?: number,
 ): FullImportResult {
+  // PRD FR-15: sheet names are no longer hard-coded. If the caller passed a
+  // flat mapping array (legacy single-sheet shape), treat the first sheet in
+  // the workbook as the target — do not prefer any specific name like
+  // "Hissar". The typical code path is the SheetMappingConfig[] branch, where
+  // the caller has already chosen which sheets to parse.
   const configs = isSheetMappingConfigs(mappingsOrConfigs)
     ? mappingsOrConfigs
     : [
         {
-          sheetName: workbook.SheetNames.includes("Hissar")
-            ? "Hissar"
-            : workbook.SheetNames[0],
+          sheetName: workbook.SheetNames[0],
           mappings: mappingsOrConfigs,
           headerRowIndex: headerRowIndex ?? 0,
         },

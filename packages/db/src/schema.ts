@@ -11,22 +11,30 @@ import {
   numeric,
   check,
   primaryKey,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
 // ─── Organizations ───────────────────────────────────────────────────────────
 
-export const organizations = pgTable("organizations", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  organizationNumber: text("organization_number"),
-  parentId: uuid("parent_id").references((): any => organizations.id, {
-    onDelete: "set null",
-  }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const organizations = pgTable(
+  "organizations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    organizationNumber: text("organization_number"),
+    // Self-reference: use AnyPgColumn to break the circular type reference
+    // instead of `: any`. This is the Drizzle-recommended pattern.
+    parentId: uuid("parent_id").references(
+      (): AnyPgColumn => organizations.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("organizations_parent_id_idx").on(t.parentId)],
+);
 
 export const organizationsRelations = relations(
   organizations,
@@ -89,6 +97,8 @@ export const userOrganizations = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.userId, t.organizationId] }),
+    index("user_organizations_user_id_idx").on(t.userId),
+    index("user_organizations_organization_id_idx").on(t.organizationId),
   ],
 );
 

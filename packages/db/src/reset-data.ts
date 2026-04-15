@@ -36,6 +36,16 @@ if (looksLikeProd) {
 const client = neon(databaseUrl);
 const db = drizzle(client);
 
+// FK dependency order (children before parents):
+//   elevator_budgets    → elevators, users
+//   elevator_details    → elevators
+//   elevators           → organizations, users
+//   user_organizations  → users, organizations
+//   organizations       → organizations (self, parent_id)
+//   users               → (none)
+// TRUNCATE ... CASCADE makes order strictly unnecessary, but we order
+// explicitly so the script also works without CASCADE and to make the
+// dependency direction obvious.
 const tables = [
   "elevator_budgets",
   "elevator_details",

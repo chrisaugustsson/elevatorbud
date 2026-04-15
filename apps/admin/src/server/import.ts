@@ -6,6 +6,7 @@ import {
   elevators,
   elevatorDetails,
   elevatorBudgets,
+  organizations,
   suggestedValues,
 } from "@elevatorbud/db/schema";
 import type { Database } from "@elevatorbud/db";
@@ -126,17 +127,19 @@ async function analyzeFn(
     }
   }
 
-  // Match org names (case-insensitive)
+  // Match org names EXACT case-sensitive (PRD FR-9).
+  // Non-exact variants (different casing / whitespace / punctuation) must NOT
+  // auto-merge; the admin decides in the mapping UI.
   const orgMatchNames: string[] = [];
   const orgMatchIds: string[] = [];
   const newOrgNames: string[] = [];
 
   if (input.orgNames.length > 0) {
     const allOrgs = await db.query.organizations.findMany();
-    const orgMap = new Map(allOrgs.map((o) => [o.name.toLowerCase(), o]));
+    const orgMap = new Map(allOrgs.map((o) => [o.name, o]));
 
     for (const name of input.orgNames) {
-      const match = orgMap.get(name.toLowerCase());
+      const match = orgMap.get(name);
       if (match) {
         orgMatchNames.push(match.name);
         orgMatchIds.push(match.id);
@@ -174,6 +177,27 @@ async function confirmFn(
 ) {
   return await db.transaction(async (tx) => {
     const allRows = input.elevators;
+
+    // Verify every referenced organization exists before any writes. Zod only
+    // guarantees non-empty string shape; a stale mapping could still point at
+    // a deleted org. Doing this inside the tx means a failure aborts the
+    // whole import atomically.
+    const referencedOrgIds = [...new Set(allRows.map((r) => r._organizationId))];
+    if (referencedOrgIds.length > 0) {
+      const existingOrgs = await tx
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(inArray(organizations.id, referencedOrgIds));
+      const existingOrgIds = new Set(existingOrgs.map((o) => o.id));
+      const missingOrgIds = referencedOrgIds.filter(
+        (id) => !existingOrgIds.has(id),
+      );
+      if (missingOrgIds.length > 0) {
+        throw new Error(
+          `Kan inte importera: ${missingOrgIds.length} organisation(er) i mappningen hittades inte. Uppdatera mappningen och försök igen.`,
+        );
+      }
+    }
 
     // 1. Batch-lookup which elevator numbers already exist
     const elevatorNumbers = allRows.map((r) => r.elevator_number);
@@ -374,6 +398,119 @@ async function confirmFn(
 }
 
 // ---------------------------------------------------------------------------
+// Server-side file validation
+// The admin could bypass the client-only file checks by hitting the server
+// fns directly. Expose a validator the client can call before parsing — and
+// that we can reuse on other code paths — so size/type limits are enforced
+// server-side too.
+// ---------------------------------------------------------------------------
+
+const MAX_UPLOAD_SIZE_MB = 10;
+const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
+
+// Accepted mime types: modern .xlsx (OOXML) + legacy .xls. Some browsers send
+// "application/octet-stream" or an empty string for Excel files — allow those
+// and let the magic-byte check be the real gate.
+const ALLOWED_MIME_TYPES = new Set([
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "application/octet-stream",
+  "",
+]);
+
+// Magic bytes:
+//   .xlsx (OOXML / zip container)  → 50 4B 03 04 ("PK\x03\x04")
+//   .xls  (OLE compound document)  → D0 CF 11 E0 A1 B1 1A E1
+function magicBytesMatchExcel(bytes: number[]): boolean {
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0x50 &&
+    bytes[1] === 0x4b &&
+    bytes[2] === 0x03 &&
+    bytes[3] === 0x04
+  ) {
+    return true;
+  }
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0xd0 &&
+    bytes[1] === 0xcf &&
+    bytes[2] === 0x11 &&
+    bytes[3] === 0xe0 &&
+    bytes[4] === 0xa1 &&
+    bytes[5] === 0xb1 &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0xe1
+  ) {
+    return true;
+  }
+  return false;
+}
+
+const validateUploadSchema = z.object({
+  fileName: z.string().min(1),
+  sizeBytes: z.number().int().nonnegative(),
+  mimeType: z.string().optional(),
+  // First N bytes of the file as an array of byte values (0–255) for magic
+  // byte detection. Client should read file.slice(0, 8).arrayBuffer() and
+  // forward Array.from(new Uint8Array(buffer)).
+  firstBytes: z.array(z.number().int().min(0).max(255)).max(16).optional(),
+});
+
+type ValidateUploadResult =
+  | { ok: true }
+  | {
+      ok: false;
+      code: "file-too-large" | "invalid-extension" | "invalid-mime" | "invalid-magic";
+      message: string;
+    };
+
+function validateUploadFn(
+  input: z.infer<typeof validateUploadSchema>,
+): ValidateUploadResult {
+  const lowerName = input.fileName.toLowerCase();
+  const hasValidExtension =
+    lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls");
+  if (!hasValidExtension) {
+    return {
+      ok: false,
+      code: "invalid-extension",
+      message: `Filen "${input.fileName}" är inte i Excel-format. Accepterade format: .xlsx och .xls — exportera från Excel och försök igen.`,
+    };
+  }
+
+  if (input.sizeBytes > MAX_UPLOAD_SIZE_BYTES) {
+    const fileSizeMB = (input.sizeBytes / (1024 * 1024)).toFixed(1);
+    return {
+      ok: false,
+      code: "file-too-large",
+      message: `Filen är för stor (${fileSizeMB} MB). Maximal filstorlek är ${MAX_UPLOAD_SIZE_MB} MB — minska filstorleken eller dela upp i flera filer och försök igen.`,
+    };
+  }
+
+  if (input.mimeType !== undefined && !ALLOWED_MIME_TYPES.has(input.mimeType)) {
+    return {
+      ok: false,
+      code: "invalid-mime",
+      message: `Filtypen (${input.mimeType}) stöds inte. Endast .xlsx och .xls accepteras — exportera från Excel och försök igen.`,
+    };
+  }
+
+  if (input.firstBytes && input.firstBytes.length > 0) {
+    if (!magicBytesMatchExcel(input.firstBytes)) {
+      return {
+        ok: false,
+        code: "invalid-magic",
+        message:
+          "Filen verkar inte vara en giltig Excel-fil. Kontrollera att du laddat upp en riktig .xlsx- eller .xls-fil och försök igen.",
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
 // Extract org names
 // ---------------------------------------------------------------------------
 
@@ -401,6 +538,13 @@ function extractOrgNamesFn(input: z.infer<typeof extractOrgNamesSchema>) {
 // ---------------------------------------------------------------------------
 // Server functions
 // ---------------------------------------------------------------------------
+
+export const validateUpload = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .inputValidator(validateUploadSchema)
+  .handler(async ({ data }) => {
+    return validateUploadFn(data);
+  });
 
 export const extractOrgNames = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])

@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
-import { eq, and, inArray, isNull } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { createClerkClient } from "@clerk/backend";
 import { users, userOrganizations, organizations } from "@elevatorbud/db/schema";
 import type { Database } from "@elevatorbud/db";
@@ -91,28 +91,34 @@ async function updateUserFn(
 ) {
   const { id, organizationIds, ...data } = input;
 
-  const [user] = await db
-    .update(users)
-    .set(data)
-    .where(eq(users.id, id))
-    .returning();
+  // Wrap both the user update and the replace-all user-organization writes
+  // in a single transaction. Without it, a mid-flight failure after the
+  // delete but before the insert would leave the user with no org rows at
+  // all (effectively orphaned from their grants).
+  return await db.transaction(async (tx) => {
+    const [user] = await tx
+      .update(users)
+      .set(data)
+      .where(eq(users.id, id))
+      .returning();
 
-  if (organizationIds !== undefined) {
-    await db
-      .delete(userOrganizations)
-      .where(eq(userOrganizations.userId, id));
+    if (organizationIds !== undefined) {
+      await tx
+        .delete(userOrganizations)
+        .where(eq(userOrganizations.userId, id));
 
-    if (organizationIds.length > 0) {
-      await db.insert(userOrganizations).values(
-        organizationIds.map((orgId) => ({
-          userId: id,
-          organizationId: orgId,
-        })),
-      );
+      if (organizationIds.length > 0) {
+        await tx.insert(userOrganizations).values(
+          organizationIds.map((orgId) => ({
+            userId: id,
+            organizationId: orgId,
+          })),
+        );
+      }
     }
-  }
 
-  return user;
+    return user;
+  });
 }
 
 async function deactivateUserFn(db: Database, id: string) {
@@ -150,21 +156,28 @@ async function createUserFn(
   });
 
   const { organizationIds, ...userFields } = input;
-  const [user] = await db
-    .insert(users)
-    .values({ ...userFields, clerkUserId: clerkUser.id, active: true })
-    .returning();
 
-  if (organizationIds && organizationIds.length > 0) {
-    await db.insert(userOrganizations).values(
-      organizationIds.map((orgId) => ({
-        userId: user.id,
-        organizationId: orgId,
-      })),
-    );
-  }
+  // Wrap the user insert and organization-grant writes in one transaction so
+  // a user row can never end up created without its intended org grants.
+  // (Clerk creation sits outside the tx — it's remote and can't join a pg
+  // transaction — but the DB writes are atomic between themselves.)
+  return await db.transaction(async (tx) => {
+    const [user] = await tx
+      .insert(users)
+      .values({ ...userFields, clerkUserId: clerkUser.id, active: true })
+      .returning();
 
-  return user;
+    if (organizationIds && organizationIds.length > 0) {
+      await tx.insert(userOrganizations).values(
+        organizationIds.map((orgId) => ({
+          userId: user.id,
+          organizationId: orgId,
+        })),
+      );
+    }
+
+    return user;
+  });
 }
 
 async function deleteUserFn(db: Database, id: string) {

@@ -252,6 +252,9 @@ export const listElevators = createServerFn({ method: "POST" })
   .inputValidator(listInputSchema)
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
+    if (data.subOrgId && !contextOrgIds.includes(data.subOrgId)) {
+      throw new Error("Underorganisation hittades inte");
+    }
     const page = data.page ?? 1;
     const pageSize = data.pageSize ?? 50;
     const sortBy = data.sortBy ?? "elevatorNumber";
@@ -330,6 +333,9 @@ export const exportElevatorData = createServerFn({ method: "POST" })
   .inputValidator(filterSchema)
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
+    if (data.subOrgId && !contextOrgIds.includes(data.subOrgId)) {
+      throw new Error("Underorganisation hittades inte");
+    }
     const where = buildWhereConditions(data, contextOrgIds);
 
     return context.db
