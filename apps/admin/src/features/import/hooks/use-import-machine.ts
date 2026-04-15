@@ -55,7 +55,6 @@ export type ImportStatus =
   | "complete";
 
 const IMPORT_BATCH_SIZE = 50;
-const CREATE_SENTINEL = "__create__";
 
 export type ResolvedOrgMapping = {
   matchedOrgs: { name: string; id: string }[];
@@ -285,7 +284,7 @@ export function useImportMachine() {
       const newOrgNames: string[] = [];
 
       for (const entry of entries) {
-        if (entry.orgId === CREATE_SENTINEL || entry.orgId === null) {
+        if (entry.orgId === null) {
           newOrgNames.push(entry.excelName);
         } else {
           matchedOrgs.push({ name: entry.excelName, id: entry.orgId });
