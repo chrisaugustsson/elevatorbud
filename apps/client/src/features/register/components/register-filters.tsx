@@ -1,4 +1,3 @@
-import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Input } from "@elevatorbud/ui/components/ui/input";
 import { MultiSelectFilter } from "@elevatorbud/ui/components/ui/multi-select-filter";
@@ -10,6 +9,7 @@ import {
   SelectValue,
 } from "@elevatorbud/ui/components/ui/select";
 import { X } from "lucide-react";
+import { FilterChip } from "../../../shared/components/filter-chip";
 
 interface FilterOptions {
   district: string[];
@@ -121,7 +121,7 @@ export function RegisterFilters({
           <SelectItem value="active">Aktiva</SelectItem>
           <SelectItem value="demolished">Rivda</SelectItem>
           <SelectItem value="archived">Arkiverade</SelectItem>
-          <SelectItem value="alla">Alla</SelectItem>
+          <SelectItem value="all">Alla</SelectItem>
         </SelectContent>
       </Select>
 
@@ -154,20 +154,10 @@ export function RegisterFilters({
 
       {subOrgId && selectedSubOrgName && onSubOrgChange && (
         <div className="flex items-center gap-2">
-          <Badge
-            variant="secondary"
-            className="flex items-center gap-1 py-1 pl-2 pr-1 text-sm"
-          >
-            {selectedSubOrgName}
-            <button
-              type="button"
-              onClick={() => onSubOrgChange(undefined)}
-              className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-muted-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={`Rensa filter: ${selectedSubOrgName}`}
-            >
-              <X className="size-3.5" aria-hidden />
-            </button>
-          </Badge>
+          <FilterChip
+            label={selectedSubOrgName}
+            onRemove={() => onSubOrgChange(undefined)}
+          />
         </div>
       )}
     </div>

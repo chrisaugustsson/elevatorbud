@@ -322,7 +322,7 @@ function RegisterPage() {
     ...(buildYearMax && !isNaN(parseInt(buildYearMax))
       ? { buildYearMax: parseInt(buildYearMax) }
       : {}),
-    ...(statusFilter !== "alla"
+    ...(statusFilter !== "all"
       ? { status: statusFilter as "active" | "demolished" | "archived" | "all" }
       : {}),
     ...(subOrgId ? { subOrgId } : {}),

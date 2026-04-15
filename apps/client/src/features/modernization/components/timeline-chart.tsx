@@ -65,6 +65,22 @@ export function TimelineChart({ data, onYearClick, selectedYear }: TimelineChart
     [data, selectedYear],
   );
 
+  // Non-color cue for the selected bar: a visible theme-aware outline.
+  // Complements the 40%-opacity dimming of unselected bars so selection
+  // is perceivable without relying on color or opacity alone.
+  const borderColors = useMemo(
+    () =>
+      data.map((d) =>
+        selectedYear && d.name === selectedYear ? colors.foreground : "transparent",
+      ),
+    [data, selectedYear, colors.foreground],
+  );
+
+  const borderWidths = useMemo(
+    () => data.map((d) => (selectedYear && d.name === selectedYear ? 2 : 0)),
+    [data, selectedYear],
+  );
+
   if (!mounted) return null;
 
   return (
@@ -91,6 +107,8 @@ export function TimelineChart({ data, onYearClick, selectedYear }: TimelineChart
                     label: "Antal hissar",
                     data: data.map((d) => d.count),
                     backgroundColor: backgroundColors,
+                    borderColor: borderColors,
+                    borderWidth: borderWidths,
                     borderRadius: 4,
                     barPercentage: 0.7,
                   },

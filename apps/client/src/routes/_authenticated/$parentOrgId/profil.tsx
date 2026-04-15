@@ -34,7 +34,12 @@ function ProfilPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Profil</h1>
+        <h1
+          id="page-heading"
+          className="text-2xl font-semibold tracking-tight focus:outline-none"
+        >
+          Profil
+        </h1>
         <p className="text-muted-foreground">
           Hantera ditt konto och dina inställningar.
         </p>

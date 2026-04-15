@@ -64,9 +64,26 @@ export function RegisterTable({
         header: ({ column }) => (
           <DataGridColumnHeader title="Hissnummer" column={column} />
         ),
-        cell: (info) => (
-          <span className="font-medium tabular-nums">{info.getValue()}</span>
-        ),
+        cell: (info) => {
+          const row = info.row.original;
+          return (
+            <div className="flex flex-col">
+              <span className="font-medium tabular-nums">{info.getValue()}</span>
+              {/*
+                Mobile-only secondary line: shows the sub-org name inline
+                when the sub-org column itself is hidden below md. Keeps
+                the sub-org visible at <768px without reserving column
+                space. Only rendered when the register is showing multi-
+                org data (showSubOrg === true).
+              */}
+              {showSubOrg && row.organizationName && (
+                <span className="md:hidden text-xs text-muted-foreground">
+                  {row.organizationName}
+                </span>
+              )}
+            </div>
+          );
+        },
       }),
       columnHelper.accessor("address", {
         size: 200,
@@ -89,6 +106,12 @@ export function RegisterTable({
                   {info.getValue() || "—"}
                 </span>
               ),
+              // US-025b: hide this column below md; the sub-org name is
+              // shown inline under the elevator number on mobile instead.
+              meta: {
+                cellClassName: "hidden md:table-cell",
+                headerClassName: "hidden md:table-cell",
+              },
             }),
           ]
         : []),

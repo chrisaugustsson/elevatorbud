@@ -6,13 +6,15 @@ import { toast } from "sonner";
 
 /**
  * FR-38: fall back to last-used context when available and still valid;
- * otherwise pick the first direct grant alphabetically.
+ * otherwise pick the first direct grant alphabetically BY NAME (not UUID).
+ * `orgs` is already sorted by name by `getUserDirectOrgs`, so index 0 is the
+ * alphabetically-first org by name.
  */
-function resolveFallbackOrgId(organizationIds: string[]): string | undefined {
-  if (organizationIds.length === 0) return undefined;
+function resolveFallbackOrgId(orgs: { id: string; name: string }[]): string | undefined {
+  if (orgs.length === 0) return undefined;
   const lastUsed = getLastUsedOrg();
-  if (lastUsed && organizationIds.includes(lastUsed)) return lastUsed;
-  return [...organizationIds].sort()[0];
+  if (lastUsed && orgs.some((o) => o.id === lastUsed)) return lastUsed;
+  return orgs[0].id;
 }
 
 export const Route = createFileRoute("/_authenticated/$parentOrgId")({
@@ -21,7 +23,10 @@ export const Route = createFileRoute("/_authenticated/$parentOrgId")({
 
     if (!user || !user.organizationIds.includes(params.parentOrgId)) {
       toast.error("Den organisationen är inte tillgänglig");
-      const fallback = user ? resolveFallbackOrgId(user.organizationIds) : undefined;
+      const orgs = user
+        ? await context.queryClient.ensureQueryData(userDirectOrgsOptions())
+        : [];
+      const fallback = resolveFallbackOrgId(orgs);
       if (fallback) {
         throw redirect({ to: "/$parentOrgId/dashboard", params: { parentOrgId: fallback } });
       }

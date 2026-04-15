@@ -76,23 +76,17 @@ export function SubOrgBreakdownChart({
   // Second, non-color cue for the selected bar: a visible outline.
   // Unselected bars get no border, so the selected bar stands out even
   // for users with color-vision deficiencies or on grayscale displays.
-  // We use a near-foreground color to contrast against the chart fill.
-  const outlineColor = useMemo(() => {
-    if (typeof document === "undefined") return "#0f172a";
-    const fg = getComputedStyle(document.documentElement)
-      .getPropertyValue("--foreground")
-      .trim();
-    return fg || "#0f172a";
-  }, []);
-
+  // We use the theme-aware foreground color (via useChartColors) so the
+  // outline stays legible on both light and dark themes and updates
+  // immediately when the user toggles themes.
   const borderColors = useMemo(
     () =>
       data.map((d) =>
         selectedSubOrgId && d.orgId === selectedSubOrgId
-          ? outlineColor
+          ? colors.foreground
           : "transparent",
       ),
-    [data, selectedSubOrgId, outlineColor],
+    [data, selectedSubOrgId, colors.foreground],
   );
 
   const borderWidths = useMemo(

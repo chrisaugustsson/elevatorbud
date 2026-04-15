@@ -14,11 +14,11 @@ import {
   DataGridPagination,
   DataGridColumnHeader,
 } from "@elevatorbud/ui/components/ui/data-grid-table";
-import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { Building2, ChevronDown, ChevronRight } from "lucide-react";
-import { useParams } from "@tanstack/react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import type { TimelinePeriod } from "@elevatorbud/ui/components/modernization/urgency-helpers";
 import { getUrgencyBadge } from "@elevatorbud/ui/components/modernization/urgency-helpers";
+import { FilterChip } from "../../../shared/components/filter-chip";
 
 type PriorityElevator = {
   id: string;
@@ -80,13 +80,14 @@ function ExpandedRow({ row }: { row: PriorityElevator }) {
           </div>
         )}
       </div>
-      <a
-        href={`/${parentOrgId}/hiss/${row.id}`}
+      <Link
+        to="/$parentOrgId/hiss/$id"
+        params={{ parentOrgId, id: row.id }}
         className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
       >
         Visa hissdetaljer
         <ChevronRight className="h-3 w-3" />
-      </a>
+      </Link>
     </div>
   );
 }
@@ -264,49 +265,17 @@ export function PriorityList({
       <div className="flex items-center gap-2">
         <Building2 className="h-5 w-5" />
         <h2 className="text-lg font-semibold">Prioritetslista</h2>
-        {selectedYear && (
-          <Badge variant="outline" className="font-normal">
-            {selectedYear}
-            <button
-              className="ml-1 hover:text-destructive"
-              onClick={onClearYear}
-            >
-              ×
-            </button>
-          </Badge>
+        {selectedYear && onClearYear && (
+          <FilterChip label={selectedYear} onRemove={onClearYear} />
         )}
         {selectedPeriod && !selectedYear && (
-          <Badge variant="outline" className="font-normal">
-            {selectedPeriod.label}
-            <button
-              className="ml-1 hover:text-destructive"
-              onClick={onClearPeriod}
-            >
-              ×
-            </button>
-          </Badge>
+          <FilterChip label={selectedPeriod.label} onRemove={onClearPeriod} />
         )}
-        {selectedDistrict && (
-          <Badge variant="outline" className="font-normal">
-            {selectedDistrict}
-            <button
-              className="ml-1 hover:text-destructive"
-              onClick={onClearDistrict}
-            >
-              ×
-            </button>
-          </Badge>
+        {selectedDistrict && onClearDistrict && (
+          <FilterChip label={selectedDistrict} onRemove={onClearDistrict} />
         )}
-        {selectedSubOrgName && (
-          <Badge variant="outline" className="font-normal">
-            {selectedSubOrgName}
-            <button
-              className="ml-1 hover:text-destructive"
-              onClick={onClearSubOrg}
-            >
-              ×
-            </button>
-          </Badge>
+        {selectedSubOrgName && onClearSubOrg && (
+          <FilterChip label={selectedSubOrgName} onRemove={onClearSubOrg} />
         )}
         <span className="text-sm text-muted-foreground">
           ({totalCount} hissar)
