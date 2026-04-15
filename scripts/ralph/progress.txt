@@ -312,3 +312,19 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - `chartRef.current.getActiveElements()` provides the currently focused/hovered element index for keyboard-triggered drill-downs
   - Pattern: server functions accept optional `subOrgId`, default to full `contextOrgIds` when absent — single `filterOrgIds` variable keeps queries clean
 ---
+
+## 2026-04-15 - US-015
+- Removed `validateWorkbookSheets` function from both `parse-excel-import-with-mapping.ts` and `index.ts`
+- Replaced with `getWorkbookSheetInfo(workbook)` that returns metadata for every sheet: name, rowCount, firstRowPreview
+- Added `SheetInfo` type to `types.ts`, exported from barrel
+- `parseExcelImportWithMapping` and `parseExcelImport` now use inline sheet-existence checks (non-mandatory) — no more "Obligatoriskt ark" warning
+- All existing callers compile without changes (admin import flow doesn't use `validateWorkbookSheets` directly)
+- Files changed:
+  - `packages/utils/src/excel-import/types.ts`
+  - `packages/utils/src/excel-import/index.ts`
+  - `packages/utils/src/excel-import/parse-excel-import-with-mapping.ts`
+  - `packages/utils/src/index.ts`
+- **Learnings for future iterations:**
+  - `XLSX.utils.sheet_to_json(sheet, { header: 1 })` returns an array of row arrays — `length - 1` gives data row count (excluding header)
+  - When removing a public export, grep for all consumers before deleting — in this case `validateWorkbookSheets` had zero external consumers
+---

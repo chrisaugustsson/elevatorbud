@@ -116,6 +116,14 @@ export type FullImportResult = {
   };
 };
 
+// --- Sheet Info Types ---
+
+export type SheetInfo = {
+  name: string;
+  rowCount: number;
+  firstRowPreview: string[];
+};
+
 // --- Column Mapping Types ---
 
 /** A known header alias mapping a Swedish header name to a target field + parser */

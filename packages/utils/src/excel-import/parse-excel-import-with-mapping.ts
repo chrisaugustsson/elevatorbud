@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import type {
   ParsedElevator,
   ImportWarning,
@@ -10,14 +9,6 @@ import type {
 import { parseElevatorSheetWithMapping } from "./parse-elevator-sheet";
 import { parseEmergencyPhoneSheet } from "./parse-emergency-phone-sheet";
 import { parseDemolishedSheet } from "./parse-demolished-sheet";
-function validateWorkbookSheets(workbook: XLSX.WorkBook) {
-  const sheetNames = workbook.SheetNames;
-  return {
-    hasHissar: sheetNames.includes("Hissar"),
-    hasNodtelefoner: sheetNames.includes("Nodtelefoner"),
-    hasRivna: sheetNames.includes("Rivna hissar"),
-  };
-}
 
 /**
  * Joins Nodtelefoner data into Hissar elevators by elevator_number.
@@ -99,18 +90,20 @@ function joinEmergencyPhones(
  * Nodtelefoner and Rivna hissar still use their existing hardcoded parsers.
  */
 export function parseExcelImportWithMapping(
-  workbook: XLSX.WorkBook,
+  workbook: import("xlsx").WorkBook,
   mappings: ColumnMapping[],
   headerRowIndex: number,
 ): FullImportResult {
-  const validation = validateWorkbookSheets(workbook);
+  const sheetNames = workbook.SheetNames;
+  const hasHissar = sheetNames.includes("Hissar");
+  const hasNodtelefoner = sheetNames.includes("Nodtelefoner");
+  const hasRivna = sheetNames.includes("Rivna hissar");
 
   const allWarnings: ImportWarning[] = [];
   const allInvalidRows: { row: number; sheet: string; reason: string }[] = [];
 
-  // 1. Parse Hissar with confirmed mapping
   let hissarResult: ElevatorParseResult;
-  if (validation.hasHissar) {
+  if (hasHissar) {
     hissarResult = parseElevatorSheetWithMapping(
       workbook,
       "Hissar",
@@ -128,17 +121,11 @@ export function parseExcelImportWithMapping(
       invalidRows: [],
       sheetName: "Hissar",
     };
-    allWarnings.push({
-      row: 0,
-      column: "",
-      message: "Obligatoriskt ark 'Hissar' saknas i filen",
-    });
   }
 
-  // 2. Parse Nodtelefoner (unchanged) and join with Hissar
   let nodJoinedCount = 0;
   let nodEntryCount = 0;
-  if (validation.hasNodtelefoner) {
+  if (hasNodtelefoner) {
     const nodResult = parseEmergencyPhoneSheet(workbook);
     nodEntryCount = nodResult.entries.length;
     allWarnings.push(...nodResult.warnings);
@@ -149,9 +136,8 @@ export function parseExcelImportWithMapping(
     );
   }
 
-  // 3. Parse Rivna hissar (unchanged)
   let rivnaResult: ElevatorParseResult;
-  if (validation.hasRivna) {
+  if (hasRivna) {
     rivnaResult = parseDemolishedSheet(workbook);
     allWarnings.push(...rivnaResult.warnings);
     allInvalidRows.push(
@@ -176,16 +162,16 @@ export function parseExcelImportWithMapping(
     invalidRows: allInvalidRows,
     sheets: {
       elevators: {
-        found: validation.hasHissar,
+        found: hasHissar,
         count: hissarResult.elevators.length,
       },
       emergencyPhones: {
-        found: validation.hasNodtelefoner,
+        found: hasNodtelefoner,
         count: nodEntryCount,
         joined: nodJoinedCount,
       },
       demolished: {
-        found: validation.hasRivna,
+        found: hasRivna,
         count: rivnaResult.elevators.length,
       },
     },
