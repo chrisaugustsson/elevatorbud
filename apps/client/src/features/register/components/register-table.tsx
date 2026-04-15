@@ -12,7 +12,7 @@ import {
   DataGridColumnHeader,
 } from "@elevatorbud/ui/components/ui/data-grid-table";
 import { Building2 } from "lucide-react";
-import { useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 
 type HissRow = {
   id: string;
@@ -55,6 +55,7 @@ export function RegisterTable({
   emptyMessage: emptyMessageProp,
 }: RegisterTableProps) {
   const { parentOrgId } = useParams({ strict: false }) as { parentOrgId: string };
+  const navigate = useNavigate();
   const columnHelper = createColumnHelper<HissRow>();
   const columns = useMemo(() => {
     const cols = [
@@ -161,7 +162,12 @@ export function RegisterTable({
       recordCount={data.length}
       tableLayout={{ width: "fixed", columnsResizable: true }}
       onRowClick={(row) => {
-        window.location.href = `/${parentOrgId}/hiss/${row.id}`;
+        // Use the router so we keep client-side state and the context
+        // crossfade — a full page reload defeats both.
+        navigate({
+          to: "/$parentOrgId/hiss/$id",
+          params: { parentOrgId, id: row.id },
+        });
       }}
       emptyMessage={
         emptyMessageProp ?? (

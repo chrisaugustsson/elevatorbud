@@ -73,13 +73,51 @@ export function SubOrgBreakdownChart({
     [data, selectedSubOrgId, colors.chart3],
   );
 
+  // Second, non-color cue for the selected bar: a visible outline.
+  // Unselected bars get no border, so the selected bar stands out even
+  // for users with color-vision deficiencies or on grayscale displays.
+  // We use a near-foreground color to contrast against the chart fill.
+  const outlineColor = useMemo(() => {
+    if (typeof document === "undefined") return "#0f172a";
+    const fg = getComputedStyle(document.documentElement)
+      .getPropertyValue("--foreground")
+      .trim();
+    return fg || "#0f172a";
+  }, []);
+
+  const borderColors = useMemo(
+    () =>
+      data.map((d) =>
+        selectedSubOrgId && d.orgId === selectedSubOrgId
+          ? outlineColor
+          : "transparent",
+      ),
+    [data, selectedSubOrgId, outlineColor],
+  );
+
+  const borderWidths = useMemo(
+    () =>
+      data.map((d) =>
+        selectedSubOrgId && d.orgId === selectedSubOrgId ? 2 : 0,
+      ),
+    [data, selectedSubOrgId],
+  );
+
+  const selectedOrgName = useMemo(
+    () =>
+      selectedSubOrgId
+        ? (data.find((d) => d.orgId === selectedSubOrgId)?.orgName ?? null)
+        : null,
+    [data, selectedSubOrgId],
+  );
+
   if (!mounted) return null;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Building2 className="h-4 w-4" />
+          <Building2 className="h-4 w-4" aria-hidden />
           Hissar per organisation
         </CardTitle>
       </CardHeader>
@@ -89,51 +127,72 @@ export function SubOrgBreakdownChart({
             Ingen organisationsdata tillgänglig.
           </p>
         ) : (
-          <div className="h-[300px] w-full overflow-hidden">
-            <Bar
-              ref={chartRef}
-              data={{
-                labels: data.map((d) => d.orgName),
-                datasets: [
-                  {
-                    label: "Antal hissar",
-                    data: data.map((d) => d.count),
-                    backgroundColor: backgroundColors,
-                    borderRadius: 4,
-                    barPercentage: 0.7,
+          <>
+            {/* Text legend — makes selection legible without relying on color alone. */}
+            <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+              <span
+                className="inline-block size-3 shrink-0 rounded-sm"
+                style={{ backgroundColor: colors.chart3 }}
+                aria-hidden
+              />
+              <span>
+                {selectedOrgName
+                  ? `Vald: ${selectedOrgName}`
+                  : "Antal hissar per organisation"}
+              </span>
+            </div>
+            <div className="h-[300px] w-full overflow-hidden rounded-sm focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+              <Bar
+                ref={chartRef}
+                data={{
+                  labels: data.map((d) => d.orgName),
+                  datasets: [
+                    {
+                      label: "Antal hissar",
+                      data: data.map((d) => d.count),
+                      backgroundColor: backgroundColors,
+                      borderColor: borderColors,
+                      borderWidth: borderWidths,
+                      borderRadius: 4,
+                      barPercentage: 0.7,
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  interaction: { mode: "index", intersect: false },
+                  onClick: handleClick,
+                  onHover: (_event, elements) => {
+                    const canvas = chartRef.current?.canvas;
+                    if (canvas) {
+                      canvas.style.cursor =
+                        elements.length > 0 ? "pointer" : "default";
+                    }
                   },
-                ],
-              }}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: { mode: "index", intersect: false },
-                onClick: handleClick,
-                onHover: (_event, elements) => {
-                  const canvas = chartRef.current?.canvas;
-                  if (canvas) {
-                    canvas.style.cursor =
-                      elements.length > 0 ? "pointer" : "default";
-                  }
-                },
-                plugins: {
-                  legend: { display: false },
-                  tooltip: {
-                    ...sharedTooltipOptions,
-                    callbacks: {
-                      label: (ctx) => `Antal hissar: ${ctx.parsed.y}`,
+                  plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                      ...sharedTooltipOptions,
+                      callbacks: {
+                        label: (ctx) => `Antal hissar: ${ctx.parsed.y}`,
+                      },
                     },
                   },
-                },
-                scales: sharedScaleOptions(colors),
-              }}
-              plugins={[hoverColumnPlugin]}
-              tabIndex={0}
-              role="img"
-              aria-label="Stapeldiagram över hissar per organisation. Klicka på en stapel för att filtrera."
-              onKeyDown={handleKeyDown}
-            />
-          </div>
+                  scales: sharedScaleOptions(colors),
+                }}
+                plugins={[hoverColumnPlugin]}
+                tabIndex={0}
+                role="img"
+                aria-label={
+                  selectedOrgName
+                    ? `Stapeldiagram över hissar per organisation. Valt: ${selectedOrgName}. Klicka på en stapel för att filtrera.`
+                    : "Stapeldiagram över hissar per organisation. Klicka på en stapel för att filtrera."
+                }
+                onKeyDown={handleKeyDown}
+              />
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

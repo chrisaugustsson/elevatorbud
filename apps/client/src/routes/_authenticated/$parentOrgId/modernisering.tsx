@@ -258,20 +258,29 @@ function ModerniseringPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">
+      <h1
+        id="page-heading"
+        className="text-2xl font-bold text-foreground focus:outline-none"
+      >
         Moderniseringsplanering
       </h1>
 
       {selectedSubOrgName && (
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="font-normal">
+          <Badge
+            variant="outline"
+            className="flex items-center gap-1 py-1 pl-2 pr-1 font-normal"
+          >
             {selectedSubOrgName}
             <button
-              className="ml-1 hover:text-destructive"
+              type="button"
+              className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-muted-foreground/20 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => updateSearch({ subOrg: undefined, page: undefined })}
-              aria-label={`Ta bort filter för ${selectedSubOrgName}`}
+              aria-label={`Rensa filter: ${selectedSubOrgName}`}
             >
-              ×
+              <span aria-hidden className="text-base leading-none">
+                ×
+              </span>
             </button>
           </Badge>
         </div>

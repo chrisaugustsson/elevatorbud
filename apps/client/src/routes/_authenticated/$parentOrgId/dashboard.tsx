@@ -461,7 +461,12 @@ function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+      <h1
+        id="page-heading"
+        className="text-2xl font-bold text-foreground focus:outline-none"
+      >
+        Dashboard
+      </h1>
 
       <KpiCards items={kpiItems} />
 

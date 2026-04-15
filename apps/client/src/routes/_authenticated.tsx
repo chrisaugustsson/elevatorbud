@@ -1,9 +1,4 @@
-import {
-  createFileRoute,
-  Outlet,
-  redirect,
-  useParams,
-} from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { auth } from "@elevatorbud/auth/server";
 import { useSuspenseQuery } from "@tanstack/react-query";
@@ -20,6 +15,7 @@ import { userDirectOrgsOptions } from "../server/context";
 import { AppSidebar } from "../shared/components/app-sidebar";
 import { OrgSwitcher } from "../shared/components/org-switcher";
 import { GlobalSearch } from "../shared/components/global-search";
+import { LiveRegionProvider } from "../shared/components/live-region";
 
 const authGuard = createServerFn().handler(async () => {
   const { isAuthenticated } = await auth();
@@ -41,8 +37,6 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const { signOut } = useClerk();
   const { data: user } = useSuspenseQuery(meOptions());
-  const params = useParams({ strict: false }) as { parentOrgId?: string };
-  const parentOrgId = params.parentOrgId;
 
   if (user === null) {
     return (
@@ -79,24 +73,26 @@ function AuthenticatedLayout() {
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
-          <OrgSwitcher />
-          <div className="ml-auto">
-            <GlobalSearch />
+    <LiveRegionProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator
+              orientation="vertical"
+              className="mr-2 data-[orientation=vertical]:h-4"
+            />
+            <OrgSwitcher />
+            <div className="ml-auto">
+              <GlobalSearch />
+            </div>
+          </header>
+          <div className="min-w-0 flex-1 overflow-auto p-6">
+            <Outlet />
           </div>
-        </header>
-        <div className="min-w-0 flex-1 overflow-auto p-6">
-          <Outlet />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+        </SidebarInset>
+      </SidebarProvider>
+    </LiveRegionProvider>
   );
 }

@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { Building2, Check, ChevronsUpDown, Search } from "lucide-react";
+import { Building2, Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import {
   Popover,
@@ -13,6 +13,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetTrigger,
 } from "@elevatorbud/ui/components/ui/sheet";
 import {
   Tooltip,
@@ -21,8 +22,17 @@ import {
   TooltipTrigger,
 } from "@elevatorbud/ui/components/ui/tooltip";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@elevatorbud/ui/components/ui/command";
 import { userDirectOrgsOptions } from "../../server/context";
 import { useSidebar } from "@elevatorbud/ui/components/ui/sidebar";
+import { useAnnounce } from "./live-region";
 
 const LAST_ORG_KEY = "elevatorbud:lastParentOrgId";
 
@@ -47,29 +57,25 @@ export function OrgSwitcher() {
   const navigate = useNavigate();
   const { isMobile } = useSidebar();
   const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState("");
-  const announceRef = useRef<HTMLDivElement>(null);
-  const mainHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const announce = useAnnounce();
 
+  // Only persist the last-used org once we've confirmed it's in the user's
+  // direct grants. Without this guard, an invalid-id redirect bounce would
+  // briefly cache an inaccessible org.
   useEffect(() => {
-    if (parentOrgId) {
+    if (!parentOrgId || !orgs) return;
+    if (orgs.some((o) => o.id === parentOrgId)) {
       saveLastUsedOrg(parentOrgId);
     }
-  }, [parentOrgId]);
+  }, [parentOrgId, orgs]);
 
   const currentOrg = useMemo(
     () => orgs?.find((o) => o.id === parentOrgId),
     [orgs, parentOrgId],
   );
 
+  // FR-39: expose type-to-filter once there are 10+ direct grants.
   const showFilter = (orgs?.length ?? 0) >= 10;
-
-  const filteredOrgs = useMemo(() => {
-    if (!orgs) return [];
-    if (!filter) return orgs;
-    const lower = filter.toLowerCase();
-    return orgs.filter((o) => o.name.toLowerCase().includes(lower));
-  }, [orgs, filter]);
 
   const handleSelect = useCallback(
     (orgId: string) => {
@@ -78,29 +84,30 @@ export function OrgSwitcher() {
         return;
       }
       setOpen(false);
-      setFilter("");
       saveLastUsedOrg(orgId);
       const orgName = orgs?.find((o) => o.id === orgId)?.name ?? "";
       navigate({
         to: "/$parentOrgId/dashboard",
         params: { parentOrgId: orgId },
       });
-      if (announceRef.current) {
-        announceRef.current.textContent = `Bytte till ${orgName}`;
-      }
+      // FR-40: announce context change via the stable aria-live region
+      // mounted at the auth-shell layer so the message survives the
+      // route-level crossfade remount in $parentOrgId.tsx.
+      announce(`Bytte till ${orgName}`);
       requestAnimationFrame(() => {
-        const heading = document.querySelector("main h1, [role='main'] h1, .min-w-0 h1");
+        const heading = document.getElementById("page-heading");
         if (heading instanceof HTMLElement) {
           heading.setAttribute("tabindex", "-1");
           heading.focus();
         }
       });
     },
-    [parentOrgId, navigate, orgs],
+    [parentOrgId, navigate, orgs, announce],
   );
 
   if (isLoading) {
-    return <Skeleton className="h-8 w-40" />;
+    // FR-37: skeleton matches the 44px switcher height to avoid layout shift.
+    return <Skeleton className="h-11 w-40" />;
   }
 
   if (!orgs || orgs.length === 0 || !parentOrgId) {
@@ -112,8 +119,14 @@ export function OrgSwitcher() {
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="flex items-center gap-2 text-sm">
-              <Building2 className="size-4 shrink-0 text-muted-foreground" />
+            <div
+              className="flex items-center gap-2 text-sm"
+              aria-label={`Aktiv organisation: ${currentOrg?.name ?? ""}`}
+            >
+              <Building2
+                className="size-4 shrink-0 text-muted-foreground"
+                aria-hidden
+              />
               <span className="max-w-[200px] truncate font-medium text-foreground">
                 {currentOrg?.name ?? "Laddar..."}
               </span>
@@ -125,103 +138,98 @@ export function OrgSwitcher() {
     );
   }
 
+  // FR-37: trigger is ≥44×44. Use h-11 (44px) with extra horizontal padding.
   const triggerButton = (
     <Button
       variant="ghost"
-      size="sm"
-      className="flex items-center gap-2 px-2"
+      className="flex h-11 min-h-11 items-center gap-2 px-3"
       aria-haspopup="menu"
       aria-expanded={open}
       aria-label={`Byt organisation. Nuvarande: ${currentOrg?.name ?? ""}`}
     >
-      <Building2 className="size-4 shrink-0 text-muted-foreground" />
+      <Building2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="max-w-[200px] truncate font-medium text-foreground text-sm">
+            <span className="max-w-[200px] truncate text-sm font-medium text-foreground">
               {currentOrg?.name ?? "Laddar..."}
             </span>
           </TooltipTrigger>
           <TooltipContent>{currentOrg?.name}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
+      <ChevronsUpDown
+        className="size-3.5 shrink-0 text-muted-foreground"
+        aria-hidden
+      />
     </Button>
   );
 
+  /**
+   * cmdk's `Command` primitive provides arrow-key navigation, Home/End,
+   * roving tabindex, Enter/Space to activate, and Escape to close — the
+   * full FR-30 keyboard model for free. Items use `role="menuitemradio"`
+   * with `aria-checked` so the single-selection semantics are correct
+   * (WAI-ARIA pattern), while keeping a visible checkmark.
+   */
   const orgList = (
-    <div role="menu" aria-label="Välj organisation">
+    <Command
+      loop
+      filter={(value, search) =>
+        value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+      }
+    >
       {showFilter && (
-        <div className="flex items-center gap-2 border-b px-3 py-2">
-          <Search className="size-4 text-muted-foreground" />
-          <input
-            type="text"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            placeholder="Filtrera organisationer..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            autoFocus
-          />
-        </div>
+        <CommandInput
+          placeholder="Filtrera organisationer..."
+          aria-label="Filtrera organisationer"
+        />
       )}
-      <div className="max-h-[300px] overflow-y-auto p-1">
-        {filteredOrgs.length === 0 ? (
-          <div className="px-3 py-2 text-sm text-muted-foreground">
-            Inga organisationer matchar
-          </div>
-        ) : (
-          filteredOrgs.map((org) => {
-            const isCurrent = org.id === parentOrgId;
+      <CommandList role="menu" aria-label="Välj organisation">
+        <CommandEmpty>Inga organisationer matchar</CommandEmpty>
+        <CommandGroup>
+          {orgs.map((org) => {
+            const isSelected = org.id === parentOrgId;
             return (
-              <button
+              <CommandItem
                 key={org.id}
-                role="menuitem"
-                aria-current={isCurrent ? "true" : undefined}
-                className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-accent focus:bg-accent focus:outline-none"
-                onClick={() => handleSelect(org.id)}
+                value={org.name}
+                role="menuitemradio"
+                aria-checked={isSelected}
+                onSelect={() => handleSelect(org.id)}
+                className="flex items-center gap-2 py-2"
               >
                 <Check
-                  className={`size-4 shrink-0 ${isCurrent ? "opacity-100" : "opacity-0"}`}
+                  className={`size-4 shrink-0 ${
+                    isSelected ? "opacity-100" : "opacity-0"
+                  }`}
+                  aria-hidden
                 />
                 <span className="truncate">{org.name}</span>
-              </button>
+              </CommandItem>
             );
-          })
-        )}
-      </div>
-    </div>
+          })}
+        </CommandGroup>
+      </CommandList>
+    </Command>
   );
 
-  return (
-    <>
-      <div
-        ref={announceRef}
-        aria-live="polite"
-        className="sr-only"
-      />
-      {isMobile ? (
-        <Sheet open={open} onOpenChange={setOpen}>
-          <button onClick={() => setOpen(true)} className="contents">
-            {triggerButton}
-          </button>
-          <SheetContent side="bottom" className="max-h-[80vh]">
-            <SheetHeader>
-              <SheetTitle>Välj organisation</SheetTitle>
-            </SheetHeader>
-            {orgList}
-          </SheetContent>
-        </Sheet>
-      ) : (
-        <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setFilter(""); }}>
-          <PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
-          <PopoverContent
-            className="w-[280px] p-0"
-            align="start"
-          >
-            {orgList}
-          </PopoverContent>
-        </Popover>
-      )}
-    </>
+  return isMobile ? (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>{triggerButton}</SheetTrigger>
+      <SheetContent side="bottom" className="max-h-[80vh]">
+        <SheetHeader>
+          <SheetTitle>Välj organisation</SheetTitle>
+        </SheetHeader>
+        {orgList}
+      </SheetContent>
+    </Sheet>
+  ) : (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
+      <PopoverContent className="w-[280px] p-0" align="start">
+        {orgList}
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -70,7 +70,7 @@ export function RegisterFilters({
             value={subOrgId ?? "__all__"}
             onValueChange={(v) => onSubOrgChange(v === "__all__" ? undefined : v)}
           >
-            <SelectTrigger className="h-9 w-48">
+            <SelectTrigger className="h-10 w-48">
               <SelectValue placeholder="Alla underorganisationer" />
             </SelectTrigger>
             <SelectContent>
@@ -114,7 +114,7 @@ export function RegisterFilters({
         )}
 
         <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-        <SelectTrigger className="h-9 w-36">
+        <SelectTrigger className="h-10 w-36">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -132,7 +132,7 @@ export function RegisterFilters({
           placeholder="Från"
           value={buildYearMin}
           onChange={(e) => onBuildYearMinChange(e.target.value)}
-          className="h-9 w-20"
+          className="h-10 w-20"
         />
         <span className="text-muted-foreground">{"–"}</span>
         <Input
@@ -140,7 +140,7 @@ export function RegisterFilters({
           placeholder="Till"
           value={buildYearMax}
           onChange={(e) => onBuildYearMaxChange(e.target.value)}
-          className="h-9 w-20"
+          className="h-10 w-20"
         />
       </div>
 
@@ -154,15 +154,18 @@ export function RegisterFilters({
 
       {subOrgId && selectedSubOrgName && onSubOrgChange && (
         <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="flex items-center gap-1 px-2 py-1 text-sm">
+          <Badge
+            variant="secondary"
+            className="flex items-center gap-1 py-1 pl-2 pr-1 text-sm"
+          >
             {selectedSubOrgName}
             <button
               type="button"
               onClick={() => onSubOrgChange(undefined)}
-              className="ml-1 rounded-sm hover:bg-muted-foreground/20"
-              aria-label={`Ta bort filter: ${selectedSubOrgName}`}
+              className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-muted-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`Rensa filter: ${selectedSubOrgName}`}
             >
-              <X className="size-3" />
+              <X className="size-3.5" aria-hidden />
             </button>
           </Badge>
         </div>

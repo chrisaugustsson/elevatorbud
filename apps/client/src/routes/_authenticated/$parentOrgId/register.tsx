@@ -394,6 +394,12 @@ function RegisterPage() {
 
   return (
     <div className="space-y-4">
+      <h1
+        id="page-heading"
+        className="text-2xl font-bold text-foreground focus:outline-none"
+      >
+        Hissregister
+      </h1>
       <RegisterToolbar
         totalCount={totalCount}
         search={search}
