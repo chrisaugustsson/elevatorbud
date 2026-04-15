@@ -427,3 +427,17 @@ Started: tis 14 apr. 2026 21:13:58 CEST
   - Component `key` should include both sheet name and header row index to force remount on sheet change
   - `Map<string, T>` in React state requires `new Map(existing)` spread pattern for immutable updates
 ---
+
+## 2026-04-15 - US-020
+- Added `"org-mapping"` state to `ImportStatus` between column mapping and preview
+- After all sheets are column-mapped, `parseExcelImportWithMapping` merges rows into single `parseResult` with `_source_sheet` metadata preserved on each row
+- New `handleOrgMappingConfirm` handler triggers analysis (elevator number + org name extraction) and transitions to preview
+- `extractOrgNamesOptions` query provides deduplicated org names to the org-mapping step
+- Placeholder org-mapping UI in import page shows merged row count, source sheet count, and org name list — US-021 will replace with full mapping UI
+- Files changed:
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+- **Learnings for future iterations:**
+  - Splitting state transitions (mapping → org-mapping → preview) is cleaner than bundling parse + analysis in one handler
+  - `extractOrgNamesOptions` query auto-fires when `parseResult` is set, so org names are ready by the time org-mapping renders
+---
