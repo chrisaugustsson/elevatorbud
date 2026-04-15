@@ -41,6 +41,7 @@ import {
   Info,
 } from "lucide-react";
 import { cn } from "@elevatorbud/ui/lib/utils";
+import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import {
   listOrganizationsOptions,
   createOrganization,
@@ -54,26 +55,38 @@ export type OrgMappingEntry = {
 export function OrgMappingSection({
   orgNames,
   rowCount,
+  priorMappings,
   onConfirm,
   onBack,
   headingRef,
 }: {
   orgNames: string[];
   rowCount: number;
+  priorMappings?: OrgMappingEntry[];
   onConfirm: (mappings: OrgMappingEntry[]) => void;
   onBack: () => void;
   headingRef?: React.RefObject<HTMLHeadingElement | null>;
 }) {
   const queryClient = useQueryClient();
-  const { data: existingOrgs = [] } = useQuery(listOrganizationsOptions());
+  const { data: existingOrgs = [], isLoading: existingOrgsLoading } = useQuery(
+    listOrganizationsOptions(),
+  );
 
   const initialMappings = useMemo(() => {
+    // Case-sensitive exact-string match only (FR-9). Different casing is not
+    // auto-merged — the admin decides.
     const orgMap = new Map(existingOrgs.map((o) => [o.name, o.id]));
+    const priorByName = new Map(
+      (priorMappings ?? []).map((m) => [m.excelName, m.orgId]),
+    );
     return orgNames.map((name): OrgMappingEntry => {
+      if (priorByName.has(name)) {
+        return { excelName: name, orgId: priorByName.get(name) ?? null };
+      }
       const exactMatch = orgMap.get(name);
       return { excelName: name, orgId: exactMatch ?? null };
     });
-  }, [orgNames, existingOrgs]);
+  }, [orgNames, existingOrgs, priorMappings]);
 
   const [mappings, setMappings] = useState<OrgMappingEntry[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -86,7 +99,9 @@ export function OrgMappingSection({
     (m) => m.orgId !== null,
   );
 
-  const noMatchesExist = existingOrgs.length === 0;
+  // Only treat "no matches" as a real state once the fetch has completed —
+  // otherwise the banner flashes in while orgs are loading.
+  const noMatchesExist = !existingOrgsLoading && existingOrgs.length === 0;
 
   const handleOrgSelect = (excelName: string, orgId: string | null) => {
     const current = mappings.length > 0 ? mappings : [...initialMappings];
@@ -138,10 +153,17 @@ export function OrgMappingSection({
         </CardHeader>
         <CardContent className="space-y-4">
           {noMatchesExist && (
-            <div className="rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950">
+            <div
+              className="rounded-md border bg-muted p-3"
+              role="status"
+              aria-live="polite"
+            >
               <div className="flex items-start gap-2">
-                <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-                <p className="text-sm text-blue-800 dark:text-blue-200">
+                <Info
+                  className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <p className="text-sm text-muted-foreground">
                   Inga befintliga organisationer hittades. Använd &quot;Skapa
                   organisation&quot; för att skapa nya organisationer direkt
                   från denna vy.
@@ -156,26 +178,43 @@ export function OrgMappingSection({
               <span>Organisation i systemet</span>
             </div>
             <div className="divide-y">
-              {activeMappings.map((mapping) => (
-                <OrgMappingRow
-                  key={mapping.excelName}
-                  mapping={mapping}
-                  existingOrgs={existingOrgs}
-                  onSelect={(orgId) =>
-                    handleOrgSelect(mapping.excelName, orgId)
-                  }
-                  onCreateRequest={() =>
-                    handleCreateRequest(mapping.excelName)
-                  }
-                  triggerRef={(el) => {
-                    if (el) {
-                      triggerRefMap.current.set(mapping.excelName, el);
-                    } else {
-                      triggerRefMap.current.delete(mapping.excelName);
+              {existingOrgsLoading ? (
+                // While the list of existing orgs is loading, show skeleton
+                // rows so the admin sees structure rather than empty cells.
+                Array.from({ length: Math.max(3, Math.min(orgNames.length, 6)) }).map(
+                  (_, i) => (
+                    <div
+                      key={`skeleton-${i}`}
+                      className="grid grid-cols-[1fr_1fr] items-center gap-4 px-4 py-3"
+                      aria-hidden="true"
+                    >
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-9 w-full" />
+                    </div>
+                  ),
+                )
+              ) : (
+                activeMappings.map((mapping) => (
+                  <OrgMappingRow
+                    key={mapping.excelName}
+                    mapping={mapping}
+                    existingOrgs={existingOrgs}
+                    onSelect={(orgId) =>
+                      handleOrgSelect(mapping.excelName, orgId)
                     }
-                  }}
-                />
-              ))}
+                    onCreateRequest={() =>
+                      handleCreateRequest(mapping.excelName)
+                    }
+                    triggerRef={(el) => {
+                      if (el) {
+                        triggerRefMap.current.set(mapping.excelName, el);
+                      } else {
+                        triggerRefMap.current.delete(mapping.excelName);
+                      }
+                    }}
+                  />
+                ))
+              )}
             </div>
           </div>
 
@@ -252,7 +291,10 @@ function OrgMappingRow({
             <span className="truncate">
               {selectedOrg ? (
                 <span className="flex items-center gap-1.5">
-                  <Check className="h-3.5 w-3.5 text-green-600" />
+                  <Check
+                    className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400"
+                    aria-hidden="true"
+                  />
                   {selectedOrg.name}
                 </span>
               ) : (

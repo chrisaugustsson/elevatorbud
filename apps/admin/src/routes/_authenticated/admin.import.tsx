@@ -35,6 +35,7 @@ function ImportPage() {
     selectedSheets,
     currentSheetIndex,
     extractedOrgData,
+    priorOrgMappingEntries,
     handleFileSelect,
     handleSheetSelectionConfirm,
     handleHeaderRowChange,
@@ -138,6 +139,7 @@ function ImportPage() {
         <OrgMappingSection
           orgNames={extractedOrgData.orgNames}
           rowCount={parseResult.elevators.length}
+          priorMappings={priorOrgMappingEntries}
           onConfirm={handleOrgMappingConfirm}
           onBack={handleBackToMapping}
           headingRef={stepHeadingRef}
@@ -150,6 +152,7 @@ function ImportPage() {
           parseResult={parseResult}
           analysis={analysis}
           resolvedOrgMapping={resolvedOrgMapping}
+          selectedSheets={selectedSheets}
           onConfirm={handleConfirm}
           onBack={handleBackToOrgMapping}
           headingRef={stepHeadingRef}
@@ -161,22 +164,35 @@ function ImportPage() {
           <CardContent className="py-12">
             <div className="mx-auto max-w-md space-y-4">
               <div className="flex items-center justify-center gap-2">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span className="font-medium">Importerar hissar...</span>
+                <Loader2
+                  className="h-5 w-5 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+                <span className="font-medium">
+                  Importerar {importProgress.total} hissar...
+                </span>
               </div>
               <div className="space-y-2">
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full animate-pulse rounded-full bg-primary transition-all duration-300"
-                    style={{
-                      width: importProgress.total > 0 && importProgress.current > 0
-                        ? "100%"
-                        : "60%",
-                    }}
-                  />
+                {/*
+                  Server does not stream per-batch progress yet — the bar is
+                  indeterminate but the visible numeric label tells the admin
+                  how many rows are in flight so the operation doesn't feel
+                  like a black box (US-028). Switch to determinate once
+                  streaming is wired.
+                */}
+                <div
+                  role="progressbar"
+                  aria-busy="true"
+                  aria-label={`Importerar ${importProgress.total} hissar`}
+                  className="relative h-2 w-full overflow-hidden rounded-full bg-muted"
+                >
+                  <div className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-primary animate-pulse motion-reduce:w-full motion-reduce:animate-none motion-reduce:opacity-70" />
                 </div>
                 <p className="text-center text-sm text-muted-foreground">
-                  Importerar {importProgress.total} hissar...
+                  {importProgress.current > 0 &&
+                  importProgress.current >= importProgress.total
+                    ? `${importProgress.total} av ${importProgress.total} importerade`
+                    : `${importProgress.total} hissar importeras...`}
                 </p>
               </div>
             </div>

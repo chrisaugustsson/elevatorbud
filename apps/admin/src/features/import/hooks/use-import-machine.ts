@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { analyzeImportOptions, extractOrgNamesOptions, confirmImport } from "~/server/import";
 import type { OrgMappingEntry } from "../components/org-mapping-section";
@@ -215,15 +215,30 @@ export function useImportMachine() {
     (sheets: string[]) => {
       if (sheets.length === 0) return;
 
+      // If the sheet selection is identical to last time, preserve any
+      // per-sheet mappings so re-entering this step via Back doesn't destroy
+      // prior work. If it changed, drop stale downstream state.
+      const selectionChanged =
+        sheets.length !== selectedSheets.length ||
+        sheets.some((s, i) => s !== selectedSheets[i]);
+
       setSelectedSheets(sheets);
       setCurrentSheetIndex(0);
-      setSheetMappings(new Map());
+      if (selectionChanged) {
+        setSheetMappings(new Map());
+        setParseResult(null);
+        setResolvedOrgMapping(null);
+        setAnalysisArgs(null);
+      }
 
-      if (loadSheetForMapping(sheets[0])) {
+      const inherited = selectionChanged
+        ? undefined
+        : sheetMappings.get(sheets[0])?.mappings;
+      if (loadSheetForMapping(sheets[0], inherited)) {
         setStatus("mapping");
       }
     },
-    [loadSheetForMapping],
+    [loadSheetForMapping, selectedSheets, sheetMappings],
   );
 
   const handleHeaderRowChange = useCallback(
@@ -393,35 +408,53 @@ export function useImportMachine() {
   }, []);
 
   const handleBackToSheetSelection = useCallback(() => {
+    // Preserve workbook, sheet selection, and per-sheet mappings so the
+    // admin can advance again without redoing work (FR-22, US-018). Only
+    // the transient step-local view state is reset.
     setStatus("sheet-selection");
     setAutoMapResult(null);
     setSheetData([]);
     setCurrentSheetIndex(0);
-    setSheetMappings(new Map());
-    setParseResult(null);
-    setResolvedOrgMapping(null);
-    setAnalysisArgs(null);
   }, []);
 
   const handleBackToMapping = useCallback(() => {
-    setCurrentSheetIndex(0);
-    setSheetMappings(new Map());
-    setParseResult(null);
-    setResolvedOrgMapping(null);
-    setAnalysisArgs(null);
+    // Re-enter column mapping at the first sheet, using the previously
+    // confirmed mapping (if any) as inherited defaults. Preserve parseResult
+    // and the resolved org-mapping so going back to preview later restores
+    // the admin's selections.
+    const firstSheet = selectedSheets[0];
+    if (!firstSheet) return;
 
-    if (loadSheetForMapping(selectedSheets[0])) {
+    const existing = sheetMappings.get(firstSheet);
+    setCurrentSheetIndex(0);
+    if (loadSheetForMapping(firstSheet, existing?.mappings)) {
       setStatus("mapping");
     }
-  }, [selectedSheets, loadSheetForMapping]);
+  }, [selectedSheets, sheetMappings, loadSheetForMapping]);
 
   const handleBackToOrgMapping = useCallback(() => {
+    // Preserve parseResult + resolvedOrgMapping so the admin sees the
+    // previously resolved org mappings; only drop the analysis result so it
+    // is re-fetched when advancing to preview again.
     setAnalysisArgs(null);
-    setResolvedOrgMapping(null);
     setStatus("org-mapping");
   }, []);
 
   const handleReset = handleBackToUpload;
+
+  // Previously confirmed org-mapping entries reconstructed so the
+  // org-mapping step can restore selections when the admin returns via Back.
+  const priorOrgMappingEntries = useMemo<OrgMappingEntry[] | undefined>(() => {
+    if (!resolvedOrgMapping) return undefined;
+    const entries: OrgMappingEntry[] = [];
+    for (const { name, id } of resolvedOrgMapping.matchedOrgs) {
+      entries.push({ excelName: name, orgId: id });
+    }
+    for (const name of resolvedOrgMapping.newOrgNames) {
+      entries.push({ excelName: name, orgId: null });
+    }
+    return entries;
+  }, [resolvedOrgMapping]);
 
   return {
     status,
@@ -440,6 +473,7 @@ export function useImportMachine() {
     sheetMappings,
     extractedOrgData,
     resolvedOrgMapping,
+    priorOrgMappingEntries,
     handleFileSelect,
     handleSheetSelectionConfirm,
     handleHeaderRowChange,

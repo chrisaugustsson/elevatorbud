@@ -62,15 +62,16 @@ export function SheetSelectionSection({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-2">
+        <div className="flex min-h-11 items-center gap-2">
           <Checkbox
             id="select-all"
             checked={selected.size === sheetInfos.length}
             onCheckedChange={toggleAll}
+            className="size-5"
           />
           <label
             htmlFor="select-all"
-            className="text-sm font-medium cursor-pointer"
+            className="flex min-h-11 flex-1 cursor-pointer items-center text-sm font-medium"
           >
             Markera alla
           </label>
@@ -82,12 +83,12 @@ export function SheetSelectionSection({
             return (
               <label
                 key={sheet.name}
-                className="flex items-start gap-3 rounded-lg border p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors hover:bg-muted/50"
               >
                 <Checkbox
                   checked={selected.has(sheet.name)}
                   onCheckedChange={() => toggleSheet(sheet.name)}
-                  className="mt-0.5"
+                  className="mt-0.5 size-5"
                 />
                 <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center gap-2">

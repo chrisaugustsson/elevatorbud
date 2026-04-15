@@ -65,12 +65,18 @@ export function ResultSection({
                     <span className="font-medium">{entry.orgName}</span>
                     <div className="flex gap-2">
                       {entry.created > 0 && (
-                        <Badge variant="secondary" className="text-green-600 text-xs">
+                        <Badge
+                          variant="secondary"
+                          className="text-emerald-700 dark:text-emerald-400 text-xs"
+                        >
                           {entry.created} skapade
                         </Badge>
                       )}
                       {entry.updated > 0 && (
-                        <Badge variant="secondary" className="text-amber-600 text-xs">
+                        <Badge
+                          variant="secondary"
+                          className="text-amber-700 dark:text-amber-400 text-xs"
+                        >
                           {entry.updated} uppdaterade
                         </Badge>
                       )}

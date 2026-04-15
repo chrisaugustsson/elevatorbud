@@ -679,7 +679,10 @@ function EditUserDialogInner({
                                   <div className="ml-6 mt-1 space-y-1">
                                     {impliedChildren.map((child) => (
                                       <div key={child.id} className="flex items-center gap-2 rounded-md border border-dashed px-3 py-1.5 opacity-70">
-                                        <Unlink className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                                        <Unlink
+                                          className="mr-1 size-4 shrink-0 text-muted-foreground"
+                                          aria-hidden="true"
+                                        />
                                         <span className="text-sm flex-1 truncate">{child.name}</span>
                                         <Badge variant="outline" className="text-xs shrink-0">via {org?.name}</Badge>
                                       </div>

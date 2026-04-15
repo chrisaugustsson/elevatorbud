@@ -52,10 +52,13 @@ export function ImportStepper({ status }: { status: ImportStatus }) {
                 >
                   {isDone ? <Check className="h-3.5 w-3.5" /> : i + 1}
                 </div>
+                {/* On mobile, only the CURRENT step's label is visible so
+                    users always know where they are without sideways scroll.
+                    From sm: up, every step's label is shown. */}
                 <span
                   className={cn(
-                    "hidden text-sm sm:inline",
-                    isCurrent ? "font-medium text-foreground" : "text-muted-foreground",
+                    "text-sm",
+                    isCurrent ? "inline font-medium text-foreground" : "hidden text-muted-foreground sm:inline",
                   )}
                 >
                   {step.label}

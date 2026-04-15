@@ -175,25 +175,40 @@ export function ColumnMappingSection({
           {matchedCount}/{totalColumns} kolumner matchade automatiskt
         </Badge>
         {autoMapResult.confidence >= 0.8 && (
-          <Badge variant="outline" className="text-green-600">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
+          <Badge
+            variant="outline"
+            className="text-emerald-700 dark:text-emerald-400"
+          >
+            <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
             Hög matchning
           </Badge>
         )}
       </div>
 
-      {/* Missing mandatory warning */}
+      {/* Missing mandatory warning — role=alert + assertive so
+          screen readers announce the hard-failure state immediately. */}
       {missingMandatory.length > 0 && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950" aria-live="polite">
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="rounded-md border border-destructive/40 bg-destructive/5 p-3"
+        >
           <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 text-red-600 dark:text-red-400" aria-hidden="true" />
+            <AlertTriangle
+              className="mt-0.5 h-4 w-4 text-destructive"
+              aria-hidden="true"
+            />
             <div>
-              <p className="text-sm font-medium text-red-800 dark:text-red-200">
+              <p className="text-sm font-medium text-destructive">
                 Obligatoriska fält saknar mappning
               </p>
               <div className="mt-1 flex flex-wrap gap-1">
                 {missingMandatory.map((t) => (
-                  <Badge key={t.field} variant="destructive" className="text-xs">
+                  <Badge
+                    key={t.field}
+                    variant="destructive"
+                    className="text-xs"
+                  >
                     {t.label}
                   </Badge>
                 ))}
@@ -284,7 +299,7 @@ export function ColumnMappingSection({
                       {isAutoMatched && (
                         <Badge
                           variant="secondary"
-                          className="text-green-600 text-xs"
+                          className="text-emerald-700 dark:text-emerald-400 text-xs"
                         >
                           <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
                           Auto
@@ -293,7 +308,7 @@ export function ColumnMappingSection({
                       {isManuallyMapped && (
                         <Badge
                           variant="secondary"
-                          className="text-blue-600 text-xs"
+                          className="text-sky-700 dark:text-sky-400 text-xs"
                         >
                           <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
                           Manuell

@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   XCircle,
   Loader2,
-  ArrowLeft,
 } from "lucide-react";
 import { SheetCard } from "./sheet-card";
 import type { AnalysisResult, ResolvedOrgMapping } from "../hooks/use-import-machine";
@@ -24,6 +23,7 @@ export function PreviewSection({
   parseResult,
   analysis,
   resolvedOrgMapping,
+  selectedSheets,
   onConfirm,
   onBack,
   headingRef,
@@ -32,6 +32,7 @@ export function PreviewSection({
   parseResult: FullImportResult;
   analysis: AnalysisResult | undefined;
   resolvedOrgMapping?: ResolvedOrgMapping | null;
+  selectedSheets?: string[];
   onConfirm: () => void;
   onBack: () => void;
   headingRef?: React.RefObject<HTMLHeadingElement | null>;
@@ -44,32 +45,44 @@ export function PreviewSection({
   const hasElevators = parseResult.elevators.length > 0;
   const analysisReady = !!analysis;
 
+  // Build the sheet summary title from the actual selected sheets rather
+  // than hardcoding "Hissar" — the import supports arbitrary sheet names.
+  const sheetTitle = (() => {
+    if (!selectedSheets || selectedSheets.length === 0) return "Valda ark";
+    if (selectedSheets.length === 1) return selectedSheets[0];
+    if (selectedSheets.length <= 3) return selectedSheets.join(", ");
+    return `${selectedSheets.length} ark`;
+  })();
+  const sheetExtra =
+    selectedSheets && selectedSheets.length > 3
+      ? selectedSheets.join(", ")
+      : undefined;
+
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
-          <div>
-            <p className="font-medium">{fileName}</p>
-            <p className="text-xs text-muted-foreground">
-              {parseResult.elevators.length} hissar totalt
-            </p>
-          </div>
+      {/* Header — no redundant "choose another file" action here; the
+          stepper + bottom Back button handle navigation (FR-28). */}
+      <div className="flex items-center gap-3">
+        <FileSpreadsheet
+          className="h-5 w-5 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <div>
+          <p className="font-medium">{fileName}</p>
+          <p className="text-xs text-muted-foreground">
+            {parseResult.elevators.length} hissar totalt
+          </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Välj annan fil
-        </Button>
       </div>
 
-      {/* Sheet summary cards */}
+      {/* Sheet summary card — reflects the sheets the admin selected. */}
       <div className="grid gap-3 sm:grid-cols-1">
         <SheetCard
-          title="Hissar"
+          title={sheetTitle}
           found={parseResult.sheets.elevators.found}
           count={parseResult.sheets.elevators.count}
           required
+          extra={sheetExtra}
         />
       </div>
 
