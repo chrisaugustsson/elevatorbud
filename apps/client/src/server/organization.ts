@@ -3,11 +3,11 @@ import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import { eq, inArray } from "drizzle-orm";
 import { organizations } from "@elevatorbud/db/schema";
-import { authMiddleware } from "./auth";
+import { authMiddlewareRead } from "./auth";
 import { getContextOrgIds } from "./context";
 
 export const getOrganization = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ id: z.string().uuid(), parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);

@@ -45,6 +45,13 @@ function AuthenticatedLayout() {
           <p className="text-muted-foreground">
             Ditt konto konfigureras. Vänta ett ögonblick...
           </p>
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={() => signOut()}
+          >
+            Logga ut
+          </Button>
         </div>
       </div>
     );

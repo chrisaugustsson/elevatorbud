@@ -20,7 +20,7 @@ import {
   elevatorBudgets,
   organizations,
 } from "@elevatorbud/db/schema";
-import { authMiddleware } from "./auth";
+import { authMiddlewareRead } from "./auth";
 import { getContextOrgIds } from "./context";
 
 const NOT_MODERNIZED = "Ej ombyggd";
@@ -116,7 +116,7 @@ function buildWhereConditions(filters: FilterInput, contextOrgIds: string[]) {
 // ---------------------------------------------------------------------------
 
 export const getElevator = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ id: z.string().uuid(), parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
@@ -140,7 +140,7 @@ export const elevatorOptions = (id: string, parentOrgId: string) =>
   });
 
 export const getElevatorDetails = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ elevatorId: z.string().uuid(), parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
@@ -166,7 +166,7 @@ export const elevatorDetailsOptions = (elevatorId: string, parentOrgId: string) 
   });
 
 export const getLatestBudget = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ elevatorId: z.string().uuid(), parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
@@ -193,7 +193,7 @@ export const elevatorBudgetOptions = (elevatorId: string, parentOrgId: string) =
   });
 
 export const searchElevators = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ search: z.string(), parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
@@ -248,7 +248,7 @@ const listInputSchema = filterSchema.extend({
 });
 
 export const listElevators = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(listInputSchema)
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
@@ -329,7 +329,7 @@ export const elevatorListOptions = (
   });
 
 export const exportElevatorData = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(filterSchema)
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);

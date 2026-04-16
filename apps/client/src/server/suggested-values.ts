@@ -3,10 +3,10 @@ import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { suggestedValues } from "@elevatorbud/db/schema";
-import { authMiddleware } from "./auth";
+import { authMiddlewareRead } from "./auth";
 
 export const listSuggestedValues = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(
     z.object({ category: z.string(), activeOnly: z.boolean().optional() }),
   )
