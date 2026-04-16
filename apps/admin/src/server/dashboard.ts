@@ -2,15 +2,15 @@ import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { sql, eq, and, desc } from "drizzle-orm";
 import { elevators, organizations } from "@elevatorbud/db/schema";
-import type { Database } from "@elevatorbud/db";
-import { adminMiddleware } from "./auth";
+import type { DatabaseHttp } from "@elevatorbud/db";
+import { adminMiddlewareRead } from "./auth";
 
 // ---------------------------------------------------------------------------
 // Inlined query logic (from packages/api/src/routers/dashboard.ts)
 // Admin sees everything — no org scoping.
 // ---------------------------------------------------------------------------
 
-async function overview(db: Database) {
+async function overview(db: DatabaseHttp) {
   const currentYear = new Date().getFullYear();
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
@@ -93,7 +93,7 @@ async function overview(db: Database) {
 // ---------------------------------------------------------------------------
 
 export const getDashboardOverview = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .handler(async ({ context }) => {
     return overview(context.db);
   });

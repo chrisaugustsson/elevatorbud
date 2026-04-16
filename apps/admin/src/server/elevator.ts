@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import { eq, and, or, ilike, inArray, gte, lte, ne, sql, desc, asc } from "drizzle-orm";
-import type { Database } from "@elevatorbud/db";
+import type { Database, DatabaseHttp } from "@elevatorbud/db";
 import {
   elevators,
   elevatorDetails,
@@ -10,7 +10,13 @@ import {
   organizations,
   suggestedValues,
 } from "@elevatorbud/db/schema";
-import { adminMiddleware } from "./auth";
+import { adminMiddleware, adminMiddlewareRead } from "./auth";
+
+// Local alias for read helpers: either driver works, pick the faster HTTP
+// one at the middleware layer. Write helpers keep `Database` so the type
+// system prevents accidentally routing a mutation through a driver that
+// can't roll back.
+type ReadDb = Database | DatabaseHttp;
 
 // ---------------------------------------------------------------------------
 // Constants & helpers (inlined from packages/api/src/routers/elevator.ts)
@@ -297,7 +303,7 @@ function buildWhereConditions(
 // Inlined query functions — no org-scoping security boundary for admin.
 // ---------------------------------------------------------------------------
 
-async function getElevatorFn(db: Database, id: string) {
+async function getElevatorFn(db: ReadDb, id: string) {
   const elevator = await db.query.elevators.findFirst({
     where: eq(elevators.id, id),
     with: { organization: true },
@@ -308,13 +314,13 @@ async function getElevatorFn(db: Database, id: string) {
   return elevator;
 }
 
-async function getDetailsFn(db: Database, elevatorId: string) {
+async function getDetailsFn(db: ReadDb, elevatorId: string) {
   return db.query.elevatorDetails.findFirst({
     where: eq(elevatorDetails.elevatorId, elevatorId),
   });
 }
 
-async function getLatestBudgetFn(db: Database, elevatorId: string) {
+async function getLatestBudgetFn(db: ReadDb, elevatorId: string) {
   return db.query.elevatorBudgets.findFirst({
     where: eq(elevatorBudgets.elevatorId, elevatorId),
     orderBy: [desc(elevatorBudgets.createdAt)],
@@ -322,7 +328,7 @@ async function getLatestBudgetFn(db: Database, elevatorId: string) {
 }
 
 async function checkElevatorNumberFn(
-  db: Database,
+  db: ReadDb,
   elevatorNumber: string,
   organizationId: string | undefined,
   excludeId?: string,
@@ -343,7 +349,7 @@ async function checkElevatorNumberFn(
   return { exists: true };
 }
 
-async function searchFn(db: Database, searchTerm: string) {
+async function searchFn(db: ReadDb, searchTerm: string) {
   if (!searchTerm.trim()) return [];
   const s = `%${searchTerm}%`;
 
@@ -371,7 +377,7 @@ async function searchFn(db: Database, searchTerm: string) {
 }
 
 async function listFn(
-  db: Database,
+  db: ReadDb,
   filters: FilterInput & {
     page?: number;
     pageSize?: number;
@@ -476,7 +482,7 @@ async function listFn(
   };
 }
 
-async function exportDataFn(db: Database, filters: FilterInput) {
+async function exportDataFn(db: ReadDb, filters: FilterInput) {
   const where = buildWhereConditions(filters, filters.organizationId);
 
   return db
@@ -680,7 +686,7 @@ async function archiveFn(
 // ---------------------------------------------------------------------------
 
 export const getElevator = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     return getElevatorFn(context.db, data.id);
@@ -693,7 +699,7 @@ export const elevatorOptions = (id: string) =>
   });
 
 export const getElevatorDetails = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ elevatorId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     return getDetailsFn(context.db, data.elevatorId);
@@ -706,7 +712,7 @@ export const elevatorDetailsOptions = (elevatorId: string) =>
   });
 
 export const getLatestBudget = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ elevatorId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     return getLatestBudgetFn(context.db, data.elevatorId);
@@ -719,7 +725,7 @@ export const elevatorBudgetOptions = (elevatorId: string) =>
   });
 
 export const searchElevators = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ search: z.string() }))
   .handler(async ({ data, context }) => {
     return searchFn(context.db, data.search);
@@ -732,7 +738,7 @@ export const searchElevatorsOptions = (search: string) =>
   });
 
 export const listElevators = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(
     filterSchema.extend({
       page: z.number().optional(),
@@ -772,7 +778,7 @@ export const listElevatorsOptions = (
   });
 
 export const exportElevatorData = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(filterSchema)
   .handler(async ({ data, context }) => {
     return exportDataFn(context.db, data);
@@ -791,7 +797,7 @@ export const exportElevatorDataOptions = (
 // ---------------------------------------------------------------------------
 
 export const checkElevatorNumber = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(
     z.object({
       elevatorNumber: z.string(),
