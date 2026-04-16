@@ -206,32 +206,33 @@ function ImportPage() {
                   aria-hidden="true"
                 />
                 <span className="font-medium">
-                  Bearbetar {importProgress.total} hissar…
+                  Bearbetar {importProgress.current} av{" "}
+                  {importProgress.total} hissar…
                 </span>
               </div>
               <div className="space-y-2">
-                {/*
-                  The server runs the import as a single transaction; no
-                  per-batch progress is streamed. The indicator is
-                  intentionally indeterminate — we use aria-busy instead
-                  of a misleading aria-valuenow so screen readers don't
-                  announce a phantom percentage. Copy avoids "X of Y" so
-                  the visual never implies progress we don't have. Switch
-                  to role="progressbar" + valuenow if the server ever
-                  streams progress.
-                */}
                 <div
-                  role="status"
-                  aria-busy="true"
-                  aria-live="polite"
-                  aria-label={`Bearbetar import av ${importProgress.total} hissar`}
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={importProgress.total}
+                  aria-valuenow={importProgress.current}
+                  aria-label={`Importerar hiss ${importProgress.current} av ${importProgress.total}`}
                   className="relative h-2 w-full overflow-hidden rounded-full bg-muted"
                 >
-                  <div className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-primary animate-pulse motion-reduce:w-full motion-reduce:animate-none motion-reduce:opacity-70" />
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-full bg-primary transition-[width] duration-200 motion-reduce:transition-none"
+                    style={{
+                      width: `${
+                        importProgress.total > 0
+                          ? (importProgress.current / importProgress.total) * 100
+                          : 0
+                      }%`,
+                    }}
+                  />
                 </div>
                 <p className="text-center text-sm text-muted-foreground">
-                  Importen körs som en enda transaktion — det här kan ta
-                  upp till en minut för stora filer. Lämna inte sidan.
+                  Importen körs i små grupper. Enstaka rader som misslyckas
+                  hoppas över och rapporteras i slutet — lämna inte sidan.
                 </p>
               </div>
             </div>
@@ -244,12 +245,18 @@ function ImportPage() {
       )}
 
       {status === "error" && importError && (
-        <ImportErrorSection
-          error={importError}
-          onBackToMapping={handleBackToOrgMapping}
-          onStartOver={handleReset}
-          headingRef={errorHeadingRef}
-        />
+        <div className="space-y-4">
+          <ImportErrorSection
+            error={importError}
+            onBackToMapping={handleBackToOrgMapping}
+            onStartOver={handleReset}
+            headingRef={errorHeadingRef}
+          />
+          {importResult &&
+            (importResult.created > 0 || importResult.failures.length > 0) && (
+              <ResultSection result={importResult} onReset={handleReset} />
+            )}
+        </div>
       )}
 
       <Dialog

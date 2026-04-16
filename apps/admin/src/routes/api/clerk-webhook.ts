@@ -1,15 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Webhook } from "svix";
-import { createDb } from "@elevatorbud/db";
-import { users } from "@elevatorbud/db/schema";
+import { withDb, users } from "@elevatorbud/db";
 import { eq } from "drizzle-orm";
 import { invalidateUserCacheByClerkId } from "@elevatorbud/auth/middleware";
-
-let _db: ReturnType<typeof createDb> | null = null;
-function getDb() {
-  if (!_db) _db = createDb(process.env.DATABASE_URL!);
-  return _db;
-}
 
 type ClerkUserEvent = {
   data: {
@@ -44,47 +37,48 @@ async function handleWebhook(request: Request): Promise<Response> {
   }
 
   const { type, data } = evt;
-  const db = getDb();
 
-  if (type === "user.created" || type === "user.updated") {
-    // Clerk does not guarantee that email_addresses[0] is the primary.
-    // Prefer the one matching primary_email_address_id; fall back to the
-    // first entry only if the lookup fails (e.g. the primary id is absent).
-    const primary = data.primary_email_address_id
-      ? data.email_addresses.find((e) => e.id === data.primary_email_address_id)
-      : undefined;
-    const email =
-      primary?.email_address ?? data.email_addresses[0]?.email_address ?? "";
-    const name = [data.first_name, data.last_name].filter(Boolean).join(" ") || email;
+  return withDb(async (db) => {
+    if (type === "user.created" || type === "user.updated") {
+      // Clerk does not guarantee that email_addresses[0] is the primary.
+      // Prefer the one matching primary_email_address_id; fall back to the
+      // first entry only if the lookup fails (e.g. the primary id is absent).
+      const primary = data.primary_email_address_id
+        ? data.email_addresses.find((e) => e.id === data.primary_email_address_id)
+        : undefined;
+      const email =
+        primary?.email_address ?? data.email_addresses[0]?.email_address ?? "";
+      const name = [data.first_name, data.last_name].filter(Boolean).join(" ") || email;
 
-    const existing = await db.query.users.findFirst({
-      where: eq(users.clerkUserId, data.id),
-    });
+      const existing = await db.query.users.findFirst({
+        where: eq(users.clerkUserId, data.id),
+      });
 
-    if (existing) {
-      await db
-        .update(users)
-        .set({ email, name })
-        .where(eq(users.id, existing.id));
-    } else {
-      await db
-        .insert(users)
-        .values({ clerkUserId: data.id, email, name, role: "customer", active: true });
+      if (existing) {
+        await db
+          .update(users)
+          .set({ email, name })
+          .where(eq(users.id, existing.id));
+      } else {
+        await db
+          .insert(users)
+          .values({ clerkUserId: data.id, email, name, role: "customer", active: true });
+      }
+      invalidateUserCacheByClerkId(data.id);
     }
-    invalidateUserCacheByClerkId(data.id);
-  }
 
-  if (type === "user.deleted") {
-    const existing = await db.query.users.findFirst({
-      where: eq(users.clerkUserId, data.id),
-    });
-    if (existing) {
-      await db.delete(users).where(eq(users.id, existing.id));
+    if (type === "user.deleted") {
+      const existing = await db.query.users.findFirst({
+        where: eq(users.clerkUserId, data.id),
+      });
+      if (existing) {
+        await db.delete(users).where(eq(users.id, existing.id));
+      }
+      invalidateUserCacheByClerkId(data.id);
     }
-    invalidateUserCacheByClerkId(data.id);
-  }
 
-  return new Response("OK", { status: 200 });
+    return new Response("OK", { status: 200 });
+  });
 }
 
 export const Route = createFileRoute("/api/clerk-webhook")({

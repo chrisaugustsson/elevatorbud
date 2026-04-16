@@ -99,16 +99,11 @@ export function PreviewSection({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <StatCard
                   label="Nya hissar"
                   value={analysis.summary.newElevators}
                   variant="success"
-                />
-                <StatCard
-                  label="Uppdateras"
-                  value={analysis.summary.updatedElevators}
-                  variant="warning"
                 />
                 <StatCard
                   label="Matchade org."

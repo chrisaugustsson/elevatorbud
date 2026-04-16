@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { analyzeImportOptions, extractOrgNamesOptions, confirmImport } from "~/server/import";
+import type { ImportFailure } from "~/server/import";
 import type { OrgMappingEntry } from "../components/org-mapping-section";
 import {
   readWorkbook,
@@ -17,13 +18,11 @@ import {
 } from "@elevatorbud/utils";
 
 export type AnalysisResult = {
-  existingElevatorNumbers: Record<string, string>;
   orgMatchNames: string[];
   orgMatchIds: string[];
   newOrgNames: string[];
   summary: {
     newElevators: number;
-    updatedElevators: number;
     matchedOrgs: number;
     newOrgs: number;
   };
@@ -36,9 +35,17 @@ export type ImportProgress = {
 
 export type ImportResult = {
   created: number;
-  updated: number;
-  perOrgCounts?: Record<string, { orgName: string; created: number; updated: number }>;
+  total: number;
+  failures: ImportFailure[];
+  perOrgCounts?: Record<string, { orgName: string; created: number }>;
 };
+
+export type { ImportFailure };
+
+// Per-chunk size. Small enough that the admin sees progress tick every
+// fraction of a second on a typical file, large enough that network RTT
+// doesn't dominate the import time.
+const IMPORT_CHUNK_SIZE = 5;
 
 export type ImportStatus =
   | "idle"
@@ -375,10 +382,13 @@ export function useImportMachine() {
     if (!parseResult || !resolvedOrgMapping) return;
 
     setStatus("importing");
+    setImportError(null);
 
     const orgIdByName = new Map<string, string>();
+    const orgNameById = new Map<string, string>();
     for (const { name, id } of resolvedOrgMapping.matchedOrgs) {
       orgIdByName.set(name, id);
+      orgNameById.set(id, name);
     }
 
     const elevatorsWithOrgId = parseResult.elevators.map((e) => ({
@@ -396,35 +406,72 @@ export function useImportMachine() {
       return;
     }
 
-    setImportProgress({ current: 0, total: elevatorsWithOrgId.length });
+    const total = elevatorsWithOrgId.length;
+    setImportProgress({ current: 0, total });
 
-    try {
-      const result = await confirmImport({
-        data: { elevators: elevatorsWithOrgId },
-      });
+    let totalCreated = 0;
+    const allFailures: ImportFailure[] = [];
+    const aggregatedPerOrg: Record<
+      string,
+      { orgName: string; created: number }
+    > = {};
 
-      setImportProgress({ current: elevatorsWithOrgId.length, total: elevatorsWithOrgId.length });
-
-      if (result.perOrgCounts) {
-        const nameById = new Map<string, string>();
-        for (const { name, id } of resolvedOrgMapping.matchedOrgs) {
-          nameById.set(id, name);
-        }
+    // Sequential chunks: parallel requests would blow through the DB
+    // connection limit and interleave savepoints in ways that aren't worth
+    // the few hundred ms of wall time on the import path.
+    for (let i = 0; i < total; i += IMPORT_CHUNK_SIZE) {
+      const chunk = elevatorsWithOrgId.slice(i, i + IMPORT_CHUNK_SIZE);
+      try {
+        const result = await confirmImport({ data: { elevators: chunk } });
+        totalCreated += result.created;
+        if (result.failures.length > 0) allFailures.push(...result.failures);
         for (const [orgId, counts] of Object.entries(result.perOrgCounts)) {
-          if (!counts.orgName) {
-            counts.orgName = nameById.get(orgId) ?? orgId;
+          if (!aggregatedPerOrg[orgId]) {
+            aggregatedPerOrg[orgId] = {
+              orgName: counts.orgName || orgNameById.get(orgId) || orgId,
+              created: 0,
+            };
           }
+          aggregatedPerOrg[orgId]!.created += counts.created;
         }
+      } catch (e) {
+        // The chunk itself threw — network issue, auth, schema bug. Record
+        // every row in the chunk as failed so the admin still sees which
+        // rows didn't make it, then stop (whatever killed this chunk will
+        // likely kill the next one too).
+        const reason =
+          e instanceof Error
+            ? e.message
+            : "Okänt fel — anslutningen till servern kan ha brutits.";
+        for (const row of chunk) {
+          allFailures.push({
+            elevator_number: row.elevator_number,
+            sheet: row._source_sheet ?? null,
+            row: row._source_row ?? null,
+            reason,
+          });
+        }
+        setImportProgress({ current: i + chunk.length, total });
+        setImportResult({
+          created: totalCreated,
+          total,
+          failures: allFailures,
+          perOrgCounts: aggregatedPerOrg,
+        });
+        setImportError(reason);
+        setStatus("error");
+        return;
       }
-
-      setImportResult(result);
-      setStatus("complete");
-    } catch (e) {
-      setImportError(
-        e instanceof Error ? e.message : "Import misslyckades — transaktionen har rullats tillbaka.",
-      );
-      setStatus("error");
+      setImportProgress({ current: i + chunk.length, total });
     }
+
+    setImportResult({
+      created: totalCreated,
+      total,
+      failures: allFailures,
+      perOrgCounts: aggregatedPerOrg,
+    });
+    setStatus("complete");
   }, [parseResult, resolvedOrgMapping]);
 
   const handleBackToUpload = useCallback(() => {
