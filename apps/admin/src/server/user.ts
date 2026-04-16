@@ -16,6 +16,58 @@ function getClerkClient() {
 }
 
 // ---------------------------------------------------------------------------
+// Clerk error translation
+//
+// Clerk's `ClerkAPIResponseError` carries its useful payload on `.errors[]`
+// (code, message, longMessage). TanStack Start serializes thrown errors via
+// Seroval's ShallowErrorPlugin, which only preserves `name` and `message` —
+// so by the time the browser deserializes, all that survives is the HTTP
+// status text (e.g. "Unprocessable Entity"). Duck-type the shape (no
+// @clerk/shared import needed) and translate to a plain Error the admin UI
+// can actually surface.
+// ---------------------------------------------------------------------------
+
+type ClerkApiError = Error & {
+  errors: Array<{ code: string; message: string; longMessage?: string }>;
+};
+
+function isClerkApiError(err: unknown): err is ClerkApiError {
+  if (!(err instanceof Error)) return false;
+  const errors = (err as ClerkApiError).errors;
+  return (
+    Array.isArray(errors) &&
+    errors.every(
+      (e) =>
+        typeof e === "object" &&
+        e !== null &&
+        typeof (e as { code: unknown }).code === "string",
+    )
+  );
+}
+
+function translateClerkError(err: unknown): Error {
+  if (!isClerkApiError(err)) {
+    return err instanceof Error ? err : new Error(String(err));
+  }
+  const first = err.errors[0];
+  if (!first) {
+    return new Error("Kunde inte skapa användaren i inloggningssystemet.");
+  }
+  switch (first.code) {
+    case "form_identifier_exists":
+      return new Error(
+        "En användare med den här e-postadressen finns redan i inloggningssystemet.",
+      );
+    default:
+      return new Error(
+        first.longMessage ??
+          first.message ??
+          "Kunde inte skapa användaren i inloggningssystemet.",
+      );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Zod schemas (inlined from packages/api/src/routers/user.ts)
 // ---------------------------------------------------------------------------
 
@@ -212,51 +264,104 @@ async function createUserFn(
   const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : undefined;
 
   const clerk = getClerkClient();
-  const clerkUser = await clerk.users.createUser({
-    emailAddress: [input.email],
-    firstName,
-    lastName,
-    skipPasswordRequirement: true,
-  });
-
   const { organizationIds, ...userFields } = input;
 
-  // Wrap the user insert and organization-grant writes in one transaction so
-  // a user row can never end up created without its intended org grants.
-  // (Clerk creation sits outside the tx — it's remote and can't join a pg
-  // transaction — but the DB writes are atomic between themselves.)
-  return await db.transaction(async (tx) => {
-    if (organizationIds && organizationIds.length > 0) {
-      await assertNoParentChildOverlap(tx, organizationIds);
+  // Create a new Clerk identity, or adopt an existing one when the email is
+  // already in Clerk but has drifted away from our DB (e.g. the DB was
+  // reset while Clerk was not). Email is unique per Clerk instance, so
+  // `form_identifier_exists` + lookup by email uniquely identifies the right
+  // user — no guesswork.
+  let clerkUser: Awaited<ReturnType<typeof clerk.users.createUser>>;
+  let adoptedExistingClerkUser = false;
+
+  try {
+    clerkUser = await clerk.users.createUser({
+      emailAddress: [input.email],
+      firstName,
+      lastName,
+      skipPasswordRequirement: true,
+    });
+  } catch (err) {
+    const identifierExists =
+      isClerkApiError(err) &&
+      err.errors.some((e) => e.code === "form_identifier_exists");
+    if (!identifierExists) throw translateClerkError(err);
+
+    const { data: matches } = await clerk.users.getUserList({
+      emailAddress: [input.email],
+    });
+    // Defensive: Clerk just told us the identifier exists, so exactly one
+    // match is expected. Anything else — fall back to the original error.
+    if (matches.length !== 1) throw translateClerkError(err);
+
+    const candidate = matches[0]!;
+
+    // If the DB already has a row pointing at this Clerk user, this is not
+    // drift — it's a real duplicate attempt. Surface a clear message.
+    const existingDbRow = await db.query.users.findFirst({
+      where: eq(users.clerkUserId, candidate.id),
+    });
+    if (existingDbRow) {
+      throw new Error("En användare med den här e-postadressen finns redan.");
     }
 
-    const [user] = await tx
-      .insert(users)
-      .values({ ...userFields, clerkUserId: clerkUser.id, active: true })
-      .returning();
+    clerkUser = candidate;
+    adoptedExistingClerkUser = true;
+  }
 
-    if (organizationIds && organizationIds.length > 0) {
-      await tx.insert(userOrganizations).values(
-        organizationIds.map((orgId) => ({
-          userId: user.id,
-          organizationId: orgId,
-        })),
-      );
+  // Clerk creation sits outside the tx — it's remote and can't join a pg
+  // transaction. If the DB writes fail:
+  //   - and we CREATED the Clerk user here → roll it back (best-effort), so
+  //     we don't leave an orphaned Clerk identity the admin UI can't see.
+  //   - and we ADOPTED an existing one → leave it alone. It predates this
+  //     request and deleting it could wipe a real identity.
+  try {
+    return await db.transaction(async (tx) => {
+      if (organizationIds && organizationIds.length > 0) {
+        await assertNoParentChildOverlap(tx, organizationIds);
+      }
+
+      const [user] = await tx
+        .insert(users)
+        .values({ ...userFields, clerkUserId: clerkUser.id, active: true })
+        .returning();
+
+      if (organizationIds && organizationIds.length > 0) {
+        await tx.insert(userOrganizations).values(
+          organizationIds.map((orgId) => ({
+            userId: user.id,
+            organizationId: orgId,
+          })),
+        );
+      }
+
+      return user;
+    });
+  } catch (err) {
+    if (!adoptedExistingClerkUser) {
+      await clerk.users.deleteUser(clerkUser.id).catch(() => {
+        // Best-effort cleanup. If this fails too, the Clerk user stays orphaned,
+        // but the original error is what the admin needs to see.
+      });
     }
-
-    return user;
-  });
+    throw err;
+  }
 }
 
 async function deleteUserFn(db: Database, id: string) {
   const dbUser = await db.query.users.findFirst({ where: eq(users.id, id) });
   if (!dbUser) throw new Error("Användaren hittades inte");
 
-  const clerk = getClerkClient();
-  await clerk.users.deleteUser(dbUser.clerkUserId);
+  // Delete the DB row first. If the Clerk call then fails, the stale Clerk
+  // identity can still be cleaned up from Clerk's own admin UI — the reverse
+  // (Clerk gone, DB row alive) leaves a row the admin can't re-delete without
+  // hitting a 404 from Clerk every time.
   await db.delete(users).where(eq(users.id, id));
   invalidateUserCacheByClerkId(dbUser.clerkUserId);
   invalidateUserCacheByDbId(dbUser.id);
+
+  const clerk = getClerkClient();
+  await clerk.users.deleteUser(dbUser.clerkUserId);
   return { deleted: true };
 }
 
