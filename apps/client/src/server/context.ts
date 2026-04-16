@@ -3,8 +3,8 @@ import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import { eq, inArray } from "drizzle-orm";
 import { organizations } from "@elevatorbud/db/schema";
-import { authMiddleware } from "./auth";
-import type { Database } from "@elevatorbud/db";
+import { authMiddlewareRead } from "./auth";
+import type { DatabaseHttp } from "@elevatorbud/db";
 
 /**
  * Resolves the set of org IDs accessible within a given parent context —
@@ -18,7 +18,7 @@ import type { Database } from "@elevatorbud/db";
  * add a `parentId IS NULL` assertion here.
  */
 export async function getContextOrgIds(
-  db: Database,
+  db: DatabaseHttp,
   user: { organizationIds: string[] },
   parentOrgId: string,
 ): Promise<string[]> {
@@ -35,7 +35,7 @@ export async function getContextOrgIds(
 }
 
 export const validateParentContext = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(
@@ -61,7 +61,7 @@ export const parentContextOptions = (parentOrgId: string) =>
   });
 
 export const getDefaultParentOrg = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .handler(async ({ context }) => {
     if (context.user.organizationIds.length === 0) return null;
 
@@ -81,7 +81,7 @@ export const defaultParentOrgOptions = () =>
   });
 
 export const getUserDirectOrgs = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .handler(async ({ context }) => {
     if (context.user.organizationIds.length === 0) return [];
 
@@ -99,7 +99,7 @@ export const userDirectOrgsOptions = () =>
   });
 
 export const getChildOrgs = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     await getContextOrgIds(context.db, context.user, data.parentOrgId);
