@@ -1,0 +1,502 @@
+{
+  "project": "Hisskompetens",
+  "branchName": "ralph/org-hierarchy-and-import-refactor",
+  "description": "Introduce one-level organization hierarchy (parent/child), multi-org user access with inherited access through the hierarchy, contact-person-per-elevator, and a refactored Excel import that drops hard-coded sheet names, adds explicit sheet + org-name mapping steps, and removes emergency-phone / removed-elevator imports.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add parentId to organizations with one-level-deep constraint",
+      "description": "As a developer, I want organizations to support a self-referential parent so we can model a one-level parent/child hierarchy.",
+      "acceptanceCriteria": [
+        "Add nullable `parentId` column to `organizations` table referencing `organizations.id`",
+        "Enforce one-level-deep constraint at the database layer: an org with a non-null `parentId` cannot itself be referenced by another org's `parentId` (check constraint, trigger, or validation in the write path — pick the simplest reliable option)",
+        "Drizzle schema updated with self-relation",
+        "Migration generated and runs cleanly against local Postgres",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Add user-organization many-to-many join table",
+      "description": "As a developer, I want a join table between users and organizations so a user can have direct access to multiple orgs.",
+      "acceptanceCriteria": [
+        "Create `userOrganizations` table (userId, organizationId, createdAt, composite PK on (userId, organizationId))",
+        "Remove `organizationId` column from `users` table",
+        "Drizzle schema + relations updated (user → userOrganizations → organization)",
+        "Cascade delete configured on both userId and organizationId",
+        "Migration runs cleanly",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Move contact person from organization to elevator",
+      "description": "As a user, I want each elevator to have its own contact person so different buildings can have different on-site contacts.",
+      "acceptanceCriteria": [
+        "Remove `contactPerson*` fields from `organizations` table",
+        "Add `contactPersonName`, `contactPersonPhone`, `contactPersonEmail` columns to `elevators` table (single contact per elevator)",
+        "Drizzle schema updated",
+        "Migration runs cleanly",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Clear existing data reset script",
+      "description": "As a developer, I want all existing elevators, organizations, user-org links, and related records cleared so the new schema starts with a clean slate.",
+      "acceptanceCriteria": [
+        "Reset script truncates relevant tables in correct FK order",
+        "Script is guarded to prevent accidental execution against prod (e.g. requires an explicit --confirm flag or checks NODE_ENV / DATABASE_URL)",
+        "Script lives under `scripts/` or `packages/db/` and is runnable via pnpm",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Effective organization access helper",
+      "description": "As a developer, I want a helper that returns the full set of org IDs a user has access to (direct grants + direct children of those grants) so client-app queries can filter correctly.",
+      "acceptanceCriteria": [
+        "Helper function `getEffectiveOrganizationIds(userId)` in `packages/auth/` or `packages/db/`",
+        "Uses a single join (no recursion — hierarchy is exactly one level deep)",
+        "Returns deduplicated array of org IDs: direct grants ∪ orgs where `parentId` is in the direct grants",
+        "Unit tests cover: user with a single direct grant (no children), user with a direct grant that has children, user with multiple direct grants at different roots",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Admin can set parent on organization",
+      "description": "As an admin, I want to set a parent organization when creating or editing an org so I can build the one-level hierarchy.",
+      "acceptanceCriteria": [
+        "Org create/edit form includes a searchable 'Parent organization' dropdown",
+        "Dropdown only shows root orgs (parentId = null) — orgs that already have a parent are not valid parent choices",
+        "Dropdown excludes the org being edited",
+        "If the org being edited already has children, the parent dropdown is disabled with a tooltip ('This organization has sub-organizations and cannot itself have a parent')",
+        "Clearing the dropdown sets `parentId` to null (makes it a top-level org)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Admin can grant user access to multiple orgs",
+      "description": "As an admin, I want to grant a user access to one or more organizations so multi-org users have a single login.",
+      "acceptanceCriteria": [
+        "User edit page shows list of orgs the user currently has direct access to",
+        "Admin can add/remove orgs from the user's access list",
+        "UI visually distinguishes inherited access (via parent grant) from direct grants — icon or text label, not color alone",
+        "UI prevents creating a direct grant on a user for both a parent and one of its children (redundant — the child grant is implied)",
+        "When revoking a direct grant, a toast confirms and lists the child orgs the user also lost implicit access to",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Warn when org parent change affects user access",
+      "description": "As an admin, I want to know when changing an org's parent will grant or revoke inherited access for existing users so I don't silently expand or cut off access.",
+      "acceptanceCriteria": [
+        "On save of a `parentId` change, compute the diff of effective access for users with a direct grant on the old parent and/or the new parent",
+        "If any user gains or loses inherited access, show a warning dialog with aggregate counts ('X users will gain access, Y users will lose access')",
+        "Dialog includes an expandable 'View affected users' section listing name, email, and gain/lose indicator",
+        "Admin must confirm explicitly before the change is applied",
+        "No warning when the change has no access-inheritance impact",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Effective access preview in user-org management",
+      "description": "As an admin, I want to see the total effective org count and which orgs are inherited vs direct for a user so I understand the reach of each grant.",
+      "acceptanceCriteria": [
+        "User access page shows 'Effective access: N organizations' total",
+        "Each direct grant row is expandable to show the child orgs it transitively grants",
+        "Inherited orgs shown read-only, labeled 'via [parent name]'",
+        "Direct grants use a solid badge; inherited shown with a muted/outline badge + label (never color alone)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Scope client-app queries to current parent context",
+      "description": "As a client-app user, I want every page to show data for the parent organization I'm currently viewing (including its direct children) so each screen has a clear, single-context scope.",
+      "acceptanceCriteria": [
+        "Client app routes include current parent org in the URL: `/:parentOrgId/...`",
+        "Every client-app server function filters by `organizationId IN (currentParentId, ...childrenOfCurrentParent)`",
+        "Middleware validates the URL's `parentOrgId` is in the user's effective direct grants — otherwise redirect/404",
+        "`context.user.organizationId` is replaced with `context.currentContextOrgIds` (array: parent + direct children)",
+        "Invalid or inaccessible `:parentOrgId` redirects to last-used or default context with a toast ('That organization is unavailable')",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill — a user with access to a parent org sees elevators from its child orgs merged into each view"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Client-app parent context header switcher",
+      "description": "As a client-app user with one or more parent orgs, I want the app to place me in one parent context at a time with a switcher in the header if I have more than one.",
+      "acceptanceCriteria": [
+        "On login, user lands on last-used parent context (via cookie/localStorage). Fallback: first direct grant alphabetically",
+        "Header shows the current parent org name",
+        "If user has 2+ direct grants, the header name is a dropdown listing those direct grants (not their children); selecting one routes to that parent",
+        "If user has only 1 direct grant, no switcher is shown (name is static text)",
+        "A user with a direct grant on a child org only (not its parent) treats that child as their context, as if it were a root",
+        "Switching updates the URL (`/:parentOrgId/...`) and replaces list/dashboard state (filters, drill-downs, pagination reset)",
+        "Long org names truncate with ellipsis; full name available via accessible tooltip and `aria-label`",
+        "Trigger button has `aria-haspopup='menu'`, `aria-expanded`, and `aria-label` describing state",
+        "Dropdown uses semantic menu roles; current selection marked `aria-current='true'` and a visible checkmark (not color alone)",
+        "Dropdown is keyboard-navigable (arrows, Enter, Escape); closes on outside click; focus returns to trigger on close",
+        "When user has 10+ direct grants, dropdown includes a type-to-filter input at the top",
+        "While orgs are loading on initial app load, header shows a skeleton placeholder for the switcher slot",
+        "Narrow viewport (<768px): switcher opens as a full-screen or bottom sheet rather than a dropdown",
+        "After switch, change announced via `aria-live='polite'`, focus moves to the main content heading, and content crossfades (≤200ms, respects `prefers-reduced-motion`)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Sub-org filter on client-app list pages",
+      "description": "As a client-app user in a parent context that has sub-orgs, I want to filter list pages by sub-org and see which sub-org each row belongs to so I can narrow focus when needed.",
+      "acceptanceCriteria": [
+        "When current parent has 1+ children, list pages show a sub-org filter and a sub-org column",
+        "When current parent has zero children, the filter and column are hidden entirely",
+        "Filter is single-select; default option is 'All sub-organizations'",
+        "When a specific sub-org is selected, a dismissable filter chip appears above the table ('Sub-Org A ×') mirroring existing filter-chip treatment",
+        "Filter state persists in URL query params (consistent with existing URL-driven filter pattern)",
+        "Empty state when the selected sub-org has zero matching rows: 'No elevators in [Sub-Org Name]' with a 'Clear filter' action",
+        "Narrow viewport (<768px): sub-org filter moves into the existing filter drawer; sub-org column is hidden (sub-org name appears inline in row's secondary text instead)",
+        "Filter change announces the new result count via `aria-live='polite'`",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Dashboard aggregates across current parent context",
+      "description": "As a client-app user, I want the dashboard to show aggregated numbers across the current parent org and all its sub-orgs so I see the full picture at a glance.",
+      "acceptanceCriteria": [
+        "Dashboard queries use `currentContextOrgIds` (parent + direct children)",
+        "No sub-org filter shown on the dashboard by default",
+        "Existing chart drill-down mechanism can reveal per-sub-org breakdowns where supported",
+        "Each chart loads independently — one slow or failed query does not block the others",
+        "Each chart has its own skeleton placeholder during load (no blank axis frames)",
+        "Each chart has its own error state with a retry action; never a broken axis or blank panel",
+        "Empty-data state: each chart shows a 'No data yet' message rather than an empty axis",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Modernisering page sub-org drill-down",
+      "description": "As a client-app user viewing modernisering charts for a parent context with sub-orgs, I want to drill down to a specific sub-org via the existing chart-click mechanism.",
+      "acceptanceCriteria": [
+        "When current parent has children, a chart dimension (or existing clickable bar) supports drilling down by sub-org",
+        "Clicking a sub-org in a chart filters the other charts on the page to that sub-org via URL params",
+        "Clickable bars have visible hover/focus state (cursor pointer + outline or elevation change)",
+        "Chart bars are keyboard-focusable; Enter or Space triggers drill-down",
+        "After drill-down, a dismissable filter chip appears above the chart grid ('Sub-Org A ×') — clearing restores aggregated view",
+        "Drill-down change announced via `aria-live='polite'`",
+        "When parent has no children, no sub-org drill-down affordance is rendered at all",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Drop hard-coded sheet name validation in Excel parser",
+      "description": "As a developer, I want the parser to stop requiring specific sheet names (`Hissar`, `Nödtelefoner`, `Rivna hissar`) so files with any sheet structure can be imported.",
+      "acceptanceCriteria": [
+        "Remove the mandatory-sheet check in `parse-excel-import-with-mapping.ts`",
+        "Parser can open any workbook and return metadata about each sheet (name, row count, first-row preview)",
+        "Existing callers still compile",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Remove emergency phone and removed-elevator import",
+      "description": "As a developer, I want to drop the emergency phone (`Nödtelefoner`) and removed elevator (`Rivna hissar`) import paths so the codebase only handles elevators.",
+      "acceptanceCriteria": [
+        "Delete the hard-coded parsers for `Nödtelefoner` and `Rivna hissar`",
+        "Remove emergency-phone-specific header aliases and types",
+        "Remove the join logic that merges emergency phone data into elevators",
+        "Any UI elements related to these two flows are removed",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Sheet selection step in import",
+      "description": "As an admin, I want to pick which sheets to import from after uploading the file so I can skip sheets that aren't relevant.",
+      "acceptanceCriteria": [
+        "After upload, a step shows a list of all sheets in the workbook",
+        "Each sheet row shows sheet name, row count, and a preview of the first row's values",
+        "Admin selects sheets via checkboxes (default: all selected)",
+        "At least one sheet must be selected to proceed",
+        "Sheets with only a header row (zero data rows) show an inline warning",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Parse Excel and extract distinct org names",
+      "description": "As a developer, I want the import to parse the Excel file and return distinct org names (case-sensitive) so the mapping UI can drive from a clean dataset.",
+      "acceptanceCriteria": [
+        "Server function returns `{ orgNames: string[], rowCount: number, parsedRows: ... }` from uploaded Excel",
+        "Names are deduplicated as exact strings (case preserved — 'Bostadsbolaget' and 'bostadsbolaget' appear as two separate entries)",
+        "Parsed row data held server-side (or re-uploaded on import) so mapping UI doesn't have to re-parse",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Per-sheet column mapping with inherited defaults",
+      "description": "As an admin, I want each selected sheet to go through its own column-mapping step but with the previous sheet's mapping carried over as a default so I don't redo identical work.",
+      "acceptanceCriteria": [
+        "After sheet selection, the column-mapping step runs once per selected sheet sequentially, with a visible progress indicator ('Sheet 2 of 4: [sheet name]')",
+        "First sheet uses existing auto-mapping logic (via `HEADER_ALIASES`)",
+        "Subsequent sheets inherit the previous sheet's resolved mapping as their starting default, overlaid on auto-detection",
+        "Admin can change any mapping on any sheet before advancing",
+        "Mandatory field validation applies per sheet before advancing (blocks Next until all mandatory fields mapped)",
+        "Missing mandatory fields shown prominently (red badge + list)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Merge rows from all selected sheets before org mapping",
+      "description": "As a developer, I want rows from every selected sheet merged into a single parsed dataset before the org-mapping step so the downstream flow is sheet-count-agnostic.",
+      "acceptanceCriteria": [
+        "After column mapping is resolved for all selected sheets, rows are concatenated into one dataset",
+        "`_source_sheet` metadata is preserved on each row for debug/trace",
+        "The org-name-mapping step receives the deduplicated org names across all merged rows",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Build the import org-name mapping UI",
+      "description": "As an admin, I want a mapping screen showing every org name in the Excel alongside a dropdown of existing orgs, with auto-selected exact matches, so I can confirm or change each mapping before running the import.",
+      "acceptanceCriteria": [
+        "Table UI: one row per distinct org name in Excel",
+        "Each row has a searchable (type-to-filter) dropdown of existing orgs with keyboard navigation",
+        "Exact case-sensitive matches are auto-selected (shown as pre-selected, not silently applied)",
+        "Rows with no match show a 'Create organization' option in the dropdown",
+        "Admin can change any auto-selected mapping",
+        "Import button is disabled until every row has a resolved org ID",
+        "If no matching orgs exist at all, step still works — every row defaults to 'Create organization' with a helpful banner",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Inline 'Create organization' dialog during import",
+      "description": "As an admin, I want to create a new organization from within the import flow without losing my parsed Excel or partial mapping.",
+      "acceptanceCriteria": [
+        "Dialog opens from the 'Create organization' option in the mapping dropdown",
+        "Minimal fields: name (prefilled from Excel row), optional parent organization",
+        "On save, the new org is created and auto-selected for that mapping row",
+        "Parsed Excel and other mapping selections persist across dialog open/close",
+        "Dialog confirms discard when closed with modified fields",
+        "Dialog traps focus and restores focus to the triggering control on close",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "Run the import with resolved mapping",
+      "description": "As an admin, I want the import to create elevators (not organizations) using the confirmed mapping so each elevator is linked to the right org.",
+      "acceptanceCriteria": [
+        "Import creates one elevator per merged Excel row",
+        "`organizationId` is set from the resolved mapping",
+        "`contactPersonName`, `contactPersonPhone`, `contactPersonEmail` are populated from the Excel row",
+        "No organizations are created as a side effect of running the import",
+        "Import is transactional — all-or-nothing, failure rolls back",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Import flow stepper with back navigation",
+      "description": "As an admin, I want to see which step I'm on during the import and be able to go back without losing my work.",
+      "acceptanceCriteria": [
+        "Step indicator visible on every import screen ('Step 2 of 5: Select sheets')",
+        "Steps: (1) Upload, (2) Select sheets, (3) Map columns, (4) Map org names, (5) Review & import",
+        "Current step highlighted; completed steps marked done; future steps disabled/muted",
+        "Back button on every step except upload",
+        "Going back preserves all state — uploaded file, sheet selection, column mappings, org-name mappings",
+        "Re-entering a later step after going back does not reset its state",
+        "Each step has exactly one primary CTA (Next / Import) and at most one secondary action (Back / Cancel)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-025",
+      "title": "File upload validation and error states",
+      "description": "As an admin, I want clear error messages when an upload fails so I know how to fix the problem rather than the flow silently breaking.",
+      "acceptanceCriteria": [
+        "Reject non-Excel files (not `.xlsx` / `.xls`) with a message stating the accepted formats",
+        "Enforce a file size limit (10MB) with a message stating the limit and the uploaded size",
+        "Surface a parse error if the workbook is corrupt or unreadable",
+        "Surface an error if the workbook has zero sheets",
+        "Every error message states cause AND recovery step (e.g. 'File must be .xlsx — re-export from Excel and try again')",
+        "Errors are announced via `aria-live='assertive'` for screen readers",
+        "Upload zone supports drag-drop with visible hover state plus a keyboard-accessible 'Choose file' button",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 25,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-026",
+      "title": "Empty and unmappable sheet handling",
+      "description": "As an admin, I want meaningful feedback when selected sheets have no usable data or missing mandatory columns so I'm never stuck at a dead end.",
+      "acceptanceCriteria": [
+        "Sheets with only a header row (zero data rows) show an inline warning on the sheet-selection row",
+        "If every selected sheet has zero data rows, the 'Next' button is disabled with an explanation",
+        "Column mapping surfaces missing mandatory fields prominently (red badge + list)",
+        "'Next' from column mapping is disabled until every mandatory field is mapped (per sheet when headers differ; once when headers match)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-027",
+      "title": "Confirm navigation away from unsaved import",
+      "description": "As an admin, I don't want to accidentally lose my parsed Excel and in-progress mappings by clicking away or refreshing.",
+      "acceptanceCriteria": [
+        "Navigating away (route change, tab close, refresh) after upload triggers a confirmation dialog",
+        "Dialog states clearly that import progress will be lost",
+        "Confirmation only fires when in-progress state exists (not on bare upload step before a file is selected, not after successful import)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 27,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-028",
+      "title": "Import execution progress and result reporting",
+      "description": "As an admin, I want to see progress during import execution and a clear result afterwards so large imports don't feel like a black box and failures are actionable.",
+      "acceptanceCriteria": [
+        "During import, show a progress indicator with batch progress (e.g. 'Importing… 250 / 1200 elevators')",
+        "Import button disabled during execution",
+        "On success: summary screen with counts per org ('Created 200 elevators in Bostadsbolaget, 80 in Sub-Org A')",
+        "On failure: error screen stating which row/sheet/field caused the failure + reminder that the transaction was rolled back, plus 'Back to mapping' and 'Start over' actions",
+        "Parse and analyze steps each show skeleton/loading feedback when they exceed 300ms",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 28,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-029",
+      "title": "Accessibility sweep across import and org management flows",
+      "description": "As a keyboard or screen-reader user, I want the entire import flow and org management pages to be fully operable with predictable focus and clear announcements.",
+      "acceptanceCriteria": [
+        "All interactive elements keyboard-reachable in logical tab order",
+        "On step advance in the import flow, focus moves to the step heading",
+        "Form errors use `aria-live='polite'`; hard failures use `role='alert'`",
+        "All icon-only buttons have `aria-label`",
+        "Modal dialogs (create-org, change-parent warning) trap focus and restore focus on close",
+        "Color is never the sole indicator (inherited vs direct access, valid vs invalid mapping, required vs optional column — always icon or text too)",
+        "Color contrast ≥4.5:1 for all text in both light and dark mode",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 29,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

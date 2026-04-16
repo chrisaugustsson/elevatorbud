@@ -1,0 +1,10 @@
+# Ralph Progress Log
+Started: tis 14 apr. 2026 20:58:12 CEST
+Feature: ralph/org-hierarchy-and-import-refactor
+---
+
+## Codebase Patterns
+
+(Add reusable patterns discovered during iterations here. Keep this section at the top.)
+
+---
