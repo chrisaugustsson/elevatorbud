@@ -1,15 +1,14 @@
 import { createMiddleware } from "@tanstack/react-start";
 import { auth } from "@clerk/tanstack-react-start/server";
-import { createDb } from "@elevatorbud/db";
-import { users, userOrganizations } from "@elevatorbud/db/schema";
+import {
+  withDb,
+  withDbHttp,
+  users,
+  userOrganizations,
+} from "@elevatorbud/db";
+import type { Database, DatabaseHttp } from "@elevatorbud/db";
 import { eq } from "drizzle-orm";
 import type { User } from "@elevatorbud/types";
-
-let _db: ReturnType<typeof createDb> | null = null;
-function getDb() {
-  if (!_db) _db = createDb(process.env.DATABASE_URL!);
-  return _db;
-}
 
 // Short-TTL cache keyed by Clerk user ID. TanStack Start middleware runs per
 // server-fn invocation with no shared request object we can hang a WeakMap
@@ -43,11 +42,13 @@ export function invalidateUserCacheByClerkId(clerkUserId: string): void {
   userCache.delete(clerkUserId);
 }
 
-async function resolveUser(requiredRole?: "admin" | "customer") {
+async function resolveUser(
+  db: Database | DatabaseHttp,
+  requiredRole?: "admin" | "customer",
+) {
   const { userId } = await auth();
   if (!userId) throw new Error("Ej autentiserad");
 
-  const db = getDb();
   const now = Date.now();
   const cached = userCache.get(userId);
 
@@ -86,50 +87,84 @@ async function resolveUser(requiredRole?: "admin" | "customer") {
   }
   if (!user.active) throw new Error("Kontot är inaktiverat");
 
-  return { user, db };
+  return { user };
 }
 
 /**
  * Middleware that requires an authenticated, active admin user.
- * Injects `user` and `db` into server function context.
+ * Injects `user` and `db` (WebSocket driver) into server function context.
+ * The DB pool lives for exactly this server-fn invocation — see `withDb`
+ * for the rationale. Use this for any admin server-fn that writes across
+ * multiple tables or needs `db.transaction()`.
  */
-export const adminMiddleware = createMiddleware().server(async ({ next }) => {
-  const { user, db } = await resolveUser("admin");
-  return next({ context: { user, db } });
-});
+export const adminMiddleware = createMiddleware().server(({ next }) =>
+  withDb(async (db) => {
+    const { user } = await resolveUser(db, "admin");
+    return next({ context: { user, db } });
+  }),
+);
 
 /**
  * Middleware that requires an authenticated, active user (any role).
- * Injects `user` and `db` into server function context.
+ * Injects `user` and `db` (WebSocket driver) into server function context.
  */
-export const authMiddleware = createMiddleware().server(async ({ next }) => {
-  const { user, db } = await resolveUser();
-  return next({ context: { user, db } });
-});
+export const authMiddleware = createMiddleware().server(({ next }) =>
+  withDb(async (db) => {
+    const { user } = await resolveUser(db);
+    return next({ context: { user, db } });
+  }),
+);
+
+/**
+ * Read-only admin middleware. Injects `user` and `db` (HTTP driver) — no
+ * WebSocket handshake per request, so it's the fastest option for pure-read
+ * server functions. The injected `db` does NOT support interactive
+ * transactions; the type system enforces that via `DatabaseHttp`, so code
+ * that needs `.transaction()` will fail to compile and must switch to
+ * `adminMiddleware`.
+ */
+export const adminMiddlewareRead = createMiddleware().server(({ next }) =>
+  withDbHttp(async (db) => {
+    const { user } = await resolveUser(db, "admin");
+    return next({ context: { user, db } });
+  }),
+);
+
+/**
+ * Read-only counterpart to `authMiddleware`. See `adminMiddlewareRead` for
+ * the HTTP-driver tradeoffs.
+ */
+export const authMiddlewareRead = createMiddleware().server(({ next }) =>
+  withDbHttp(async (db) => {
+    const { user } = await resolveUser(db);
+    return next({ context: { user, db } });
+  }),
+);
 
 /** For auth guards that return null instead of throwing. */
 export async function getAuthUser(): Promise<User | null> {
   const { userId } = await auth();
   if (!userId) return null;
 
-  const db = getDb();
-  const dbUser = await db.query.users.findFirst({
-    where: eq(users.clerkUserId, userId),
+  return withDb(async (db) => {
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.clerkUserId, userId),
+    });
+    if (!dbUser) return null;
+
+    const orgRows = await db
+      .select({ organizationId: userOrganizations.organizationId })
+      .from(userOrganizations)
+      .where(eq(userOrganizations.userId, dbUser.id));
+
+    return {
+      id: dbUser.id,
+      clerkUserId: dbUser.clerkUserId,
+      email: dbUser.email,
+      name: dbUser.name,
+      role: dbUser.role,
+      organizationIds: orgRows.map((r) => r.organizationId),
+      active: dbUser.active,
+    };
   });
-  if (!dbUser) return null;
-
-  const orgRows = await db
-    .select({ organizationId: userOrganizations.organizationId })
-    .from(userOrganizations)
-    .where(eq(userOrganizations.userId, dbUser.id));
-
-  return {
-    id: dbUser.id,
-    clerkUserId: dbUser.clerkUserId,
-    email: dbUser.email,
-    name: dbUser.name,
-    role: dbUser.role,
-    organizationIds: orgRows.map((r) => r.organizationId),
-    active: dbUser.active,
-  };
 }
