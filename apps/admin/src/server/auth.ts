@@ -1,5 +1,6 @@
 export {
   adminMiddleware,
+  adminMiddlewareRead,
   getAuthUser,
   invalidateUserCacheByDbId,
   invalidateUserCacheByClerkId,

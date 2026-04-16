@@ -12,6 +12,8 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/migrate.ts",
+    "db:migrate:dev": "tsx --env-file=../../.env.development src/migrate.ts",
+    "db:migrate:prod": "tsx --env-file=../../.env.production src/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:reset": "tsx src/reset-data.ts",
