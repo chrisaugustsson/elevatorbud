@@ -3,11 +3,11 @@ import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { elevators, organizations } from "@elevatorbud/db/schema";
-import { authMiddleware } from "./auth";
+import { authMiddlewareRead } from "./auth";
 import { getContextOrgIds } from "./context";
 
 export const getInspectionCalendar = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
@@ -16,7 +16,7 @@ export const getInspectionCalendar = createServerFn()
       SELECT inspection_month as month, count(*)::int as count
       FROM elevators e
       WHERE e.status = 'active'
-        AND e.organization_id = ANY(${contextOrgIds})
+        AND e.organization_id IN ${contextOrgIds}
         AND inspection_month IS NOT NULL
       GROUP BY inspection_month
       ORDER BY inspection_month
@@ -36,7 +36,7 @@ export const inspectionCalendarOptions = (parentOrgId: string) =>
   });
 
 export const getMaintenanceCompanies = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
@@ -48,7 +48,7 @@ export const getMaintenanceCompanies = createServerFn()
         count(*)::int as count
       FROM elevators e
       WHERE e.status = 'active'
-        AND e.organization_id = ANY(${contextOrgIds})
+        AND e.organization_id IN ${contextOrgIds}
         AND maintenance_company IS NOT NULL
       GROUP BY maintenance_company, district
       ORDER BY maintenance_company, district
@@ -86,7 +86,7 @@ export const maintenanceCompaniesOptions = (parentOrgId: string) =>
   });
 
 export const getEmergencyPhoneStatus = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
@@ -101,7 +101,7 @@ export const getEmergencyPhoneStatus = createServerFn()
       FROM elevators e
       LEFT JOIN elevator_details d ON d.elevator_id = e.id
       WHERE e.status = 'active'
-        AND e.organization_id = ANY(${contextOrgIds})
+        AND e.organization_id IN ${contextOrgIds}
     `);
 
     type EmergencyPhoneRow = {
@@ -128,7 +128,7 @@ export const emergencyPhoneStatusOptions = (parentOrgId: string) =>
   });
 
 export const getInspectionList = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ month: z.string(), parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);

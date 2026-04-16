@@ -2,11 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
-import { authMiddleware } from "./auth";
+import { authMiddlewareRead } from "./auth";
 import { getContextOrgIds } from "./context";
 
 export const getTimeline = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ parentOrgId: z.string().uuid(), subOrgId: z.string().uuid().optional() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
@@ -30,7 +30,7 @@ export const getTimeline = createServerFn()
         LIMIT 1
       ) lb ON true
       WHERE e.status = 'active'
-        AND e.organization_id = ANY(${contextOrgIds})
+        AND e.organization_id IN ${contextOrgIds}
         ${subOrgFilter}
         AND lb.recommended_modernization_year IS NOT NULL
       GROUP BY lb.recommended_modernization_year
@@ -51,7 +51,7 @@ export const timelineOptions = (parentOrgId: string, subOrgId?: string) =>
   });
 
 export const getBudget = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ parentOrgId: z.string().uuid(), subOrgId: z.string().uuid().optional() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
@@ -78,7 +78,7 @@ export const getBudget = createServerFn()
         LIMIT 1
       ) lb ON true
       WHERE e.status = 'active'
-        AND e.organization_id = ANY(${contextOrgIds})
+        AND e.organization_id IN ${contextOrgIds}
         ${subOrgFilter}
         AND lb.recommended_modernization_year IS NOT NULL
       GROUP BY lb.recommended_modernization_year, e.district, e.elevator_type
@@ -108,7 +108,7 @@ export const budgetOptions = (parentOrgId: string, subOrgId?: string) =>
   });
 
 export const getPriorityList = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(
     z.object({
       parentOrgId: z.string().uuid(),
@@ -162,7 +162,7 @@ export const getPriorityList = createServerFn()
         ) lb ON true
         LEFT JOIN organizations o ON o.id = e.organization_id
         WHERE e.status = 'active'
-          AND e.organization_id = ANY(${contextOrgIds})
+          AND e.organization_id IN ${contextOrgIds}
           ${subOrgFilter}
           AND lb.recommended_modernization_year IS NOT NULL
           ${yearFilter}
@@ -181,7 +181,7 @@ export const getPriorityList = createServerFn()
           LIMIT 1
         ) lb ON true
         WHERE e.status = 'active'
-          AND e.organization_id = ANY(${contextOrgIds})
+          AND e.organization_id IN ${contextOrgIds}
           ${subOrgFilter}
           AND lb.recommended_modernization_year IS NOT NULL
           ${yearFilter}
@@ -227,7 +227,7 @@ export const getPriorityList = createServerFn()
   });
 
 export const getSubOrgBreakdown = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
@@ -247,7 +247,7 @@ export const getSubOrgBreakdown = createServerFn()
       ) lb ON true
       JOIN organizations o ON o.id = e.organization_id
       WHERE e.status = 'active'
-        AND e.organization_id = ANY(${contextOrgIds})
+        AND e.organization_id IN ${contextOrgIds}
         AND lb.recommended_modernization_year IS NOT NULL
       GROUP BY o.id, o.name
       ORDER BY o.name

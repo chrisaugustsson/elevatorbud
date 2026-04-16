@@ -3,13 +3,13 @@ import { queryOptions } from "@tanstack/react-query";
 import { and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { elevators } from "@elevatorbud/db/schema";
-import { authMiddleware } from "./auth";
+import { authMiddlewareRead } from "./auth";
 import { getContextOrgIds } from "./context";
 
 const NOT_MODERNIZED = "Ej ombyggd";
 
 export const getStats = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
@@ -45,7 +45,7 @@ export const getStats = createServerFn()
           LIMIT 1
         ) lb ON true
         WHERE e.status = 'active'
-        AND e.organization_id = ANY(${contextOrgIds})
+        AND e.organization_id IN ${contextOrgIds}
       `),
     ]);
 
@@ -96,7 +96,7 @@ function toArray(r: { rows: Record<string, unknown>[] }): ChartRow[] {
 }
 
 export const getSingleChartData = createServerFn()
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(
     z.object({
       parentOrgId: z.string().uuid(),
@@ -109,7 +109,7 @@ export const getSingleChartData = createServerFn()
       context.user,
       data.parentOrgId,
     );
-    const orgFilter = sql`AND e.organization_id = ANY(${contextOrgIds})`;
+    const orgFilter = sql`AND e.organization_id IN ${contextOrgIds}`;
     const activeFilter = sql`e.status = 'active'`;
 
     const queries: Record<ChartType, () => Promise<{ rows: Record<string, unknown>[] }>> = {
