@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listOrganizationsOptions, createOrganization, updateOrganization, previewParentChange } from "~/server/organization";
@@ -8,8 +8,11 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
+  getExpandedRowModel,
+  flexRender,
   createColumnHelper,
   type SortingState,
+  type ExpandedState,
 } from "@tanstack/react-table";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Input } from "@elevatorbud/ui/components/ui/input";
@@ -22,12 +25,6 @@ import {
   TableHeader,
   TableRow,
 } from "@elevatorbud/ui/components/ui/table";
-import {
-  DataGrid,
-  DataGridContainer,
-  DataGridTable,
-  DataGridColumnHeader,
-} from "@elevatorbud/ui/components/ui/data-grid-table";
 import {
   Dialog,
   DialogContent,
@@ -56,7 +53,7 @@ import {
   TooltipTrigger,
 } from "@elevatorbud/ui/components/ui/tooltip";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus, Building2, UserPlus, Check, ChevronsUpDown, X, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Pencil, Loader2 } from "lucide-react";
+import { Plus, Building2, UserPlus, Check, ChevronsUpDown, X, ChevronDown, ChevronRight, AlertTriangle, ArrowUp, ArrowDown, Pencil, Loader2 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -90,7 +87,12 @@ type Organisation = {
   createdAt: Date;
 };
 
-const columnHelper = createColumnHelper<Organisation>();
+// TanStack Table reads `subRows` off each row to build its internal tree.
+// Attaching it to a copy (never the original) keeps the rest of the page free
+// to use the flat list shape.
+type OrganisationNode = Organisation & { subRows?: OrganisationNode[] };
+
+const columnHelper = createColumnHelper<OrganisationNode>();
 
 function validateOrganisationsnummer(value: string): string | undefined {
   if (!value) return undefined;
@@ -118,8 +120,18 @@ function Organisationer() {
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
+  // Carries the parent context when "+ Lägg till suborganisation" is clicked,
+  // so the create dialog can pre-fill parentId. Null parentId = top-level add
+  // from the page's main "Ny organisation" button.
+  const [createState, setCreateState] = useState<{ open: boolean; parentId: string | null }>({
+    open: false,
+    parentId: null,
+  });
   const [editOrg, setEditOrg] = useState<Organisation | null>(null);
+  // User's manual expand/collapse choices. When a search filter is active we
+  // override this with "expand all" so matches stay visible; clearing the
+  // filter reverts to what the user had before.
+  const [userExpanded, setUserExpanded] = useState<ExpandedState>({});
 
   // Open the edit dialog when the URL contains ?edit=<id> (e.g. when
   // navigating back from the detail page's edit button). Clears the
@@ -135,67 +147,142 @@ function Organisationer() {
     });
   }, [editIdFromSearch, orgs, navigate]);
 
+  // Flat list → nested tree. One level deep is enforced by the DB trigger
+  // `enforce_one_level_org_hierarchy`, so we don't need recursion.
+  const tree = useMemo<OrganisationNode[]>(() => {
+    const childrenByParent = new Map<string, Organisation[]>();
+    for (const o of orgs) {
+      if (o.parentId) {
+        const arr = childrenByParent.get(o.parentId) ?? [];
+        arr.push(o);
+        childrenByParent.set(o.parentId, arr);
+      }
+    }
+    return orgs
+      .filter((o) => o.parentId === null)
+      .map((o) => ({ ...o, subRows: childrenByParent.get(o.id) ?? [] }));
+  }, [orgs]);
+
+  const rootCount = tree.length;
+  const subCount = orgs.length - rootCount;
+
   const columns = useMemo(
     () => [
       columnHelper.accessor("name", {
-        size: 220,
-        header: ({ column }) => (
-          <DataGridColumnHeader title="Namn" column={column} />
-        ),
-        cell: (info) => (
-          <span className="font-medium">{info.getValue()}</span>
-        ),
-      }),
-      columnHelper.accessor("organizationNumber", {
-        size: 140,
-        header: ({ column }) => (
-          <DataGridColumnHeader title="Org.nummer" column={column} />
-        ),
-        enableSorting: false,
-        cell: (info) => (
-          <span className="tabular-nums">{info.getValue() || "—"}</span>
-        ),
-      }),
-      columnHelper.display({
-        id: "actions",
-        size: 60,
-        enableResizing: false,
-        header: "",
-        cell: (info) => {
-          const row = info.row.original;
+        header: "Namn",
+        cell: ({ row }) => {
+          const isParent = row.depth === 0;
+          const canExpand = row.getCanExpand();
+          const isExpanded = row.getIsExpanded();
           return (
-            <div className="flex items-center justify-end">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                aria-label="Redigera organisation"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditOrg(row);
-                }}
-              >
-                <Pencil className="size-4" />
-              </Button>
+            <div className={`flex items-center gap-2 ${isParent ? "" : "pl-10"}`}>
+              {isParent ? (
+                canExpand ? (
+                  <button
+                    type="button"
+                    className="inline-flex size-7 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                    aria-label={
+                      isExpanded
+                        ? `Dölj suborganisationer för ${row.original.name}`
+                        : `Visa suborganisationer för ${row.original.name}`
+                    }
+                    aria-expanded={isExpanded}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      row.toggleExpanded();
+                    }}
+                  >
+                    <ChevronRight
+                      className={`size-4 transition-transform motion-reduce:transition-none ${
+                        isExpanded ? "rotate-90" : ""
+                      }`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                ) : (
+                  // Spacer so parent names without a caret still line up with
+                  // parents that have one — keeps the left edge even.
+                  <span className="inline-block size-7" aria-hidden="true" />
+                )
+              ) : null}
+              <span className={isParent ? "font-medium" : ""}>{row.original.name}</span>
             </div>
           );
         },
+      }),
+      columnHelper.accessor("organizationNumber", {
+        header: "Org.nummer",
+        enableSorting: false,
+        cell: (info) => (
+          <span className="tabular-nums text-muted-foreground">{info.getValue() || "—"}</span>
+        ),
+      }),
+      columnHelper.display({
+        id: "subOrgCount",
+        header: "Suborganisationer",
+        cell: ({ row }) => {
+          if (row.depth > 0) return <span className="text-muted-foreground">—</span>;
+          const count = row.original.subRows?.length ?? 0;
+          return (
+            <Badge variant={count > 0 ? "default" : "secondary"} className="tabular-nums">
+              {count}
+            </Badge>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: "actions",
+        enableSorting: false,
+        header: "",
+        cell: ({ row }) => (
+          <div className="flex items-center justify-end">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              aria-label={`Redigera ${row.original.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditOrg(row.original);
+              }}
+            >
+              <Pencil className="size-4" />
+            </Button>
+          </div>
+        ),
       }),
     ],
     [],
   );
 
+  // When a search filter is active, expand everything so matching children
+  // stay visible under their parents (VS Code file-search pattern). This is
+  // separate from the user's manual expansion, which is restored when the
+  // filter clears.
+  const expanded: ExpandedState = globalFilter ? true : userExpanded;
+
   const table = useReactTable({
-    data: orgs,
+    data: tree,
     columns,
-    columnResizeMode: "onChange",
-    state: { sorting, globalFilter },
+    state: { sorting, globalFilter, expanded },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
+    onExpandedChange: setUserExpanded,
+    getSubRows: (row) => row.subRows,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    // Match a parent when any of its children match the search. Without this,
+    // searching for a sub-org name would hide its parent and the sub-org with it.
+    filterFromLeafRows: true,
+    // Don't lose the user's expansion state every time the filter changes.
+    autoResetExpanded: false,
   });
+
+  const rows = table.getRowModel().rows;
+  const visibleRoots = rows.filter((r) => r.depth === 0).length;
+  const visibleSubs = rows.filter((r) => r.depth === 1).length;
 
   return (
     <div className="space-y-6">
@@ -206,7 +293,7 @@ function Organisationer() {
             Hantera kundorganisationer och deras kontaktuppgifter.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button onClick={() => setCreateState({ open: true, parentId: null })}>
           <Plus />
           Ny organisation
         </Button>
@@ -220,41 +307,109 @@ function Organisationer() {
           className="max-w-sm"
         />
         <p className="text-sm text-muted-foreground">
-          {table.getFilteredRowModel().rows.length} organisationer
+          <span className="text-foreground">{globalFilter ? visibleRoots : rootCount}</span> huvudorganisationer
+          <span className="mx-1 text-muted-foreground/60">·</span>
+          <span className="text-foreground">{globalFilter ? visibleSubs : subCount}</span> suborganisationer
         </p>
       </div>
 
-      <DataGrid
-        table={table}
-        recordCount={orgs.length}
-        tableLayout={{ width: "fixed", columnsResizable: true }}
-        onRowClick={(row) =>
-          navigate({
-            to: "/admin/organisationer/$id" as string,
-            params: { id: row.id },
-          })
-        }
-        emptyMessage={
-          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-            <Building2 className="size-8" />
-            <p>Inga organisationer hittades.</p>
-          </div>
-        }
-      >
-        <DataGridContainer>
-          <div className="overflow-x-auto">
-            <DataGridTable />
-          </div>
-        </DataGridContainer>
-      </DataGrid>
+      <div className="overflow-x-auto rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {table.getHeaderGroups()[0]?.headers.map((header) => (
+                <TableHead key={header.id} className={header.id === "actions" ? "w-14" : undefined}>
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="h-32">
+                  <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                    <Building2 className="size-8" />
+                    <p>Inga organisationer hittades.</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((row, i) => {
+                const next = rows[i + 1];
+                // The "+ Lägg till suborganisation" action is injected after the
+                // last visible child of an expanded parent. "Last" means either
+                // the next row is a different parent (depth 0) or we're at the
+                // end of the list.
+                const isLastChildOfParent =
+                  row.depth === 1 && (!next || next.depth === 0);
+                const parentRow = row.depth === 1 ? row.getParentRow() : undefined;
+                return (
+                  <Fragment key={row.id}>
+                    <TableRow
+                      aria-level={row.depth + 1}
+                      aria-expanded={
+                        row.getCanExpand() ? row.getIsExpanded() : undefined
+                      }
+                      className={`cursor-pointer ${row.depth > 0 ? "bg-muted/30" : ""}`}
+                      onClick={() =>
+                        navigate({
+                          to: "/admin/organisationer/$id" as string,
+                          params: { id: row.original.id },
+                        })
+                      }
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    {isLastChildOfParent && parentRow && (
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableCell colSpan={4} className="py-2">
+                          <div className="pl-10">
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-2 rounded-md border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-muted-foreground hover:bg-background hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                              aria-label={`Lägg till suborganisation till ${parentRow.original.name}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCreateState({
+                                  open: true,
+                                  parentId: parentRow.original.id,
+                                });
+                              }}
+                            >
+                              <Plus className="size-3.5" aria-hidden="true" />
+                              Lägg till suborganisation
+                            </button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       <CreateOrgDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
+        // Remounting on parent change resets the form's default parentId.
+        key={createState.parentId ?? "root"}
+        open={createState.open}
+        onOpenChange={(open) =>
+          setCreateState((s) => ({ ...s, open, parentId: open ? s.parentId : null }))
+        }
         orgs={orgs}
+        initialParentId={createState.parentId}
         onSubmit={async (values) => {
           await createOrg.mutateAsync(values);
-          setCreateOpen(false);
+          setCreateState({ open: false, parentId: null });
         }}
       />
 
@@ -378,11 +533,16 @@ function CreateOrgDialog({
   open,
   onOpenChange,
   orgs,
+  initialParentId,
   onSubmit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orgs: Organisation[];
+  // Pre-fills the parent select. Set when opening the dialog via
+  // "+ Lägg till suborganisation" so the new org lands under the intended
+  // parent without the admin having to pick it again. Null = top-level.
+  initialParentId?: string | null;
   onSubmit: (values: {
     name: string;
     organizationNumber?: string;
@@ -393,7 +553,7 @@ function CreateOrgDialog({
     defaultValues: {
       name: "",
       organizationNumber: "",
-      parentId: null as string | null,
+      parentId: (initialParentId ?? null) as string | null,
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
@@ -959,7 +1119,7 @@ function OrganisationerSkeleton() {
         <Table>
           <TableHeader>
             <TableRow>
-              {["w-24", "w-28", "w-32", "w-44", "w-20"].map((w, i) => (
+              {["w-16", "w-24", "w-32", "w-8"].map((w, i) => (
                 <TableHead key={i}>
                   <Skeleton className={`h-4 ${w}`} />
                 </TableHead>
@@ -971,8 +1131,7 @@ function OrganisationerSkeleton() {
               <TableRow key={i}>
                 <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-10" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-8" /></TableCell>
               </TableRow>
             ))}
