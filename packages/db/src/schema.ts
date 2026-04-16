@@ -185,14 +185,9 @@ export const elevators = pgTable(
     index("elevators_district_idx").on(t.district),
     index("elevators_manufacturer_idx").on(t.manufacturer),
     index("elevators_elevator_type_idx").on(t.elevatorType),
-    // Elevator numbers are only unique within an org (the same number can
-    // legitimately belong to different orgs). This composite unique prevents
-    // the import cross-org move bug: matching by elevatorNumber alone would
-    // otherwise let an import silently reassign another org's elevator.
-    unique("elevators_organization_id_elevator_number_unique").on(
-      t.organizationId,
-      t.elevatorNumber,
-    ),
+    // Elevator numbers are not unique, even within an org — imports always
+    // create new rows, so duplicates are allowed by design. The plain index
+    // on elevator_number above is kept for lookups.
     check("elevators_status_check", sql`${t.status} IN ('active', 'demolished', 'archived')`),
     check("elevators_build_year_check", sql`${t.buildYear} IS NULL OR (${t.buildYear} >= 1800 AND ${t.buildYear} <= 2100)`),
   ],

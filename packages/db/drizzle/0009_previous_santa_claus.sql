@@ -1,0 +1,1 @@
+ALTER TABLE "elevators" DROP CONSTRAINT "elevators_organization_id_elevator_number_unique";

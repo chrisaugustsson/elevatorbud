@@ -64,6 +64,13 @@
       "when": 1776251232256,
       "tag": "0008_dizzy_paibok",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1776285044299,
+      "tag": "0009_previous_santa_claus",
+      "breakpoints": true
     }
   ]
 }
