@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
-import { and, eq, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import {
   elevators,
   elevatorDetails,
@@ -21,11 +21,15 @@ const analyzeImportSchema = z.object({
   orgNames: z.array(z.string()),
 });
 
-// Payload upper bound: real production files (Bostadsbolaget) sit around
-// ~1200 rows. 10k leaves plenty of headroom for larger customers while
-// preventing unbounded payloads that could exhaust server memory. Extension
-// requires a deliberate schema bump.
-const MAX_IMPORT_ROWS = 10000;
+// Defensive cap for a single confirm chunk. The client chunks by a small
+// number (5) for per-chunk progress + per-row failure isolation; anything
+// noticeably larger than that is a buggy or hostile caller.
+const MAX_CHUNK_ROWS = 100;
+
+// Upper bound for the full-file payloads (extract org names, analyze). Real
+// production files (Bostadsbolaget) sit around ~1200 rows; 10k leaves room
+// for larger customers while capping unbounded JSON.
+const MAX_FILE_ROWS = 10000;
 
 const confirmImportSchema = z.object({
   elevators: z
@@ -84,7 +88,7 @@ const confirmImportSchema = z.object({
       _source_sheet: z.string().optional(),
       }),
     )
-    .max(MAX_IMPORT_ROWS),
+    .max(MAX_CHUNK_ROWS),
 });
 
 /**
@@ -92,61 +96,40 @@ const confirmImportSchema = z.object({
  * broke the import, so the admin can fix it without guessing. Keeps the
  * transaction-rolled-back reminder from the UI copy so the two messages
  * stay consistent.
+ *
+ * Drizzle wraps PG errors in `DrizzleQueryError` whose `.message` is just
+ * "Failed query: <SQL>\nparams: <params>". The real reason (FK/check
+ * violation, column overflow, etc.) is on `.cause`, and on some drivers
+ * wrapped one level deeper. Walk the chain to surface it — without this
+ * the admin sees a wall of SQL but not the actual cause.
  */
-function formatRowError(
-  row: { elevator_number: string; _source_row?: number; _source_sheet?: string },
-  field: string | null,
-  cause: unknown,
-): Error {
-  const causeMsg = cause instanceof Error ? cause.message : String(cause);
-  const sheet = row._source_sheet ? `arket "${row._source_sheet}"` : "okänt ark";
-  const rowRef = row._source_row ? `rad ${row._source_row}` : "okänd rad";
-  const fieldRef = field ? ` (fält: ${field})` : "";
-  return new Error(
-    `Importen misslyckades på ${sheet}, ${rowRef}, hiss "${row.elevator_number}"${fieldRef}: ${causeMsg}. Transaktionen har rullats tillbaka — inga rader har skapats eller ändrats.`,
-  );
-}
-
-/**
- * After a bulk insert fails, retry each row individually inside a savepoint
- * to find the exact offending row, so the admin sees "rad 47" instead of
- * "rad 1". The savepoint is always rolled back (we're about to throw anyway),
- * so this adds no writes — it's purely diagnostic. If the per-row probe
- * somehow succeeds for every row (race or transient), fall back to the
- * original bulk error pointing at row 0.
- */
-type TxLike = {
-  transaction: <T>(fn: (tx: TxLike) => Promise<T>) => Promise<T>;
-};
-
-async function findFailingRow<R extends { elevator_number: string; _source_row?: number; _source_sheet?: string }>(
-  tx: TxLike,
-  rows: R[],
-  perRowInsert: (row: R, index: number) => Promise<unknown>,
-  field: string | null,
-  originalError: unknown,
-): Promise<Error> {
-  for (let i = 0; i < rows.length; i++) {
-    try {
-      await tx.transaction(async () => {
-        await perRowInsert(rows[i]!, i);
-        // Force the savepoint to roll back so no row is actually written.
-        throw new RollbackProbe();
-      });
-    } catch (e) {
-      if (e instanceof RollbackProbe) continue;
-      return formatRowError(rows[i]!, field, e);
+function rootCauseMessage(err: unknown): string {
+  let cur: unknown = err;
+  let root = "";
+  for (let depth = 0; depth < 5 && cur; depth++) {
+    if (cur instanceof Error) {
+      // Prefer a non-"Failed query" message as the root; Drizzle's wrapper
+      // always starts with that string, PG's does not.
+      if (cur.message && !cur.message.startsWith("Failed query:")) {
+        root = cur.message;
+      } else if (!root) {
+        root = cur.message ?? "";
+      }
+      cur = (cur as { cause?: unknown }).cause;
+    } else {
+      if (!root) root = String(cur);
+      break;
     }
   }
-  return formatRowError(rows[0]!, field, originalError);
+  return root || "okänt fel";
 }
 
-class RollbackProbe extends Error {
-  constructor() {
-    super("rollback-probe");
-    this.name = "RollbackProbe";
-  }
-}
+export type ImportFailure = {
+  elevator_number: string;
+  sheet: string | null;
+  row: number | null;
+  reason: string;
+};
 
 // ---------------------------------------------------------------------------
 // Inlined query logic — no org scoping (import is admin-only).
@@ -180,22 +163,8 @@ async function analyzeFn(
   db: Database,
   input: z.infer<typeof analyzeImportSchema>,
 ) {
-  // Find existing elevators by number (batched to avoid parameter limit)
-  const existingElevatorNumbers: Record<string, string> = {};
-  const BATCH_SIZE = 100;
-  for (let i = 0; i < input.elevatorNumberList.length; i += BATCH_SIZE) {
-    const batch = input.elevatorNumberList.slice(i, i + BATCH_SIZE);
-    const existing = await db
-      .select({
-        id: elevators.id,
-        elevatorNumber: elevators.elevatorNumber,
-      })
-      .from(elevators)
-      .where(inArray(elevators.elevatorNumber, batch));
-    for (const e of existing) {
-      existingElevatorNumbers[e.elevatorNumber] = e.id;
-    }
-  }
+  // Imports always create new elevator rows — no reconciliation against
+  // existing numbers. The analyze step only resolves org-name matches now.
 
   // Match org names EXACT case-sensitive (PRD FR-9).
   // Non-exact variants (different casing / whitespace / punctuation) must NOT
@@ -219,374 +188,172 @@ async function analyzeFn(
     }
   }
 
-  const newCount = input.elevatorNumberList.filter(
-    (n) => !existingElevatorNumbers[n],
-  ).length;
-  const updatedCount = input.elevatorNumberList.filter(
-    (n) => existingElevatorNumbers[n],
-  ).length;
-
   return {
-    existingElevatorNumbers,
     orgMatchNames,
     orgMatchIds,
     newOrgNames,
     summary: {
-      newElevators: newCount,
-      updatedElevators: updatedCount,
+      newElevators: input.elevatorNumberList.length,
       matchedOrgs: orgMatchNames.length,
       newOrgs: newOrgNames.length,
     },
   };
 }
 
-// Exported so integration tests can call it directly with a test DB,
-// bypassing the server-fn wrapper and auth middleware.
+type ConfirmRow = z.infer<typeof confirmImportSchema>["elevators"][number];
+
+function toElevatorInsert(r: ConfirmRow, userId: string) {
+  return {
+    elevatorNumber: r.elevator_number,
+    address: r.address,
+    elevatorClassification: r.elevator_classification,
+    district: r.district,
+    elevatorType: r.elevator_type,
+    manufacturer: r.manufacturer,
+    buildYear: r.build_year,
+    inspectionAuthority: r.inspection_authority,
+    inspectionMonth: r.inspection_month,
+    maintenanceCompany: r.maintenance_company,
+    modernizationYear: r.modernization_year,
+    needsUpgrade: r.needs_upgrade,
+    organizationId: r._organizationId,
+    contactPersonName: r.contact_person_name,
+    contactPersonPhone: r.contact_person_phone,
+    contactPersonEmail: r.contact_person_email,
+    status: "active" as const,
+    createdBy: userId,
+  };
+}
+
+function rowRef(r: ConfirmRow): Pick<ImportFailure, "elevator_number" | "sheet" | "row"> {
+  return {
+    elevator_number: r.elevator_number,
+    sheet: r._source_sheet ?? null,
+    row: r._source_row ?? null,
+  };
+}
+
+export type ConfirmImportResult = {
+  created: number;
+  failures: ImportFailure[];
+  perOrgCounts: Record<string, { orgName: string; created: number }>;
+};
+
+/**
+ * Process one chunk of elevators. Each row runs inside its own PG savepoint
+ * so a failure isolates to that row — successful rows in the same chunk
+ * commit. The client calls this in a loop with small chunks to stream
+ * progress and build a per-row failure report.
+ *
+ * Exported so integration tests can call it directly with a test DB,
+ * bypassing the server-fn wrapper and auth middleware.
+ */
 export async function confirmFn(
   db: Database,
   userId: string,
   input: z.infer<typeof confirmImportSchema>,
-) {
-  return await db.transaction(async (tx) => {
-    const allRows = input.elevators;
+): Promise<ConfirmImportResult> {
+  const rows = input.elevators;
+  const failures: ImportFailure[] = [];
+  const perOrgCounts: Record<string, { orgName: string; created: number }> = {};
+  let created = 0;
 
-    // Verify every referenced organization exists before any writes. Zod only
-    // guarantees non-empty string shape; a stale mapping could still point at
-    // a deleted org. Doing this inside the tx means a failure aborts the
-    // whole import atomically.
-    const referencedOrgIds = [...new Set(allRows.map((r) => r._organizationId))];
-    if (referencedOrgIds.length > 0) {
-      const existingOrgs = await tx
-        .select({ id: organizations.id })
-        .from(organizations)
-        .where(inArray(organizations.id, referencedOrgIds));
-      const existingOrgIds = new Set(existingOrgs.map((o) => o.id));
-      const missingOrgIds = referencedOrgIds.filter(
-        (id) => !existingOrgIds.has(id),
-      );
-      if (missingOrgIds.length > 0) {
-        throw new Error(
-          `Kan inte importera: ${missingOrgIds.length} organisation(er) i mappningen hittades inte. Uppdatera mappningen och försök igen.`,
-        );
+  if (rows.length === 0) {
+    return { created: 0, failures: [], perOrgCounts: {} };
+  }
+
+  // Look up every referenced org once per chunk. Rows whose org vanished
+  // between mapping and import are recorded as per-row failures instead of
+  // aborting the whole chunk — the admin can re-map and re-run.
+  const referencedOrgIds = [...new Set(rows.map((r) => r._organizationId))];
+  const existingOrgs = await db
+    .select({ id: organizations.id, name: organizations.name })
+    .from(organizations)
+    .where(inArray(organizations.id, referencedOrgIds));
+  const orgById = new Map(existingOrgs.map((o) => [o.id, o]));
+
+  const successfulRows: ConfirmRow[] = [];
+
+  await db.transaction(async (tx) => {
+    for (const row of rows) {
+      const org = orgById.get(row._organizationId);
+      if (!org) {
+        failures.push({
+          ...rowRef(row),
+          reason:
+            "Organisationen i mappningen hittades inte — uppdatera och försök igen.",
+        });
+        continue;
       }
-    }
 
-    // 1. Batch-lookup which (org, elevatorNumber) pairs already exist.
-    //
-    // Scoping by BOTH org and number is load-bearing: without the org filter,
-    // importing "H1" against org B would match org A's existing "H1" and
-    // silently reassign it to B (cross-org move bug). The (org, number) pair
-    // is also protected by a composite unique index (see schema).
-    //
-    // Group rows by org so we can do one IN (...) lookup per org and still
-    // respect the batch size for the parameter limit.
-    const rowsByOrg = new Map<string, string[]>();
-    for (const r of allRows) {
-      const list = rowsByOrg.get(r._organizationId) ?? [];
-      list.push(r.elevator_number);
-      rowsByOrg.set(r._organizationId, list);
-    }
-
-    const existingMap = new Map<string, { id: string }>();
-    const keyFor = (orgId: string, num: string) => `${orgId}::${num}`;
-
-    for (const [orgId, numbers] of rowsByOrg) {
-      const unique = [...new Set(numbers)];
-      for (let i = 0; i < unique.length; i += 100) {
-        const batch = unique.slice(i, i + 100);
-        const found = await tx
-          .select({
-            id: elevators.id,
-            elevatorNumber: elevators.elevatorNumber,
-          })
-          .from(elevators)
-          .where(
-            and(
-              eq(elevators.organizationId, orgId),
-              inArray(elevators.elevatorNumber, batch),
-            ),
-          );
-        for (const e of found) {
-          existingMap.set(keyFor(orgId, e.elevatorNumber), { id: e.id });
-        }
-      }
-    }
-
-    // Batch-lookup existing details for updates
-    const existingIds = [...existingMap.values()].map((e) => e.id);
-    const existingDetailsMap = new Map<string, string>();
-    for (let i = 0; i < existingIds.length; i += 100) {
-      const batch = existingIds.slice(i, i + 100);
-      const found = await tx
-        .select({ id: elevatorDetails.id, elevatorId: elevatorDetails.elevatorId })
-        .from(elevatorDetails)
-        .where(inArray(elevatorDetails.elevatorId, batch));
-      for (const d of found) {
-        existingDetailsMap.set(d.elevatorId, d.id);
-      }
-    }
-
-    // Split into new vs update — keyed by (org, number) so "H1" in org A and
-    // "H1" in org B are treated independently.
-    const toCreate = allRows.filter(
-      (r) => !existingMap.has(keyFor(r._organizationId, r.elevator_number)),
-    );
-    const toUpdate = allRows.filter((r) =>
-      existingMap.has(keyFor(r._organizationId, r.elevator_number)),
-    );
-
-    // Pre-check for duplicate (org, number) within the input itself — two
-    // Excel rows with the same elevator number for the same org would pass
-    // the existingMap filter but fail the composite unique index with a
-    // first-row-blaming "duplicate key" error. Catch this before the bulk
-    // insert so we can point at the actual duplicate row instead of row 1.
-    const createKeys = new Map<string, number>();
-    for (let i = 0; i < toCreate.length; i++) {
-      const r = toCreate[i]!;
-      const key = keyFor(r._organizationId, r.elevator_number);
-      const prior = createKeys.get(key);
-      if (prior !== undefined) {
-        throw formatRowError(
-          r,
-          null,
-          new Error(
-            `Hiss "${r.elevator_number}" förekommer flera gånger i samma organisation (tidigare rad: ${toCreate[prior]!._source_row ?? "?"}).`,
-          ),
-        );
-      }
-      createKeys.set(key, i);
-    }
-
-    // 2. Bulk insert new elevators
-    //
-    // On DB error, fall back to per-row inserts in a savepoint to isolate
-    // the exact failing row, so the admin gets "row 47" rather than "row 1".
-    // The savepoint is always rolled back (we're going to throw anyway) so
-    // this adds no writes — it's purely diagnostic.
-    let created = 0;
-    if (toCreate.length > 0) {
-      let insertedElevators: { id: string }[];
-      const toElevatorInsert = (r: (typeof toCreate)[number]) => ({
-        elevatorNumber: r.elevator_number,
-        address: r.address,
-        elevatorClassification: r.elevator_classification,
-        district: r.district,
-        elevatorType: r.elevator_type,
-        manufacturer: r.manufacturer,
-        buildYear: r.build_year,
-        inspectionAuthority: r.inspection_authority,
-        inspectionMonth: r.inspection_month,
-        maintenanceCompany: r.maintenance_company,
-        modernizationYear: r.modernization_year,
-        needsUpgrade: r.needs_upgrade,
-        organizationId: r._organizationId,
-        contactPersonName: r.contact_person_name,
-        contactPersonPhone: r.contact_person_phone,
-        contactPersonEmail: r.contact_person_email,
-        status: "active" as const,
-        createdBy: userId,
-      });
       try {
-        insertedElevators = await tx
-          .insert(elevators)
-          .values(toCreate.map(toElevatorInsert))
-          .returning({ id: elevators.id });
-      } catch (bulkErr) {
-        throw await findFailingRow(tx, toCreate, (r) =>
-          tx.insert(elevators).values(toElevatorInsert(r)),
-          null,
-          bulkErr,
-        );
-      }
+        await tx.transaction(async (sp) => {
+          const [elevator] = await sp
+            .insert(elevators)
+            .values(toElevatorInsert(row, userId))
+            .returning({ id: elevators.id });
 
-      // Bulk insert details for new elevators
-      try {
-        await tx.insert(elevatorDetails).values(
-          insertedElevators.map((e, idx) => ({
-            elevatorId: e.id,
-            ...toDetailData(toCreate[idx]!),
-          })),
-        );
-      } catch (bulkErr) {
-        throw await findFailingRow(
-          tx,
-          toCreate,
-          (r, idx) =>
-            tx.insert(elevatorDetails).values({
-              elevatorId: insertedElevators[idx]!.id,
-              ...toDetailData(r),
-            }),
-          "tekniska detaljer",
-          bulkErr,
-        );
-      }
+          if (!elevator) throw new Error("Insert returnerade ingen rad");
 
-      // Bulk insert budgets for new elevators that have budget data
-      const budgetRows = insertedElevators
-        .map((e, idx) => {
-          const d = toCreate[idx]!;
-          if (!d.recommended_modernization_year && !d.budget_amount) return null;
-          return {
-            elevatorId: e.id,
-            revisionYear: d.revision_year ?? new Date().getFullYear(),
-            recommendedModernizationYear: d.recommended_modernization_year,
-            budgetAmount:
-              d.budget_amount != null ? String(d.budget_amount) : undefined,
-            measures: d.measures ?? d.modernization_measures,
-            warranty: d.warranty,
-            createdBy: userId,
-          };
-        })
-        .filter((r): r is NonNullable<typeof r> => r !== null);
-
-      if (budgetRows.length > 0) {
-        try {
-          await tx.insert(elevatorBudgets).values(budgetRows);
-        } catch (bulkErr) {
-          // Map budget rows back to their source toCreate row so the error
-          // points at the Excel row, not the dense budget-array index.
-          const budgetRowToSource: number[] = [];
-          insertedElevators.forEach((_, idx) => {
-            const d = toCreate[idx]!;
-            if (d.recommended_modernization_year || d.budget_amount) {
-              budgetRowToSource.push(idx);
-            }
+          await sp.insert(elevatorDetails).values({
+            elevatorId: elevator.id,
+            ...toDetailData(row),
           });
-          throw await findFailingRow(
-            tx,
-            budgetRowToSource.map((i) => toCreate[i]!),
-            (_r, denseIdx) =>
-              tx.insert(elevatorBudgets).values(budgetRows[denseIdx]!),
-            "modernisering/budget",
-            bulkErr,
-          );
-        }
-      }
 
-      // Bulk insert suggested values
-      const svEntries: { category: string; value: string }[] = [];
-      const svSeen = new Set<string>();
-      for (const r of toCreate) {
-        const pairs: [string, string | null | undefined][] = [
-          ["elevator_type", r.elevator_type],
-          ["manufacturer", r.manufacturer],
-          ["district", r.district],
-          ["maintenance_company", r.maintenance_company],
-          ["inspection_authority", r.inspection_authority],
-          ["elevator_classification", r.elevator_classification],
-        ];
-        for (const [cat, val] of pairs) {
-          if (val && !svSeen.has(`${cat}:${val}`)) {
-            svSeen.add(`${cat}:${val}`);
-            svEntries.push({ category: cat, value: val });
-          }
-        }
-      }
-      if (svEntries.length > 0) {
-        await tx
-          .insert(suggestedValues)
-          .values(svEntries.map((e) => ({ ...e, active: true })))
-          .onConflictDoNothing();
-      }
-
-      created = toCreate.length;
-    }
-
-    // 3. Update existing elevators
-    let updated = 0;
-    if (toUpdate.length > 0) {
-      const now = new Date();
-      const currentYear = new Date().getFullYear();
-
-      for (const r of toUpdate) {
-        const existing = existingMap.get(
-          keyFor(r._organizationId, r.elevator_number),
-        )!;
-
-        // Per-row try/catch lets the admin see exactly which Excel row
-        // broke the update (sheet + row number + field), instead of a raw
-        // Postgres constraint message.
-        try {
-          await tx
-            .update(elevators)
-            .set({
-              address: r.address,
-              district: r.district,
-              elevatorType: r.elevator_type,
-              manufacturer: r.manufacturer,
-              buildYear: r.build_year,
-              inspectionAuthority: r.inspection_authority,
-              inspectionMonth: r.inspection_month,
-              maintenanceCompany: r.maintenance_company,
-              modernizationYear: r.modernization_year,
-              needsUpgrade: r.needs_upgrade,
-              organizationId: r._organizationId,
-              contactPersonName: r.contact_person_name,
-              contactPersonPhone: r.contact_person_phone,
-              contactPersonEmail: r.contact_person_email,
-              lastUpdatedAt: now,
-              lastUpdatedBy: userId,
-            })
-            .where(eq(elevators.id, existing.id));
-
-          const detailData = toDetailData(r);
-          const existingDetailId = existingDetailsMap.get(existing.id);
-          if (existingDetailId) {
-            await tx
-              .update(elevatorDetails)
-              .set(detailData)
-              .where(eq(elevatorDetails.id, existingDetailId));
-          } else {
-            await tx
-              .insert(elevatorDetails)
-              .values({ elevatorId: existing.id, ...detailData });
-          }
-
-          if (r.recommended_modernization_year || r.budget_amount) {
-            await tx.insert(elevatorBudgets).values({
-              elevatorId: existing.id,
-              revisionYear: r.revision_year ?? currentYear,
-              recommendedModernizationYear: r.recommended_modernization_year,
+          if (row.recommended_modernization_year || row.budget_amount != null) {
+            await sp.insert(elevatorBudgets).values({
+              elevatorId: elevator.id,
+              revisionYear: row.revision_year ?? new Date().getFullYear(),
+              recommendedModernizationYear: row.recommended_modernization_year,
               budgetAmount:
-                r.budget_amount != null ? String(r.budget_amount) : undefined,
-              measures: r.measures ?? r.modernization_measures,
-              warranty: r.warranty,
+                row.budget_amount != null ? String(row.budget_amount) : undefined,
+              measures: row.measures ?? row.modernization_measures,
+              warranty: row.warranty,
               createdBy: userId,
             });
           }
-        } catch (e) {
-          throw formatRowError(r, null, e);
+        });
+
+        created++;
+        successfulRows.push(row);
+        if (!perOrgCounts[org.id])
+          perOrgCounts[org.id] = { orgName: org.name, created: 0 };
+        perOrgCounts[org.id]!.created++;
+      } catch (e) {
+        failures.push({ ...rowRef(row), reason: rootCauseMessage(e) });
+      }
+    }
+
+    // Suggested values are chunk-level reference data, not per-row state —
+    // collect from every row that committed and upsert once. `onConflictDoNothing`
+    // keeps repeated chunks safe.
+    const svEntries: { category: string; value: string }[] = [];
+    const svSeen = new Set<string>();
+    for (const r of successfulRows) {
+      const pairs: [string, string | null | undefined][] = [
+        ["elevator_type", r.elevator_type],
+        ["manufacturer", r.manufacturer],
+        ["district", r.district],
+        ["maintenance_company", r.maintenance_company],
+        ["inspection_authority", r.inspection_authority],
+        ["elevator_classification", r.elevator_classification],
+      ];
+      for (const [cat, val] of pairs) {
+        if (val && !svSeen.has(`${cat}:${val}`)) {
+          svSeen.add(`${cat}:${val}`);
+          svEntries.push({ category: cat, value: val });
         }
-
-        updated++;
       }
     }
-
-    const perOrgCounts: Record<string, { orgName: string; created: number; updated: number }> = {};
-    for (const r of toCreate) {
-      const orgId = r._organizationId;
-      if (!perOrgCounts[orgId]) perOrgCounts[orgId] = { orgName: "", created: 0, updated: 0 };
-      perOrgCounts[orgId].created++;
+    if (svEntries.length > 0) {
+      await tx
+        .insert(suggestedValues)
+        .values(svEntries.map((e) => ({ ...e, active: true })))
+        .onConflictDoNothing();
     }
-    for (const r of toUpdate) {
-      const orgId = r._organizationId;
-      if (!perOrgCounts[orgId]) perOrgCounts[orgId] = { orgName: "", created: 0, updated: 0 };
-      perOrgCounts[orgId].updated++;
-    }
-
-    const touchedOrgIds = Object.keys(perOrgCounts);
-    if (touchedOrgIds.length > 0) {
-      const orgRows = await tx
-        .select({ id: organizations.id, name: organizations.name })
-        .from(organizations)
-        .where(inArray(organizations.id, touchedOrgIds));
-      for (const o of orgRows) {
-        if (perOrgCounts[o.id]) perOrgCounts[o.id]!.orgName = o.name;
-      }
-    }
-
-    return { created, updated, perOrgCounts };
   });
+
+  return { created, failures, perOrgCounts };
 }
 
 // ---------------------------------------------------------------------------
@@ -602,10 +369,10 @@ const extractOrgNamesSchema = z.object({
         })
         .passthrough(),
     )
-    // Match the confirmImport bound — an admin can't submit a larger import
-    // than they can actually execute, and this prevents unbounded JSON
-    // payloads from exhausting server memory on parse.
-    .max(MAX_IMPORT_ROWS),
+    // Whole-file payload: covers every row in the spreadsheet so we can
+    // list the org names in one pass. Distinct from the per-chunk confirm
+    // cap, which is deliberately small.
+    .max(MAX_FILE_ROWS),
 });
 
 function extractOrgNamesFn(input: z.infer<typeof extractOrgNamesSchema>) {

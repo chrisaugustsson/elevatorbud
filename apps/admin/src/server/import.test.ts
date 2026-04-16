@@ -33,9 +33,9 @@ describeIfDb("confirmImport (real DB)", () => {
     pool = new Pool({ connectionString: TEST_DB_URL });
     db = drizzle(pool, { schema }) as unknown as Database;
 
-    // Run every migration so triggers (one-level-deep), composite unique
-    // indexes, and check constraints are all present — the rollback proof
-    // is only as honest as the schema it runs against.
+    // Run every migration so triggers (one-level-deep) and check
+    // constraints are all present — the rollback proof is only as honest
+    // as the schema it runs against.
     await migrate(drizzle(pool, { schema }), {
       migrationsFolder: "../../packages/db/drizzle",
     });
@@ -73,88 +73,106 @@ describeIfDb("confirmImport (real DB)", () => {
     userId = user!.id;
   });
 
-  it("rolls back all writes when a row violates a check constraint", async () => {
+  it("skips the failing row and commits the valid rows in the same chunk", async () => {
     // Row 1 is valid; row 2 has build_year=999 which violates
-    // elevators_build_year_check (1800-2100). If the transaction were
-    // partial, row 1 would remain after the throw — this test proves it
-    // doesn't.
-    await expect(
-      confirmFn(db, userId, {
-        elevators: [
-          {
-            elevator_number: "H1",
-            build_year: 1980,
-            _organizationId: orgId,
-            _source_row: 5,
-            _source_sheet: "Hissar",
-          },
-          {
-            elevator_number: "H2",
-            build_year: 999,
-            _organizationId: orgId,
-            _source_row: 42,
-            _source_sheet: "Hissar",
-          },
-        ],
-      }),
-    ).rejects.toThrow(/Transaktionen har rullats tillbaka/);
+    // elevators_build_year_check (1800-2100). With per-row savepoints,
+    // row 1 must commit and row 2 must appear in the failures list — the
+    // whole-chunk rollback behavior is intentionally gone so one bad row
+    // doesn't torpedo an otherwise-clean import.
+    const result = await confirmFn(db, userId, {
+      elevators: [
+        {
+          elevator_number: "H1",
+          build_year: 1980,
+          _organizationId: orgId,
+          _source_row: 5,
+          _source_sheet: "Hissar",
+        },
+        {
+          elevator_number: "H2",
+          build_year: 999,
+          _organizationId: orgId,
+          _source_row: 42,
+          _source_sheet: "Hissar",
+        },
+      ],
+    });
 
-    const remaining = await db.select().from(schema.elevators);
-    expect(remaining).toHaveLength(0);
+    expect(result.created).toBe(1);
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]).toMatchObject({
+      elevator_number: "H2",
+      row: 42,
+      sheet: "Hissar",
+    });
+    expect(result.failures[0]!.reason).toMatch(/build_year/);
 
-    const detailsRemaining = await db.select().from(schema.elevatorDetails);
-    expect(detailsRemaining).toHaveLength(0);
+    const rows = await db.select().from(schema.elevators);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.elevatorNumber).toBe("H1");
+
+    // Details must follow the successful elevator only — no orphan rows
+    // from the failed savepoint.
+    const details = await db.select().from(schema.elevatorDetails);
+    expect(details).toHaveLength(1);
   });
 
-  it("rolls back when two input rows share the same (org, elevator_number)", async () => {
-    // The pre-check should catch this before the DB is touched, and point
-    // at row 2 — not the default "row 0 blame" the legacy code fell back
-    // on. Still expected: zero rows written.
-    await expect(
-      confirmFn(db, userId, {
-        elevators: [
-          {
-            elevator_number: "H1",
-            _organizationId: orgId,
-            _source_row: 5,
-            _source_sheet: "Hissar",
-          },
-          {
-            elevator_number: "H1",
-            _organizationId: orgId,
-            _source_row: 42,
-            _source_sheet: "Hissar",
-          },
-        ],
-      }),
-    ).rejects.toThrow(/rad 42/);
+  it("creates both rows when two input rows share the same (org, elevator_number)", async () => {
+    // Duplicates within one org are allowed by design — every import row
+    // becomes its own new elevator, even if the number matches an existing
+    // or in-batch row.
+    const result = await confirmFn(db, userId, {
+      elevators: [
+        {
+          elevator_number: "H1",
+          _organizationId: orgId,
+          _source_row: 5,
+          _source_sheet: "Hissar",
+        },
+        {
+          elevator_number: "H1",
+          _organizationId: orgId,
+          _source_row: 42,
+          _source_sheet: "Hissar",
+        },
+      ],
+    });
 
-    const remaining = await db.select().from(schema.elevators);
-    expect(remaining).toHaveLength(0);
+    expect(result.created).toBe(2);
+    expect(result.failures).toHaveLength(0);
+    const rows = await db.select().from(schema.elevators);
+    expect(rows).toHaveLength(2);
   });
 
-  it("rolls back when the resolved org id does not exist", async () => {
+  it("records a failure for rows whose org id is missing", async () => {
     const missingOrgId = "00000000-0000-0000-0000-000000000099";
-    await expect(
-      confirmFn(db, userId, {
-        elevators: [
-          {
-            elevator_number: "H1",
-            _organizationId: missingOrgId,
-            _source_row: 5,
-            _source_sheet: "Hissar",
-          },
-        ],
-      }),
-    ).rejects.toThrow(/organisation.*hittades inte/);
+    const result = await confirmFn(db, userId, {
+      elevators: [
+        {
+          elevator_number: "H1",
+          _organizationId: missingOrgId,
+          _source_row: 5,
+          _source_sheet: "Hissar",
+        },
+      ],
+    });
+
+    expect(result.created).toBe(0);
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]).toMatchObject({
+      elevator_number: "H1",
+      row: 5,
+      sheet: "Hissar",
+    });
+    expect(result.failures[0]!.reason).toMatch(/[Oo]rganisation/);
 
     const remaining = await db.select().from(schema.elevators);
     expect(remaining).toHaveLength(0);
   });
 
   it("commits successfully when all rows are valid", async () => {
-    // Positive-path sanity check: the rollback assertions above are only
-    // meaningful if the happy path actually writes rows.
+    // Positive-path sanity check: the per-row isolation assertions above
+    // are only meaningful if the happy path actually writes rows.
     const result = await confirmFn(db, userId, {
       elevators: [
         {
