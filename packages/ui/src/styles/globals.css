@@ -139,3 +139,52 @@
     font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
   }
 }
+
+/**
+ * Smooth row expansion for data-grid tables. Animates grid-template-rows
+ * from 0fr → 1fr so a wrapping grid container reveals its child at the
+ * child's natural height — no JS measurement, no max-height hack. Used by
+ * expanded rows in the modernization priority list. The child must have
+ * min-h-0 and the wrapper must have overflow-hidden for the 0fr state to
+ * visually collapse.
+ *
+ * Both open and close animations are driven by `data-state="open"` /
+ * `"closed"`. The parent row is kept mounted for ~260ms after collapse
+ * (see DataGridTableBodyRowExpandded) so the close keyframe has time to
+ * finish before the DOM node is removed.
+ */
+@keyframes expand-row {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+
+@keyframes collapse-row {
+  from {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  to {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-expand-row] {
+    animation: none !important;
+  }
+  [data-expand-row][data-state='open'] {
+    grid-template-rows: 1fr !important;
+    opacity: 1 !important;
+  }
+  [data-expand-row][data-state='closed'] {
+    grid-template-rows: 0fr !important;
+    opacity: 0 !important;
+  }
+}
