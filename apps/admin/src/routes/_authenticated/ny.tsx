@@ -73,7 +73,7 @@ function NyHiss() {
   const queryClient = useQueryClient();
   const { data: orgs } = useSuspenseQuery(listOrganizationsOptions());
   const createHiss = useMutation({
-    mutationFn: (input: ReturnType<typeof formValuesToUpdateArgs> & { organizationId: string; revisionYear: number }) =>
+    mutationFn: (input: ReturnType<typeof formValuesToUpdateArgs> & { organizationId: string }) =>
       createElevator({ data: { ...input, elevatorNumber: input.elevatorNumber ?? "" } }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["elevator"] }); },
   });
@@ -96,7 +96,6 @@ function NyHiss() {
         await createHiss.mutateAsync({
           ...args,
           organizationId: value.organization_id,
-          revisionYear: new Date().getFullYear(),
         });
         clearDraft(draftKey);
         setSubmitSuccess(true);

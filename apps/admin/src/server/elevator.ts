@@ -73,6 +73,53 @@ const filterSchema = z.object({
 
 type FilterInput = z.infer<typeof filterSchema>;
 
+// Year-field validators. Kept in sync with the import parsers
+// (packages/utils/src/excel-import/parsers.ts): only accept a 4-digit year
+// in the plausible range 1800–2100. modernizationYear also accepts the
+// "Ej ombyggd" sentinel for backwards compatibility with existing rows.
+// Empty strings are coerced to undefined so the UI can clear a value.
+const yearLike = z
+  .string()
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined;
+    const t = v.trim();
+    return t === "" ? undefined : t;
+  })
+  .refine(
+    (v) => v === undefined || /^\d{4}$/.test(v),
+    "Endast 4-siffriga år accepteras (t.ex. 2025).",
+  )
+  .refine(
+    (v) => {
+      if (v === undefined) return true;
+      const year = Number(v);
+      return year >= 1800 && year <= 2100;
+    },
+    "Året måste ligga mellan 1800 och 2100.",
+  );
+
+const modernizationYearLike = z
+  .string()
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined;
+    const t = v.trim();
+    return t === "" ? undefined : t;
+  })
+  .refine(
+    (v) => v === undefined || v === "Ej ombyggd" || /^\d{4}$/.test(v),
+    'Endast 4-siffriga år eller "Ej ombyggd" accepteras.',
+  )
+  .refine(
+    (v) => {
+      if (v === undefined || v === "Ej ombyggd") return true;
+      const year = Number(v);
+      return year >= 1800 && year <= 2100;
+    },
+    "Året måste ligga mellan 1800 och 2100.",
+  );
+
 const createInput = z.object({
   // Core
   elevatorNumber: z.string().min(1),
@@ -85,7 +132,17 @@ const createInput = z.object({
   inspectionAuthority: z.string().optional(),
   inspectionMonth: z.string().optional(),
   maintenanceCompany: z.string().optional(),
-  modernizationYear: z.string().optional(),
+  modernizationYear: modernizationYearLike,
+  // ISO YYYY-MM-DD or empty/undefined; warranty expiration date for the
+  // most recent modernization. Empty string is normalized to undefined
+  // by the form-converter helper.
+  warrantyExpiresAt: z
+    .string()
+    .refine(
+      (v) => /^\d{4}-\d{2}-\d{2}$/.test(v),
+      "warrantyExpiresAt: ISO YYYY-MM-DD krävs.",
+    )
+    .optional(),
   hasEmergencyPhone: z.boolean().optional(),
   needsUpgrade: z.boolean().optional(),
   organizationId: z.string().uuid(),
@@ -113,11 +170,9 @@ const createInput = z.object({
   emergencyPhonePrice: z.number().optional(),
   comments: z.string().optional(),
   // Budget
-  revisionYear: z.number(),
-  recommendedModernizationYear: z.string().optional(),
+  recommendedModernizationYear: yearLike,
   budgetAmount: z.number().optional(),
   measures: z.string().optional(),
-  warranty: z.boolean().optional(),
 });
 
 const updateInput = z.object({
@@ -133,7 +188,14 @@ const updateInput = z.object({
   inspectionAuthority: z.string().optional(),
   inspectionMonth: z.string().optional(),
   maintenanceCompany: z.string().optional(),
-  modernizationYear: z.string().optional(),
+  modernizationYear: modernizationYearLike,
+  warrantyExpiresAt: z
+    .string()
+    .refine(
+      (v) => /^\d{4}-\d{2}-\d{2}$/.test(v),
+      "warrantyExpiresAt: ISO YYYY-MM-DD krävs.",
+    )
+    .optional(),
   hasEmergencyPhone: z.boolean().optional(),
   needsUpgrade: z.boolean().optional(),
   organizationId: z.string().uuid().optional(),
@@ -161,11 +223,9 @@ const updateInput = z.object({
   emergencyPhonePrice: z.number().optional(),
   comments: z.string().optional(),
   // Budget
-  revisionYear: z.number().optional(),
-  recommendedModernizationYear: z.string().optional(),
+  recommendedModernizationYear: yearLike,
   budgetAmount: z.number().optional(),
   measures: z.string().optional(),
-  warranty: z.boolean().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -198,11 +258,9 @@ const DETAIL_KEYS = new Set([
 ]);
 
 const BUDGET_KEYS = new Set([
-  "revisionYear",
   "recommendedModernizationYear",
   "budgetAmount",
   "measures",
-  "warranty",
 ]);
 
 const NUMERIC_FIELDS = new Set(["emergencyPhonePrice", "budgetAmount"]);
@@ -324,6 +382,18 @@ async function getLatestBudgetFn(db: ReadDb, elevatorId: string) {
   return db.query.elevatorBudgets.findFirst({
     where: eq(elevatorBudgets.elevatorId, elevatorId),
     orderBy: [desc(elevatorBudgets.createdAt)],
+  });
+}
+
+async function listBudgetsFn(db: ReadDb, elevatorId: string) {
+  return db.query.elevatorBudgets.findMany({
+    where: eq(elevatorBudgets.elevatorId, elevatorId),
+    // Planned year ascending (soonest first); fall back to createdAt for
+    // entries without a recommended year so they sink to the bottom.
+    orderBy: [
+      sql`${elevatorBudgets.recommendedModernizationYear} NULLS LAST`,
+      desc(elevatorBudgets.createdAt),
+    ],
   });
 }
 
@@ -554,7 +624,6 @@ async function createFn(
   if (budget.recommendedModernizationYear || budget.budgetAmount) {
     await db.insert(elevatorBudgets).values({
       elevatorId: elevator.id,
-      revisionYear: input.revisionYear,
       recommendedModernizationYear:
         budget.recommendedModernizationYear as string | undefined,
       budgetAmount:
@@ -562,7 +631,6 @@ async function createFn(
           ? String(budget.budgetAmount)
           : undefined,
       measures: budget.measures as string | undefined,
-      warranty: budget.warranty as boolean | undefined,
       createdBy: userId,
     });
   }
@@ -639,8 +707,6 @@ async function updateFn(
   ) {
     await db.insert(elevatorBudgets).values({
       elevatorId: id,
-      revisionYear:
-        (budget.revisionYear as number) ?? new Date().getFullYear(),
       recommendedModernizationYear:
         budget.recommendedModernizationYear as string | undefined,
       budgetAmount:
@@ -648,7 +714,6 @@ async function updateFn(
           ? String(budget.budgetAmount)
           : undefined,
       measures: budget.measures as string | undefined,
-      warranty: budget.warranty as boolean | undefined,
       createdBy: userId,
     });
   }
@@ -722,6 +787,19 @@ export const elevatorBudgetOptions = (elevatorId: string) =>
   queryOptions({
     queryKey: ["elevator", "budget", elevatorId],
     queryFn: () => getLatestBudget({ data: { elevatorId } }),
+  });
+
+export const listElevatorBudgets = createServerFn()
+  .middleware([adminMiddlewareRead])
+  .inputValidator(z.object({ elevatorId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    return listBudgetsFn(context.db, data.elevatorId);
+  });
+
+export const elevatorBudgetsOptions = (elevatorId: string) =>
+  queryOptions({
+    queryKey: ["elevator", "budgets", elevatorId],
+    queryFn: () => listElevatorBudgets({ data: { elevatorId } }),
   });
 
 export const searchElevators = createServerFn()
@@ -838,4 +916,83 @@ export const archiveElevator = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     return archiveFn(context.db, data.id, data.status, context.user.id);
+  });
+
+// ─── Budget (planerad modernisering) CRUD ─────────────────────────────
+//
+// Each row in `elevator_budgets` is a standalone planned modernization.
+// Elevators have 0..N budgets, sorted by recommendedModernizationYear for
+// display. Create/update/delete are per-row; the "latest" budget used in
+// list views is a denormalization of the MAX(createdAt) row.
+
+const budgetMutationFields = z.object({
+  recommendedModernizationYear: yearLike,
+  measures: z.string().optional(),
+  budgetAmount: z.number().min(0).optional(),
+});
+
+export const createElevatorBudget = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .inputValidator(
+    budgetMutationFields.extend({
+      elevatorId: z.string().uuid(),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    const [row] = await context.db
+      .insert(elevatorBudgets)
+      .values({
+        elevatorId: data.elevatorId,
+        recommendedModernizationYear: data.recommendedModernizationYear,
+        measures: data.measures?.trim() || null,
+        budgetAmount:
+          data.budgetAmount != null ? String(data.budgetAmount) : null,
+        createdBy: context.user.id,
+      })
+      .returning();
+    return row;
+  });
+
+export const updateElevatorBudget = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .inputValidator(
+    budgetMutationFields.extend({
+      id: z.string().uuid(),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    const { id, ...fields } = data;
+    const existing = await context.db.query.elevatorBudgets.findFirst({
+      where: eq(elevatorBudgets.id, id),
+    });
+    if (!existing) throw new Error("Planerad modernisering hittades inte");
+
+    await context.db
+      .update(elevatorBudgets)
+      .set({
+        recommendedModernizationYear:
+          fields.recommendedModernizationYear ??
+          existing.recommendedModernizationYear,
+        measures:
+          fields.measures !== undefined
+            ? fields.measures.trim() || null
+            : existing.measures,
+        budgetAmount:
+          fields.budgetAmount !== undefined
+            ? String(fields.budgetAmount)
+            : existing.budgetAmount,
+      })
+      .where(eq(elevatorBudgets.id, id));
+
+    return { id };
+  });
+
+export const deleteElevatorBudget = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .inputValidator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    await context.db
+      .delete(elevatorBudgets)
+      .where(eq(elevatorBudgets.id, data.id));
+    return { id: data.id };
   });

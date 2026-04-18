@@ -41,9 +41,9 @@ export function StepReview({ form, goToStep, orgs }: StepReviewProps) {
         { label: "Hisstyp", value: values.elevator_type },
         { label: "Fabrikat", value: values.manufacturer },
         { label: "Byggår", value: values.build_year },
-        { label: "Hastighet", value: values.speed },
-        { label: "Lyfthöjd", value: values.lift_height },
-        { label: "Marklast", value: values.load_capacity },
+        { label: "Hastighet (m/s)", value: values.speed },
+        { label: "Lyfthöjd (m)", value: values.lift_height },
+        { label: "Märklast (kg)", value: values.load_capacity },
         { label: "Antal plan", value: values.floor_count },
         { label: "Antal dörrar", value: values.door_count },
       ],
@@ -87,7 +87,7 @@ export function StepReview({ form, goToStep, orgs }: StepReviewProps) {
       step: 6,
       fields: [
         { label: "Moderniseringsår", value: values.modernization_year },
-        { label: "Garanti", value: values.warranty, type: "boolean" },
+        { label: "Garanti gäller t.o.m.", value: values.warranty_expires_at },
         {
           label: "Rekommenderat moderniseringsår",
           value: values.recommended_modernization_year,

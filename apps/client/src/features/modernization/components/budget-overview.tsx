@@ -11,7 +11,7 @@ import {
   hoverColumnPlugin,
   withAlpha,
 } from "@elevatorbud/ui/lib/chart-helpers";
-import { Bar, Line } from "react-chartjs-2";
+import { Bar } from "react-chartjs-2";
 import { TrendingUp } from "lucide-react";
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import type { ChartEvent, ActiveElement, Chart as ChartJS } from "chart.js";
@@ -55,7 +55,7 @@ function BudgetPerYearChart({
   selectedYear?: string | null;
 }) {
   const colors = useChartColors();
-  const chartRef = useRef<ChartJS<"line">>(null);
+  const chartRef = useRef<ChartJS<"bar">>(null);
 
   const handleClick = useCallback(
     (_event: ChartEvent, elements: ActiveElement[]) => {
@@ -95,31 +95,15 @@ function BudgetPerYearChart({
       labels: data.map((d) => d.name),
       datasets: [
         {
-          type: "bar" as const,
           label: "Per år",
           data: data.map((d) => d.amount),
           backgroundColor: barBackgrounds,
           borderRadius: 4,
           barPercentage: 0.7,
-          order: 2,
-        },
-        {
-          type: "line" as const,
-          label: "Kumulativt",
-          data: data.map((d) => d.kumulativt),
-          borderColor: colors.chart4,
-          borderWidth: 2,
-          pointRadius: 0,
-          pointHitRadius: 10,
-          pointHoverRadius: 4,
-          pointHoverBackgroundColor: colors.chart4,
-          tension: 0.3,
-          fill: false,
-          order: 1,
         },
       ],
     }),
-    [data, colors, barBackgrounds],
+    [data, barBackgrounds],
   );
 
   const options = useMemo(
@@ -135,24 +119,12 @@ function BudgetPerYearChart({
         }
       },
       plugins: {
-        legend: {
-          position: "bottom" as const,
-          labels: {
-            color: colors.label,
-            font: { size: 11, family: "Sora" },
-            usePointStyle: true,
-            pointStyle: "circle" as const,
-            padding: 16,
-          },
-        },
+        legend: { display: false },
         tooltip: {
           ...sharedTooltipOptions,
           callbacks: {
-            label: (ctx: {
-              dataset: { label?: string };
-              parsed: { y: number | null };
-            }) =>
-              `${ctx.dataset.label}: ${ctx.parsed.y?.toLocaleString("sv-SE")} tkr`,
+            label: (ctx: { parsed: { y: number | null } }) =>
+              `Budget: ${ctx.parsed.y?.toLocaleString("sv-SE")} tkr`,
           },
         },
       },
@@ -163,10 +135,11 @@ function BudgetPerYearChart({
 
   return (
     <div className="h-[300px] w-full">
-      <Line
+      <Bar
         ref={chartRef}
-        data={chartData as Parameters<typeof Line>[0]["data"]}
+        data={chartData}
         options={options}
+        plugins={[hoverColumnPlugin]}
         tabIndex={0}
         role="img"
         aria-label="Stapeldiagram över budget per år. Klicka på en stapel för att filtrera."

@@ -6,6 +6,7 @@ import {
   elevators,
   elevatorDetails,
   elevatorBudgets,
+  elevatorEvents,
   organizations,
   suggestedValues,
 } from "@elevatorbud/db/schema";
@@ -46,7 +47,35 @@ const confirmImportSchema = z.object({
       inspection_authority: z.string().nullish(),
       inspection_month: z.string().nullish(),
       maintenance_company: z.string().nullish(),
-      modernization_year: z.string().nullish(),
+      // Year-like fields accept only 4-digit year or null/undefined.
+      // modernization_year additionally accepts the "Ej ombyggd" sentinel
+      // for backwards compatibility with existing exports. Client-side
+      // parsers strip invalid values with warnings; this is a second
+      // layer of defense so the DB never ends up with "2025 Maskin" again.
+      modernization_year: z
+        .string()
+        .refine(
+          (v) =>
+            v === "Ej ombyggd" ||
+            (/^\d{4}$/.test(v) &&
+              Number(v) >= 1800 &&
+              Number(v) <= 2100),
+          'modernization_year: endast 4-siffrigt år eller "Ej ombyggd".',
+        )
+        .nullish(),
+      // YYYY-MM-DD expected when provided. Used to seed the initial
+      // `inventory` event AND cached on elevators.inventory_date.
+      inventory_date: z.string().nullish(),
+      // YYYY-MM-DD expected when provided. Warranty expiration date for
+      // the most recent modernization (or null when the source cell was
+      // a sentinel like "Ja"/"Nej"/"?"/"okänt").
+      warranty_expires_at: z
+        .string()
+        .refine(
+          (v) => /^\d{4}-\d{2}-\d{2}$/.test(v),
+          "warranty_expires_at: ISO YYYY-MM-DD krävs.",
+        )
+        .nullish(),
       needs_upgrade: z.boolean().nullish(),
       // Details
       speed: z.string().nullish(),
@@ -76,12 +105,16 @@ const confirmImportSchema = z.object({
       contact_person_phone: z.string().nullish(),
       contact_person_email: z.string().nullish(),
       // Budget
-      revision_year: z.number().nullish(),
-      recommended_modernization_year: z.string().nullish(),
+      recommended_modernization_year: z
+        .string()
+        .refine(
+          (v) =>
+            /^\d{4}$/.test(v) && Number(v) >= 1800 && Number(v) <= 2100,
+          "recommended_modernization_year: endast 4-siffrigt år (1800–2100).",
+        )
+        .nullish(),
       budget_amount: z.number().nullish(),
-      measures: z.string().nullish(),
       modernization_measures: z.string().nullish(),
-      warranty: z.boolean().nullish(),
       // Resolved org ID from mapping step
       _organizationId: z.string(),
       _source_row: z.number().optional(),
@@ -215,6 +248,8 @@ function toElevatorInsert(r: ConfirmRow, userId: string) {
     inspectionMonth: r.inspection_month,
     maintenanceCompany: r.maintenance_company,
     modernizationYear: r.modernization_year,
+    warrantyExpiresAt: r.warranty_expires_at,
+    inventoryDate: r.inventory_date,
     needsUpgrade: r.needs_upgrade,
     organizationId: r._organizationId,
     contactPersonName: r.contact_person_name,
@@ -223,6 +258,39 @@ function toElevatorInsert(r: ConfirmRow, userId: string) {
     status: "active" as const,
     createdBy: userId,
   };
+}
+
+/**
+ * Parse a year-like string from the Excel column `Moderniseringsår`. Accepts
+ * bare 4-digit years and common variants ("1987", "1987-88", " 1987 ").
+ * Returns null for "Ej ombyggd" sentinels and non-parseable values.
+ *
+ * The elevator's modernization event occurredAt is set to July 1 of the
+ * parsed year — a neutral mid-year placeholder when the day isn't known,
+ * consistent enough for year-based grouping on the timeline.
+ */
+function parseModernizationYearForEvent(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.toLowerCase() === "ej ombyggd") return null;
+  const match = trimmed.match(/^(\d{4})/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  if (!Number.isFinite(year) || year < 1800 || year > 2100) return null;
+  return new Date(Date.UTC(year, 6, 1)); // July 1 UTC
+}
+
+function parseInventoryDateForEvent(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return new Date(`${trimmed}T00:00:00Z`);
+  }
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
 }
 
 function rowRef(r: ConfirmRow): Pick<ImportFailure, "elevator_number" | "sheet" | "row"> {
@@ -288,12 +356,24 @@ export async function confirmFn(
 
       try {
         await tx.transaction(async (sp) => {
+          // Skip rows whose (organizationId, elevatorNumber) already exists.
+          // The constraint catches both intra-file duplicates (same number
+          // appearing twice in the source) and re-imports of a previously
+          // imported file. Skipped rows surface in the failures list so the
+          // admin can see what was deduped.
           const [elevator] = await sp
             .insert(elevators)
             .values(toElevatorInsert(row, userId))
+            .onConflictDoNothing({
+              target: [elevators.organizationId, elevators.elevatorNumber],
+            })
             .returning({ id: elevators.id });
 
-          if (!elevator) throw new Error("Insert returnerade ingen rad");
+          if (!elevator) {
+            throw new Error(
+              `Hissnummer ${row.elevator_number} finns redan i organisationen — överhoppad.`,
+            );
+          }
 
           await sp.insert(elevatorDetails).values({
             elevatorId: elevator.id,
@@ -303,12 +383,50 @@ export async function confirmFn(
           if (row.recommended_modernization_year || row.budget_amount != null) {
             await sp.insert(elevatorBudgets).values({
               elevatorId: elevator.id,
-              revisionYear: row.revision_year ?? new Date().getFullYear(),
               recommendedModernizationYear: row.recommended_modernization_year,
               budgetAmount:
                 row.budget_amount != null ? String(row.budget_amount) : undefined,
-              measures: row.measures ?? row.modernization_measures,
-              warranty: row.warranty,
+              measures: row.modernization_measures,
+              createdBy: userId,
+            });
+          }
+
+          // Seed historical events from the Excel row so the timeline starts
+          // populated. Writes inside the same savepoint as the elevator
+          // insert, so a failure here rolls the whole row back.
+          //
+          // The "Åtgärder vid modernisering" column describes the FUTURE
+          // recommended modernization (it lives on the budget/plan), not what
+          // was actually done in the historic year. So the seeded modernization
+          // event has no description — we only know the year happened.
+          const modernizationDate = parseModernizationYearForEvent(
+            row.modernization_year,
+          );
+          if (modernizationDate) {
+            await sp.insert(elevatorEvents).values({
+              elevatorId: elevator.id,
+              type: "modernization",
+              occurredAt: modernizationDate,
+              title: `Modernisering ${modernizationDate.getUTCFullYear()}`,
+              metadata: {
+                source: "import",
+                rawModernizationYear: row.modernization_year ?? null,
+              },
+              createdBy: userId,
+            });
+          }
+
+          const inventoryDate = parseInventoryDateForEvent(row.inventory_date);
+          if (inventoryDate) {
+            await sp.insert(elevatorEvents).values({
+              elevatorId: elevator.id,
+              type: "inventory",
+              occurredAt: inventoryDate,
+              title: "Inventering",
+              metadata: {
+                source: "import",
+                rawInventoryDate: row.inventory_date ?? null,
+              },
               createdBy: userId,
             });
           }

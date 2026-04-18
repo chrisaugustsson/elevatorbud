@@ -47,7 +47,7 @@ export function serverToFormValues(
     maintenance_company: (hiss.maintenanceCompany as string) ?? "",
     shaft_lighting: (hiss.shaftLighting as string) ?? "",
     modernization_year: (hiss.modernizationYear as string) ?? "",
-    warranty: (hiss.warranty as boolean) ?? false,
+    warranty_expires_at: (hiss.warrantyExpiresAt as string) ?? "",
     recommended_modernization_year:
       (hiss.recommendedModernizationYear as string) ?? "",
     budget_amount:
@@ -98,7 +98,7 @@ export function formValuesToUpdateArgs(value: HissFormValues) {
     maintenanceCompany: toOptionalString(value.maintenance_company),
     shaftLighting: toOptionalString(value.shaft_lighting),
     modernizationYear: toOptionalString(value.modernization_year),
-    warranty: value.warranty || undefined,
+    warrantyExpiresAt: toOptionalString(value.warranty_expires_at),
     recommendedModernizationYear: toOptionalString(
       value.recommended_modernization_year,
     ),

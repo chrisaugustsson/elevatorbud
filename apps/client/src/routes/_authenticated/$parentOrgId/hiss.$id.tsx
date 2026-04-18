@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { elevatorOptions, elevatorDetailsOptions, elevatorBudgetOptions } from "../../../server/elevator";
+import { elevatorEventsOptions } from "../../../server/elevator-events";
 import {
   Card,
   CardContent,
@@ -11,13 +12,17 @@ import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import { Separator } from "@elevatorbud/ui/components/ui/separator";
-import { ArrowLeft, Phone, MessageSquare } from "lucide-react";
+import { ArrowLeft, Phone, MessageSquare, History } from "lucide-react";
+import { EventTimeline } from "../../../features/elevator-events/event-timeline";
 
 export const Route = createFileRoute("/_authenticated/$parentOrgId/hiss/$id")({
   loader: ({ context, params }) => {
     context.queryClient.prefetchQuery(elevatorOptions(params.id, params.parentOrgId));
     context.queryClient.prefetchQuery(elevatorDetailsOptions(params.id, params.parentOrgId));
     context.queryClient.prefetchQuery(elevatorBudgetOptions(params.id, params.parentOrgId));
+    context.queryClient.prefetchQuery(
+      elevatorEventsOptions(params.id, params.parentOrgId),
+    );
   },
   component: HissDetail,
   pendingComponent: DetailSkeleton,
@@ -78,6 +83,9 @@ function HissDetail() {
   const { data: hiss } = useSuspenseQuery(elevatorOptions(id, parentOrgId));
   const { data: details } = useSuspenseQuery(elevatorDetailsOptions(id, parentOrgId));
   const { data: budget } = useSuspenseQuery(elevatorBudgetOptions(id, parentOrgId));
+  const { data: events } = useSuspenseQuery(
+    elevatorEventsOptions(id, parentOrgId),
+  );
 
   if (!hiss) {
     return (
@@ -116,6 +124,29 @@ function HissDetail() {
 
       <Separator />
 
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <History className="size-4" />
+            Historik
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EventTimeline
+            events={events.map((e) => ({
+              id: e.id,
+              type: e.type,
+              occurredAt: e.occurredAt,
+              title: e.title,
+              description: e.description,
+              cost: e.cost,
+              currency: e.currency,
+              performedBy: e.performedBy,
+            }))}
+          />
+        </CardContent>
+      </Card>
+
       <DetailSection title="Identifiering">
         <DetailField label="Hissnummer" value={hiss.elevatorNumber} />
         <DetailField label="Adress" value={hiss.address} />
@@ -127,9 +158,9 @@ function HissDetail() {
         <DetailField label="Hisstyp" value={hiss.elevatorType} />
         <DetailField label="Fabrikat" value={hiss.manufacturer} />
         <DetailField label="Byggår" value={hiss.buildYear} />
-        <DetailField label="Hastighet" value={details?.speed} />
-        <DetailField label="Lyfthöjd" value={details?.liftHeight} />
-        <DetailField label="Marklast" value={details?.loadCapacity} />
+        <DetailField label="Hastighet (m/s)" value={details?.speed} />
+        <DetailField label="Lyfthöjd (m)" value={details?.liftHeight} />
+        <DetailField label="Märklast (kg)" value={details?.loadCapacity} />
         <DetailField label="Antal plan" value={details?.floorCount} />
         <DetailField label="Antal dörrar" value={details?.doorCount} />
       </DetailSection>
@@ -161,7 +192,10 @@ function HissDetail() {
 
       <DetailSection title="Modernisering">
         <DetailField label="Moderniserad" value={hiss.modernizationYear} />
-        <DetailField label="Garanti" value={budget?.warranty} />
+        <DetailField
+          label="Garanti gäller t.o.m."
+          value={hiss.warrantyExpiresAt}
+        />
         <DetailField
           label="Rekommenderat moderniseringsår"
           value={budget?.recommendedModernizationYear}

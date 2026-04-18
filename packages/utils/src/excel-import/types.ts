@@ -6,6 +6,10 @@ export type ParsedElevator = {
   address?: string;
   elevator_designation?: string;
   district?: string;
+  // ISO date string (YYYY-MM-DD). The Excel column "Inventerings datum"
+  // often carries year-month only (e.g. "2021-10") — normalized to the
+  // first of the month on parse.
+  inventory_date?: string;
 
   // Teknisk specifikation
   elevator_type?: string;
@@ -41,7 +45,10 @@ export type ParsedElevator = {
 
   // Modernisering
   modernization_year?: string;
-  warranty?: boolean;
+  // Warranty expiration date for the most recent modernization. ISO
+  // YYYY-MM-DD when the source cell was a parseable date; undefined for
+  // sentinel strings ("Ja"/"Nej"/"?"/"okänt"/empty).
+  warranty_expires_at?: string;
   recommended_modernization_year?: string;
   budget_amount?: number;
   modernization_measures?: string;
@@ -78,7 +85,7 @@ export type ColumnDef = {
   letter: string; // Excel column letter (for error messages)
   field: string; // Target field name or special parser key
   mandatory?: boolean;
-  parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_daylight_opening" | "build_year" | "modernization_year" | "boolean" | "number" | "budget";
+  parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_daylight_opening" | "build_year" | "modernization_year" | "recommended_modernization_year" | "inventory_date" | "warranty_date" | "boolean" | "number" | "budget";
 };
 
 export type SheetMappingConfig = {

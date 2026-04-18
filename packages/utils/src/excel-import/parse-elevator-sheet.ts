@@ -8,6 +8,9 @@ import {
   parseCabSize,
   parseDaylightOpening,
   parseModernizationYear,
+  parseRecommendedModernizationYear,
+  parseInventoryDate,
+  parseWarrantyDate,
   parseBoolean,
   parseBudgetAmount,
 } from "./parsers";
@@ -81,7 +84,54 @@ function parseRowWithMapping(
       }
       case "modernization_year": {
         const parsed = parseModernizationYear(raw);
-        if (parsed.modernization_year !== undefined) result.modernization_year = parsed.modernization_year;
+        if (parsed.modernization_year !== undefined) {
+          result.modernization_year = parsed.modernization_year;
+        }
+        if (parsed.warning) {
+          warnings.push({
+            row: rowIndex,
+            column: mapping.sourceHeader,
+            message: parsed.warning,
+          });
+        }
+        break;
+      }
+      case "recommended_modernization_year": {
+        const parsed = parseRecommendedModernizationYear(raw);
+        if (parsed.recommended_modernization_year !== undefined) {
+          result.recommended_modernization_year =
+            parsed.recommended_modernization_year;
+        }
+        if (parsed.warning) {
+          warnings.push({
+            row: rowIndex,
+            column: mapping.sourceHeader,
+            message: parsed.warning,
+          });
+        }
+        break;
+      }
+      case "inventory_date": {
+        const parsed = parseInventoryDate(raw);
+        if (parsed.inventory_date !== undefined) {
+          result.inventory_date = parsed.inventory_date;
+        } else {
+          warnings.push({
+            row: rowIndex,
+            column: mapping.sourceHeader,
+            message: `Kunde inte tolka inventeringsdatum: "${raw}"`,
+          });
+        }
+        break;
+      }
+      case "warranty_date": {
+        // Garanti column. Only parseable dates are kept; sentinel
+        // strings ("Ja"/"Nej"/"?"/"okänt") are dropped silently — they
+        // carry no actionable info for our UI.
+        const parsed = parseWarrantyDate(raw);
+        if (parsed.warranty_expires_at !== undefined) {
+          result.warranty_expires_at = parsed.warranty_expires_at;
+        }
         break;
       }
       case "boolean": {

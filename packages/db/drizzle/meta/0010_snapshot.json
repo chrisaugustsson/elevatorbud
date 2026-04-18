@@ -1,0 +1,1376 @@
+{
+  "id": "23c6e38e-e3ab-46af-ace6-72097ded7294",
+  "prevId": "752fd18a-8174-4943-8323-75ed71e430c7",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.contact_submissions": {
+      "name": "contact_submissions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'new'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "contact_submissions_status_idx": {
+          "name": "contact_submissions_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "contact_submissions_status_check": {
+          "name": "contact_submissions_status_check",
+          "value": "\"contact_submissions\".\"status\" IN ('new', 'read', 'archived')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.elevator_budgets": {
+      "name": "elevator_budgets",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "elevator_id": {
+          "name": "elevator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revision_year": {
+          "name": "revision_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recommended_modernization_year": {
+          "name": "recommended_modernization_year",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "budget_amount": {
+          "name": "budget_amount",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "measures": {
+          "name": "measures",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "warranty": {
+          "name": "warranty",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "elevator_budgets_elevator_id_idx": {
+          "name": "elevator_budgets_elevator_id_idx",
+          "columns": [
+            {
+              "expression": "elevator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "elevator_budgets_elevator_id_revision_year_idx": {
+          "name": "elevator_budgets_elevator_id_revision_year_idx",
+          "columns": [
+            {
+              "expression": "elevator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "revision_year",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "elevator_budgets_elevator_id_elevators_id_fk": {
+          "name": "elevator_budgets_elevator_id_elevators_id_fk",
+          "tableFrom": "elevator_budgets",
+          "tableTo": "elevators",
+          "columnsFrom": [
+            "elevator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "elevator_budgets_created_by_users_id_fk": {
+          "name": "elevator_budgets_created_by_users_id_fk",
+          "tableFrom": "elevator_budgets",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.elevator_details": {
+      "name": "elevator_details",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "elevator_id": {
+          "name": "elevator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "speed": {
+          "name": "speed",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lift_height": {
+          "name": "lift_height",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "load_capacity": {
+          "name": "load_capacity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "floor_count": {
+          "name": "floor_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door_count": {
+          "name": "door_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door_type": {
+          "name": "door_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "passthrough": {
+          "name": "passthrough",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dispatch_mode": {
+          "name": "dispatch_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cab_size": {
+          "name": "cab_size",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door_opening": {
+          "name": "door_opening",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door_carrier": {
+          "name": "door_carrier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "door_machine": {
+          "name": "door_machine",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "drive_system": {
+          "name": "drive_system",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "suspension": {
+          "name": "suspension",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "machine_placement": {
+          "name": "machine_placement",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "machine_type": {
+          "name": "machine_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "control_system_type": {
+          "name": "control_system_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shaft_lighting": {
+          "name": "shaft_lighting",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emergency_phone_model": {
+          "name": "emergency_phone_model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emergency_phone_type": {
+          "name": "emergency_phone_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emergency_phone_price": {
+          "name": "emergency_phone_price",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comments": {
+          "name": "comments",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "elevator_details_elevator_id_idx": {
+          "name": "elevator_details_elevator_id_idx",
+          "columns": [
+            {
+              "expression": "elevator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "elevator_details_elevator_id_elevators_id_fk": {
+          "name": "elevator_details_elevator_id_elevators_id_fk",
+          "tableFrom": "elevator_details",
+          "tableTo": "elevators",
+          "columnsFrom": [
+            "elevator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "elevator_details_elevator_id_unique": {
+          "name": "elevator_details_elevator_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "elevator_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.elevator_events": {
+      "name": "elevator_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "elevator_id": {
+          "name": "elevator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cost": {
+          "name": "cost",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'SEK'"
+        },
+        "performed_by": {
+          "name": "performed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attachments": {
+          "name": "attachments",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "elevator_events_elevator_id_idx": {
+          "name": "elevator_events_elevator_id_idx",
+          "columns": [
+            {
+              "expression": "elevator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "elevator_events_elevator_id_occurred_at_idx": {
+          "name": "elevator_events_elevator_id_occurred_at_idx",
+          "columns": [
+            {
+              "expression": "elevator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "elevator_events_type_idx": {
+          "name": "elevator_events_type_idx",
+          "columns": [
+            {
+              "expression": "type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "elevator_events_occurred_at_idx": {
+          "name": "elevator_events_occurred_at_idx",
+          "columns": [
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "elevator_events_elevator_id_elevators_id_fk": {
+          "name": "elevator_events_elevator_id_elevators_id_fk",
+          "tableFrom": "elevator_events",
+          "tableTo": "elevators",
+          "columnsFrom": [
+            "elevator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "elevator_events_created_by_users_id_fk": {
+          "name": "elevator_events_created_by_users_id_fk",
+          "tableFrom": "elevator_events",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "elevator_events_updated_by_users_id_fk": {
+          "name": "elevator_events_updated_by_users_id_fk",
+          "tableFrom": "elevator_events",
+          "tableTo": "users",
+          "columnsFrom": [
+            "updated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "elevator_events_type_check": {
+          "name": "elevator_events_type_check",
+          "value": "\"elevator_events\".\"type\" IN ('inventory','inspection','repair','service','modernization','replacement','note')"
+        },
+        "elevator_events_cost_nonneg": {
+          "name": "elevator_events_cost_nonneg",
+          "value": "\"elevator_events\".\"cost\" IS NULL OR \"elevator_events\".\"cost\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.elevators": {
+      "name": "elevators",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "elevator_number": {
+          "name": "elevator_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "elevator_classification": {
+          "name": "elevator_classification",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "district": {
+          "name": "district",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inventory_date": {
+          "name": "inventory_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "elevator_type": {
+          "name": "elevator_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "manufacturer": {
+          "name": "manufacturer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "build_year": {
+          "name": "build_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inspection_authority": {
+          "name": "inspection_authority",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inspection_month": {
+          "name": "inspection_month",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "maintenance_company": {
+          "name": "maintenance_company",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "modernization_year": {
+          "name": "modernization_year",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "has_emergency_phone": {
+          "name": "has_emergency_phone",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "needs_upgrade": {
+          "name": "needs_upgrade",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_person_name": {
+          "name": "contact_person_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_person_phone": {
+          "name": "contact_person_phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_person_email": {
+          "name": "contact_person_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_updated_by": {
+          "name": "last_updated_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_updated_at": {
+          "name": "last_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "elevators_organization_id_idx": {
+          "name": "elevators_organization_id_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "elevators_elevator_number_idx": {
+          "name": "elevators_elevator_number_idx",
+          "columns": [
+            {
+              "expression": "elevator_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "elevators_organization_id_status_idx": {
+          "name": "elevators_organization_id_status_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "elevators_district_idx": {
+          "name": "elevators_district_idx",
+          "columns": [
+            {
+              "expression": "district",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "elevators_manufacturer_idx": {
+          "name": "elevators_manufacturer_idx",
+          "columns": [
+            {
+              "expression": "manufacturer",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "elevators_elevator_type_idx": {
+          "name": "elevators_elevator_type_idx",
+          "columns": [
+            {
+              "expression": "elevator_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "elevators_organization_id_organizations_id_fk": {
+          "name": "elevators_organization_id_organizations_id_fk",
+          "tableFrom": "elevators",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "elevators_created_by_users_id_fk": {
+          "name": "elevators_created_by_users_id_fk",
+          "tableFrom": "elevators",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "elevators_last_updated_by_users_id_fk": {
+          "name": "elevators_last_updated_by_users_id_fk",
+          "tableFrom": "elevators",
+          "tableTo": "users",
+          "columnsFrom": [
+            "last_updated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "elevators_status_check": {
+          "name": "elevators_status_check",
+          "value": "\"elevators\".\"status\" IN ('active', 'demolished', 'archived')"
+        },
+        "elevators_build_year_check": {
+          "name": "elevators_build_year_check",
+          "value": "\"elevators\".\"build_year\" IS NULL OR (\"elevators\".\"build_year\" >= 1800 AND \"elevators\".\"build_year\" <= 2100)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.organizations": {
+      "name": "organizations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organization_number": {
+          "name": "organization_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "organizations_parent_id_idx": {
+          "name": "organizations_parent_id_idx",
+          "columns": [
+            {
+              "expression": "parent_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "organizations_parent_id_organizations_id_fk": {
+          "name": "organizations_parent_id_organizations_id_fk",
+          "tableFrom": "organizations",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pages": {
+      "name": "pages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sections": {
+          "name": "sections",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "published": {
+          "name": "published",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "pages_slug_idx": {
+          "name": "pages_slug_idx",
+          "columns": [
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "pages_slug_unique": {
+          "name": "pages_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.suggested_values": {
+      "name": "suggested_values",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "suggested_values_category_idx": {
+          "name": "suggested_values_category_idx",
+          "columns": [
+            {
+              "expression": "category",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "suggested_values_category_value_unique": {
+          "name": "suggested_values_category_value_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "category",
+            "value"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_organizations": {
+      "name": "user_organizations",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "user_organizations_user_id_idx": {
+          "name": "user_organizations_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "user_organizations_organization_id_idx": {
+          "name": "user_organizations_organization_id_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "user_organizations_user_id_users_id_fk": {
+          "name": "user_organizations_user_id_users_id_fk",
+          "tableFrom": "user_organizations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "user_organizations_organization_id_organizations_id_fk": {
+          "name": "user_organizations_organization_id_organizations_id_fk",
+          "tableFrom": "user_organizations",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "user_organizations_user_id_organization_id_pk": {
+          "name": "user_organizations_user_id_organization_id_pk",
+          "columns": [
+            "user_id",
+            "organization_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "clerk_user_id": {
+          "name": "clerk_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'customer'"
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_login": {
+          "name": "last_login",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "users_role_idx": {
+          "name": "users_role_idx",
+          "columns": [
+            {
+              "expression": "role",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_clerk_user_id_unique": {
+          "name": "users_clerk_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "clerk_user_id"
+          ]
+        },
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "users_role_check": {
+          "name": "users_role_check",
+          "value": "\"users\".\"role\" IN ('admin', 'customer')"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

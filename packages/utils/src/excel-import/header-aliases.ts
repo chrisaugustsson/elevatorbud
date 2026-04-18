@@ -25,6 +25,14 @@ export const HEADER_ALIASES: HeaderAlias[] = [
   { header: "distrikt/ort", field: "district" },
   { header: "distrikt/ ort", field: "district" },
   { header: "ort", field: "district" },
+  {
+    header: "inventerings datum",
+    field: "inventory_date",
+    parser: "inventory_date",
+  },
+  { header: "inventeringsdatum", field: "inventory_date", parser: "inventory_date" },
+  { header: "inventerings-datum", field: "inventory_date", parser: "inventory_date" },
+  { header: "inventeringsdag", field: "inventory_date", parser: "inventory_date" },
 
   // --- Teknisk specifikation ---
   { header: "hisstyp", field: "elevator_type" },
@@ -119,10 +127,14 @@ export const HEADER_ALIASES: HeaderAlias[] = [
     mandatory: true,
     parser: "modernization_year",
   },
-  { header: "garanti", field: "warranty", parser: "boolean" },
+  // The "Garanti" column is a date when present (warranty expiration for
+  // the most recent modernization). Sentinels like "Ja"/"Nej"/"?" carry
+  // no concrete expiration, so the parser drops them silently.
+  { header: "garanti", field: "warranty_expires_at", parser: "warranty_date" },
   {
     header: "rekommenderat moderniseringsår",
     field: "recommended_modernization_year",
+    parser: "recommended_modernization_year",
   },
   {
     header: "uppdaterat budgetbelopp 2026",
@@ -159,6 +171,7 @@ export const TARGET_FIELDS: { field: string; label: string; parser?: HeaderAlias
   { field: "address", label: "Hissadress" },
   { field: "elevator_designation", label: "Hissbeteckning" },
   { field: "district", label: "Distrikt / Ort" },
+  { field: "inventory_date", label: "Inventeringsdatum", parser: "inventory_date" },
   { field: "elevator_type", label: "Hisstyp" },
   { field: "manufacturer", label: "Fabrikat" },
   { field: "build_year", label: "Byggår", parser: "build_year", mandatory: true },
@@ -183,8 +196,12 @@ export const TARGET_FIELDS: { field: string; label: string; parser?: HeaderAlias
   { field: "maintenance_company", label: "Skötselföretag" },
   { field: "shaft_lighting", label: "Schaktbelysning" },
   { field: "modernization_year", label: "Moderniseringsår", parser: "modernization_year", mandatory: true },
-  { field: "warranty", label: "Garanti", parser: "boolean" },
-  { field: "recommended_modernization_year", label: "Rekommenderat moderniseringsår" },
+  { field: "warranty_expires_at", label: "Garanti (datum)", parser: "warranty_date" },
+  {
+    field: "recommended_modernization_year",
+    label: "Rekommenderat moderniseringsår",
+    parser: "recommended_modernization_year",
+  },
   { field: "budget_amount", label: "Budgetbelopp", parser: "budget" },
   { field: "modernization_measures", label: "Moderniseringsåtgärder" },
   { field: "comments", label: "Kommentarer" },
