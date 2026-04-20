@@ -15,11 +15,6 @@ async function overview(db: DatabaseHttp) {
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const nextMonth = ((now.getMonth() + 1) % 12) + 1;
-  // TODO(inspection-month-normalization): `inspection_month` is currently
-  // stored as free-text Swedish month names ("Maj", "Oktober", …), so this
-  // numeric match returns 0 against real data. The fix lands with the
-  // schema migration to `integer` + import normalization — see the
-  // inspection-month rework.
   const modernizationCutoff = currentYear + 3;
 
   const activeCondition = eq(elevators.status, "active");
@@ -35,7 +30,7 @@ async function overview(db: DatabaseHttp) {
     db.execute(sql`
       SELECT count(*)::int as count FROM elevators e
       WHERE e.status = 'active'
-        AND e.inspection_month IN (${String(currentMonth)}, ${String(nextMonth)})
+        AND e.inspection_month IN (${currentMonth}, ${nextMonth})
     `),
     db.execute(sql`
       SELECT count(*)::int as count FROM elevators e

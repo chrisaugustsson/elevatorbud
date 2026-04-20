@@ -22,7 +22,7 @@ export const getInspectionCalendar = createServerFn()
       ORDER BY inspection_month
     `);
 
-    type InspectionRow = { month: string; count: number };
+    type InspectionRow = { month: number; count: number };
     return (result.rows as InspectionRow[]).map((r) => ({
       month: r.month,
       count: r.count,
@@ -129,7 +129,7 @@ export const emergencyPhoneStatusOptions = (parentOrgId: string) =>
 
 export const getInspectionList = createServerFn()
   .middleware([authMiddlewareRead])
-  .inputValidator(z.object({ month: z.string(), parentOrgId: z.string().uuid() }))
+  .inputValidator(z.object({ month: z.number().int().min(1).max(12), parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
 
@@ -155,7 +155,7 @@ export const getInspectionList = createServerFn()
       .orderBy(elevators.elevatorNumber);
   });
 
-export const inspectionListOptions = (month: string, parentOrgId: string) =>
+export const inspectionListOptions = (month: number, parentOrgId: string) =>
   queryOptions({
     queryKey: ["maintenance", "inspectionList", month, parentOrgId],
     queryFn: () => getInspectionList({ data: { month, parentOrgId } }),

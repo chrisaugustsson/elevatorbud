@@ -272,6 +272,60 @@ export function parseBoolean(raw: string): boolean | undefined {
   return undefined;
 }
 
+/**
+ * Parses the "Besiktningsmånad" column to a month number 1–12.
+ *
+ * Accepts:
+ *   - Full Swedish name: "Januari", "januari", "JANUARI"
+ *   - Short Swedish form: "Jan", "jan.", "Sept"
+ *   - Numeric: "5", "05"
+ *   - Whitespace and trailing dot tolerated
+ *
+ * Anything else ("?", "vårig", "maj/juni", "May", typos) is returned as
+ * unset and flagged via the `warning` field. Import callers surface
+ * the warning to the admin so the source cell can be corrected.
+ */
+const SWEDISH_MONTH_MAP: Record<string, number> = {
+  januari: 1,  jan: 1,
+  februari: 2, feb: 2,
+  mars: 3,     mar: 3,
+  april: 4,    apr: 4,
+  maj: 5,
+  juni: 6,     jun: 6,
+  juli: 7,     jul: 7,
+  augusti: 8,  aug: 8,
+  september: 9, sep: 9, sept: 9,
+  oktober: 10, okt: 10,
+  november: 11, nov: 11,
+  december: 12, dec: 12,
+};
+
+export function parseInspectionMonth(raw: string): {
+  inspection_month?: number;
+  warning?: string;
+} {
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+
+  const normalized = trimmed.toLowerCase().replace(/\.$/, "");
+
+  // Numeric input, padded or unpadded.
+  if (/^\d{1,2}$/.test(normalized)) {
+    const n = parseInt(normalized, 10);
+    if (n >= 1 && n <= 12) return { inspection_month: n };
+    return {
+      warning: `Besiktningsmånad "${trimmed}" är inte ett giltigt månadsnummer (1–12) — ignorerat.`,
+    };
+  }
+
+  const mapped = SWEDISH_MONTH_MAP[normalized];
+  if (mapped !== undefined) return { inspection_month: mapped };
+
+  return {
+    warning: `Kunde inte tolka besiktningsmånad: "${trimmed}" — ignorerat. (Acceptera svenska månadsnamn, t.ex. "Maj" eller "maj", eller siffra 1–12.)`,
+  };
+}
+
 export function parseBudgetAmount(raw: string): { budget_amount?: number } {
   const trimmed = raw.trim();
   if (!trimmed) return {};

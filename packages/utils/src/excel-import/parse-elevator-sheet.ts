@@ -9,6 +9,7 @@ import {
   parseDaylightOpening,
   parseModernizationYear,
   parseRecommendedModernizationYear,
+  parseInspectionMonth,
   parseInventoryDate,
   parseWarrantyDate,
   parseBoolean,
@@ -68,6 +69,7 @@ function parseRowWithMapping(
             row: rowIndex,
             column: mapping.sourceHeader,
             message: `Kunde inte tolka plan/dörrar-värde: "${raw}"`,
+            elevator_number,
           });
         }
         break;
@@ -92,6 +94,7 @@ function parseRowWithMapping(
             row: rowIndex,
             column: mapping.sourceHeader,
             message: parsed.warning,
+            elevator_number,
           });
         }
         break;
@@ -107,6 +110,22 @@ function parseRowWithMapping(
             row: rowIndex,
             column: mapping.sourceHeader,
             message: parsed.warning,
+            elevator_number,
+          });
+        }
+        break;
+      }
+      case "inspection_month": {
+        const parsed = parseInspectionMonth(raw);
+        if (parsed.inspection_month !== undefined) {
+          result.inspection_month = parsed.inspection_month;
+        }
+        if (parsed.warning) {
+          warnings.push({
+            row: rowIndex,
+            column: mapping.sourceHeader,
+            message: parsed.warning,
+            elevator_number,
           });
         }
         break;
@@ -120,6 +139,7 @@ function parseRowWithMapping(
             row: rowIndex,
             column: mapping.sourceHeader,
             message: `Kunde inte tolka inventeringsdatum: "${raw}"`,
+            elevator_number,
           });
         }
         break;

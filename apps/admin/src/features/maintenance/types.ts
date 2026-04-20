@@ -1,5 +1,10 @@
 export type KalenderEntry = {
+  // Month number 1–12 — used as the filter-click payload and to look up
+  // the Swedish name.
+  monthNumber: number;
+  // 3-letter Swedish abbreviation for bar axis labels ("Jan", "Feb"…).
   name: string;
+  // Full Swedish month name for tooltips / section headings.
   fullName: string;
   antal: number;
   isCurrent: boolean;

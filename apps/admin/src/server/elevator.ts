@@ -137,7 +137,7 @@ const createInput = z.object({
   manufacturer: z.string().optional(),
   buildYear: z.number().optional(),
   inspectionAuthority: z.string().optional(),
-  inspectionMonth: z.string().optional(),
+  inspectionMonth: z.number().int().min(1).max(12).optional(),
   maintenanceCompany: z.string().optional(),
   modernizationYear: modernizationYearLike,
   // ISO YYYY-MM-DD or empty/undefined; warranty expiration date for the
@@ -193,7 +193,7 @@ const updateInput = z.object({
   manufacturer: z.string().optional(),
   buildYear: z.number().optional(),
   inspectionAuthority: z.string().optional(),
-  inspectionMonth: z.string().optional(),
+  inspectionMonth: z.number().int().min(1).max(12).optional(),
   maintenanceCompany: z.string().optional(),
   modernizationYear: modernizationYearLike,
   warrantyExpiresAt: z

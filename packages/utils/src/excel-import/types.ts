@@ -39,7 +39,7 @@ export type ParsedElevator = {
 
   // Besiktning och underhall
   inspection_authority?: string;
-  inspection_month?: string;
+  inspection_month?: number;
   maintenance_company?: string;
   shaft_lighting?: string;
 
@@ -71,6 +71,12 @@ export type ImportWarning = {
   row: number;
   column: string;
   message: string;
+  /**
+   * Elevator number for the row that produced this warning, when known.
+   * Not every warning can attach one (e.g. warnings emitted before
+   * elevator_number is parsed), so consumers must treat it as optional.
+   */
+  elevator_number?: string;
 };
 
 export type ElevatorParseResult = {
@@ -85,7 +91,7 @@ export type ColumnDef = {
   letter: string; // Excel column letter (for error messages)
   field: string; // Target field name or special parser key
   mandatory?: boolean;
-  parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_daylight_opening" | "build_year" | "modernization_year" | "recommended_modernization_year" | "inventory_date" | "warranty_date" | "boolean" | "number" | "budget";
+  parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_daylight_opening" | "build_year" | "modernization_year" | "recommended_modernization_year" | "inspection_month" | "inventory_date" | "warranty_date" | "boolean" | "number" | "budget";
 };
 
 export type SheetMappingConfig = {

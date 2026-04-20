@@ -21,7 +21,7 @@ type ListResult = {
     buildYear: number | null;
     modernizationYear: string | null;
     maintenanceCompany: string | null;
-    inspectionMonth: string | null;
+    inspectionMonth: number | null;
     inspectionAuthority: string | null;
     status: string;
     organizationId: string;

@@ -1,3 +1,5 @@
+import { formatInspectionMonth } from "@elevatorbud/utils/format";
+
 // Narrow on purpose — the hero shows only "who / what / where" facts the
 // admin needs at-a-glance. All technical/spec data lives in the Teknik
 // tab.
@@ -14,7 +16,7 @@ export type IdentityData = {
   contactPersonName: string | null;
   maintenanceCompany: string | null;
   inspectionAuthority: string | null;
-  inspectionMonth: string | null;
+  inspectionMonth: number | null;
   // ISO YYYY-MM-DD warranty expiration date for the most recent
   // modernization. Null when no parseable date — sentinel strings from
   // the Excel ("Ja"/"Nej"/"?"/"okänt") are intentionally dropped to null
@@ -32,11 +34,10 @@ type Props = {
 };
 
 export function IdentityHero({ data }: Props) {
+  const monthName = formatInspectionMonth(data.inspectionMonth);
   const inspection =
-    data.inspectionAuthority || data.inspectionMonth
-      ? [data.inspectionAuthority, data.inspectionMonth]
-          .filter(Boolean)
-          .join(", ")
+    data.inspectionAuthority || monthName
+      ? [data.inspectionAuthority, monthName].filter(Boolean).join(", ")
       : null;
 
   const warranty = warrantyState(data.warrantyExpiresAt);

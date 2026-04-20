@@ -29,18 +29,22 @@ export function InspectionCalendar({
   totalBesiktningar,
   currentMonthCount,
   currentMonthName,
-  selectedManad,
-  onSelectManad,
+  selectedMonth,
+  onSelectMonth,
   besiktningslista,
 }: {
   kalenderData: KalenderEntry[];
   totalBesiktningar: number;
   currentMonthCount: number;
   currentMonthName: string;
-  selectedManad: string | null;
-  onSelectManad: (month: string | null) => void;
+  selectedMonth: number | null;
+  onSelectMonth: (month: number | null) => void;
   besiktningslista: BesiktningsListaItem[] | undefined;
 }) {
+  const selectedMonthName =
+    selectedMonth != null
+      ? kalenderData.find((k) => k.monthNumber === selectedMonth)?.fullName ?? null
+      : null;
   const colors = useChartColors();
 
   return (
@@ -89,14 +93,14 @@ export function InspectionCalendar({
         <CardHeader>
           <CardTitle className="text-base">
             Besiktningar per månad
-            {selectedManad && (
+            {selectedMonthName && (
               <Badge variant="outline" className="ml-2 font-normal">
-                {selectedManad}
+                {selectedMonthName}
                 <button
                   className="ml-1 hover:text-destructive"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onSelectManad(null);
+                    onSelectMonth(null);
                   }}
                 >
                   ×
@@ -125,7 +129,7 @@ export function InspectionCalendar({
                           : entry.isCurrent
                             ? colors.chart1
                             : colors.chart2;
-                        return selectedManad && !entry.isSelected
+                        return selectedMonth != null && !entry.isSelected
                           ? base + "66"
                           : base;
                       }),
@@ -140,9 +144,11 @@ export function InspectionCalendar({
                   interaction: { mode: "index", intersect: false },
                   onClick: (_event, elements) => {
                     if (elements[0]) {
-                      const fullName = kalenderData[elements[0].index]?.fullName;
-                      if (fullName) {
-                        onSelectManad(selectedManad === fullName ? null : fullName);
+                      const entry = kalenderData[elements[0].index];
+                      if (entry) {
+                        onSelectMonth(
+                          selectedMonth === entry.monthNumber ? null : entry.monthNumber,
+                        );
                       }
                     }
                   },
@@ -173,11 +179,11 @@ export function InspectionCalendar({
       </Card>
 
       {/* Elevator list for selected month */}
-      {selectedManad && (
+      {selectedMonthName && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              Hissar med besiktning i {selectedManad}
+              Hissar med besiktning i {selectedMonthName}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -189,7 +195,7 @@ export function InspectionCalendar({
               </div>
             ) : besiktningslista.length === 0 ? (
               <p className="py-4 text-center text-muted-foreground">
-                Inga hissar med besiktning i {selectedManad}.
+                Inga hissar med besiktning i {selectedMonthName}.
               </p>
             ) : (
               <div className="overflow-x-auto">

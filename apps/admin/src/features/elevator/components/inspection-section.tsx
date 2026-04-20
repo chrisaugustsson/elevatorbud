@@ -57,8 +57,8 @@ export function InspectionSection({
                   <SelectValue placeholder="Välj månad..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {BESIKTNINGSMANADER.map((manad) => (
-                    <SelectItem key={manad} value={manad}>
+                  {BESIKTNINGSMANADER.map((manad, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>
                       {manad}
                     </SelectItem>
                   ))}

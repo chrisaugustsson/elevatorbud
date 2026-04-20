@@ -33,3 +33,31 @@ function coerce(value: number | string | null | undefined): number | null {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : null;
 }
+
+const SWEDISH_MONTH_NAMES = [
+  "Januari",
+  "Februari",
+  "Mars",
+  "April",
+  "Maj",
+  "Juni",
+  "Juli",
+  "Augusti",
+  "September",
+  "Oktober",
+  "November",
+  "December",
+] as const;
+
+/**
+ * Month-number → Swedish month name. Paired with `parseInspectionMonth`
+ * (excel-import/parsers) so round-trips through the DB's integer
+ * `inspection_month` column come back out as "Maj" / "Oktober" for
+ * display and for Excel export.
+ */
+export function formatInspectionMonth(
+  n: number | null | undefined,
+): string {
+  if (n == null || !Number.isInteger(n) || n < 1 || n > 12) return "";
+  return SWEDISH_MONTH_NAMES[n - 1]!;
+}

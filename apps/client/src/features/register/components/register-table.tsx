@@ -25,7 +25,7 @@ type HissRow = {
   buildYear: number | null;
   modernizationYear: string | null;
   maintenanceCompany: string | null;
-  inspectionMonth: string | null;
+  inspectionMonth: number | null;
   hasEmergencyPhone: boolean | null;
   needsUpgrade: boolean | null;
   status: string;

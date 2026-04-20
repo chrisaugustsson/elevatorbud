@@ -12,7 +12,7 @@ import { adminMiddlewareRead } from "./auth";
 // ---------------------------------------------------------------------------
 
 const inspectionListInput = z.object({
-  month: z.string(),
+  month: z.number().int().min(1).max(12),
   organizationId: z.string().uuid().optional(),
 });
 
@@ -33,7 +33,7 @@ async function inspectionCalendar(
     ORDER BY inspection_month
   `);
 
-  type InspectionRow = { month: string; count: number };
+  type InspectionRow = { month: number; count: number };
   return (result.rows as InspectionRow[]).map((r) => ({
     month: r.month,
     count: r.count,
@@ -125,7 +125,7 @@ async function emergencyPhoneStatus(
 async function inspectionList(
   db: DatabaseHttp,
   organizationId: string | undefined,
-  month: string,
+  month: number,
 ) {
   const conditions = [
     eq(elevators.status, "active"),
@@ -225,7 +225,7 @@ export const getInspectionList = createServerFn({ method: "POST" })
     return inspectionList(context.db, data.organizationId, data.month);
   });
 
-export const inspectionListOptions = (month: string, organizationId?: string) =>
+export const inspectionListOptions = (month: number, organizationId?: string) =>
   queryOptions({
     queryKey: ["maintenance", "inspectionList", { month, organizationId }],
     queryFn: () => getInspectionList({ data: { month, organizationId } }),

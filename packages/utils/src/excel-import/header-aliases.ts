@@ -115,7 +115,7 @@ export const HEADER_ALIASES: HeaderAlias[] = [
 
   // --- Besiktning och underhåll ---
   { header: "besiktningsorgan", field: "inspection_authority" },
-  { header: "besiktningsmånad", field: "inspection_month" },
+  { header: "besiktningsmånad", field: "inspection_month", parser: "inspection_month" },
   { header: "skötselföretag", field: "maintenance_company" },
   { header: "underhållsföretag", field: "maintenance_company" },
   { header: "schaktbelysning", field: "shaft_lighting" },

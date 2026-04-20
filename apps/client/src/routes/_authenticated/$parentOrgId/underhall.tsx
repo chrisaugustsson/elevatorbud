@@ -46,12 +46,11 @@ const MANADER = [
   "December",
 ];
 
-const currentMonthIndex = new Date().getMonth();
-const currentMonthName = MANADER[currentMonthIndex];
+const currentMonthNumber = new Date().getMonth() + 1;
 
 function UnderhallPage() {
   const { parentOrgId } = Route.useParams();
-  const [selectedManad, setSelectedManad] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
   const { data: kalender } = useSuspenseQuery(inspectionCalendarOptions(parentOrgId));
 
@@ -64,17 +63,21 @@ function UnderhallPage() {
   );
 
   const { data: besiktningslista } = useQuery({
-    ...inspectionListOptions(selectedManad!, parentOrgId),
-    enabled: !!selectedManad,
+    ...inspectionListOptions(selectedMonth!, parentOrgId),
+    enabled: selectedMonth != null,
   });
 
-  const kalenderData = kalender.map((k) => ({
-    name: k.month.substring(0, 3),
-    fullName: k.month,
-    count: k.count,
-    isCurrent: k.month === currentMonthName,
-    isSelected: k.month === selectedManad,
-  }));
+  const kalenderData = kalender.map((k) => {
+    const fullName = MANADER[k.month - 1] ?? String(k.month);
+    return {
+      monthNumber: k.month,
+      name: fullName.substring(0, 3),
+      fullName,
+      count: k.count,
+      isCurrent: k.month === currentMonthNumber,
+      isSelected: k.month === selectedMonth,
+    };
+  });
 
   const totalBesiktningar = kalenderData.reduce((s, k) => s + k.count, 0);
   const currentMonthCount =
@@ -93,8 +96,8 @@ function UnderhallPage() {
         kalenderData={kalenderData}
         totalBesiktningar={totalBesiktningar}
         currentMonthCount={currentMonthCount}
-        selectedManad={selectedManad}
-        onSelectManad={setSelectedManad}
+        selectedMonth={selectedMonth}
+        onSelectMonth={setSelectedMonth}
         besiktningslista={besiktningslista}
       />
 
