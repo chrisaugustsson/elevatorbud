@@ -5,7 +5,6 @@ import { FieldWrapper } from "./field-wrapper";
 import { ComboboxField } from "./combobox-field";
 import { Label } from "@elevatorbud/ui/components/ui/label";
 import { Input } from "@elevatorbud/ui/components/ui/input";
-import { Switch } from "@elevatorbud/ui/components/ui/switch";
 
 interface ModernizationSectionProps {
   form: HissForm;
@@ -45,19 +44,19 @@ export function ModernizationSection({
       <FieldWrapper
         changed={
           !!originalValues &&
-          isChanged("warranty", formValues, originalValues)
+          isChanged("warranty_expires_at", formValues, originalValues)
         }
       >
-        <form.Field name="warranty">
+        <form.Field name="warranty_expires_at">
           {(field) => (
-            <div className="flex min-h-[44px] items-center justify-between rounded-md border px-3 py-2">
-              <Label htmlFor="warranty" className="cursor-pointer">
-                Garanti
-              </Label>
-              <Switch
-                id="warranty"
-                checked={field.state.value}
-                onCheckedChange={(val) => field.handleChange(val)}
+            <div className="space-y-1.5">
+              <Label htmlFor="warranty_expires_at">Garanti gäller t.o.m.</Label>
+              <Input
+                id="warranty_expires_at"
+                className="h-11"
+                type="date"
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
               />
             </div>
           )}

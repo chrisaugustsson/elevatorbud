@@ -4,6 +4,6 @@ export type User = {
   email: string;
   name: string;
   role: "admin" | "customer";
-  organizationId: string | null;
+  organizationIds: string[];
   active: boolean;
 };

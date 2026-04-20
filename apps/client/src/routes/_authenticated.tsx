@@ -1,8 +1,4 @@
-import {
-  createFileRoute,
-  Outlet,
-  redirect,
-} from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { auth } from "@elevatorbud/auth/server";
 import { useSuspenseQuery } from "@tanstack/react-query";
@@ -15,9 +11,11 @@ import { Separator } from "@elevatorbud/ui/components/ui/separator";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { useClerk } from "@elevatorbud/auth";
 import { meOptions } from "../server/user";
+import { userDirectOrgsOptions } from "../server/context";
 import { AppSidebar } from "../shared/components/app-sidebar";
-import { OrgDisplay } from "../shared/components/org-display";
+import { OrgSwitcher } from "../shared/components/org-switcher";
 import { GlobalSearch } from "../shared/components/global-search";
+import { LiveRegionProvider } from "../shared/components/live-region";
 
 const authGuard = createServerFn().handler(async () => {
   const { isAuthenticated } = await auth();
@@ -31,6 +29,7 @@ export const Route = createFileRoute("/_authenticated")({
   beforeLoad: () => authGuard(),
   loader: ({ context }) => {
     context.queryClient.prefetchQuery(meOptions());
+    context.queryClient.prefetchQuery(userDirectOrgsOptions());
   },
   component: AuthenticatedLayout,
 });
@@ -46,6 +45,13 @@ function AuthenticatedLayout() {
           <p className="text-muted-foreground">
             Ditt konto konfigureras. Vänta ett ögonblick...
           </p>
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={() => signOut()}
+          >
+            Logga ut
+          </Button>
         </div>
       </div>
     );
@@ -74,26 +80,26 @@ function AuthenticatedLayout() {
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator
-            orientation="vertical"
-            className="mr-2 data-[orientation=vertical]:h-4"
-          />
-          {user.organizationId && (
-            <OrgDisplay organisationId={user.organizationId} />
-          )}
-          <div className="ml-auto">
-            <GlobalSearch />
+    <LiveRegionProvider>
+      <SidebarProvider className="h-svh min-h-0 overflow-hidden">
+        <AppSidebar />
+        <SidebarInset className="h-svh overflow-hidden">
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator
+              orientation="vertical"
+              className="mr-2 data-[orientation=vertical]:h-4"
+            />
+            <OrgSwitcher />
+            <div className="ml-auto">
+              <GlobalSearch />
+            </div>
+          </header>
+          <div className="min-w-0 flex-1 overflow-auto p-6">
+            <Outlet />
           </div>
-        </header>
-        <div className="min-w-0 flex-1 overflow-auto p-6">
-          <Outlet />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+        </SidebarInset>
+      </SidebarProvider>
+    </LiveRegionProvider>
   );
 }

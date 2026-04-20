@@ -5,17 +5,30 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { elevatorOptions, elevatorDetailsOptions, elevatorBudgetOptions, archiveElevator } from "~/server/elevator";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@elevatorbud/ui/components/ui/card";
+  elevatorOptions,
+  elevatorDetailsOptions,
+  elevatorBudgetsOptions,
+  archiveElevator,
+  createElevatorBudget,
+  updateElevatorBudget,
+  deleteElevatorBudget,
+} from "~/server/elevator";
+import {
+  elevatorEventsOptions,
+  createElevatorEvent,
+  updateElevatorEvent,
+  createModernizationEvent,
+} from "~/server/elevator-events";
+import type { ElevatorEventType } from "@elevatorbud/db/schema";
 import { Button } from "@elevatorbud/ui/components/ui/button";
-import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
-import { Separator } from "@elevatorbud/ui/components/ui/separator";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@elevatorbud/ui/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +39,13 @@ import {
   DialogTrigger,
 } from "@elevatorbud/ui/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@elevatorbud/ui/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -35,71 +55,49 @@ import {
 import {
   ArrowLeft,
   Pencil,
-  Building2,
-  Phone,
-  MessageSquare,
   Archive,
+  Plus,
+  Sparkles,
+  ShieldCheck,
+  MessageSquarePlus,
+  Wrench,
+  Replace,
 } from "lucide-react";
+import { toast } from "sonner";
+import {
+  EventDialog,
+  type EventFormSubmit,
+} from "~/features/elevator-events/event-dialog";
+import {
+  ModernizationWizard,
+  type ModernizationWizardSubmit,
+} from "~/features/elevator-events/modernization-wizard";
+import type { ModernizationFieldKey } from "~/features/elevator-events/modernization-fields";
+import {
+  IdentityHero,
+  type IdentityData,
+} from "~/features/elevator/identity-panel";
+import {
+  EventList,
+  PlanList,
+  type EditorialEvent,
+  type EditorialPlan,
+} from "~/features/elevator/editorial-rows";
+import {
+  BudgetDialog,
+  type BudgetFormSubmit,
+} from "~/features/elevator/budget-dialog";
 
 export const Route = createFileRoute("/_authenticated/hiss/$id/")({
   loader: ({ context, params }) => {
     context.queryClient.prefetchQuery(elevatorOptions(params.id));
     context.queryClient.prefetchQuery(elevatorDetailsOptions(params.id));
-    context.queryClient.prefetchQuery(elevatorBudgetOptions(params.id));
+    context.queryClient.prefetchQuery(elevatorBudgetsOptions(params.id));
+    context.queryClient.prefetchQuery(elevatorEventsOptions(params.id));
   },
   component: HissDetail,
   pendingComponent: DetailSkeleton,
 });
-
-function DetailField({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number | boolean | null | undefined;
-}) {
-  let display: string;
-  if (value === undefined || value === null || value === "") {
-    display = "—";
-  } else if (typeof value === "boolean") {
-    display = value ? "Ja" : "Nej";
-  } else {
-    display = String(value);
-  }
-
-  return (
-    <div className="space-y-1">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="text-sm font-medium">{display}</dd>
-    </div>
-  );
-}
-
-function DetailSection({
-  title,
-  icon,
-  children,
-}: {
-  title: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          {icon}
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
-          {children}
-        </dl>
-      </CardContent>
-    </Card>
-  );
-}
 
 function HissDetail() {
   const { id } = Route.useParams();
@@ -107,15 +105,287 @@ function HissDetail() {
   const queryClient = useQueryClient();
   const { data: hiss } = useSuspenseQuery(elevatorOptions(id));
   const { data: details } = useSuspenseQuery(elevatorDetailsOptions(id));
-  const { data: budget } = useSuspenseQuery(elevatorBudgetOptions(id));
-  const org = hiss.organization;
+  const { data: budgets } = useSuspenseQuery(elevatorBudgetsOptions(id));
+  const { data: events } = useSuspenseQuery(elevatorEventsOptions(id));
+
   const archiveMutation = useMutation({
-    mutationFn: (input: { id: string; status: "demolished" | "archived" }) => archiveElevator({ data: input }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["elevator"] }); },
+    mutationFn: (input: { id: string; status: "demolished" | "archived" }) =>
+      archiveElevator({ data: input }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["elevator"] });
+    },
   });
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
-  const [archiveStatus, setArchiveStatus] = useState<"demolished" | "archived">("demolished");
+  const [archiveStatus, setArchiveStatus] = useState<"demolished" | "archived">(
+    "demolished",
+  );
   const [isArchiving, setIsArchiving] = useState(false);
+
+  const [eventDialog, setEventDialog] = useState<
+    | { open: false }
+    | { open: true; mode: "create"; type: ElevatorEventType }
+    | {
+        open: true;
+        mode: "edit";
+        type: ElevatorEventType;
+        eventId: string;
+        initial: {
+          occurredAt: string;
+          title: string;
+          description: string;
+          cost: string;
+          performedBy: string;
+        };
+      }
+  >({ open: false });
+
+  const [modernizationOpen, setModernizationOpen] = useState(false);
+
+  const [budgetDialog, setBudgetDialog] = useState<
+    | { open: false }
+    | { open: true; mode: "create" }
+    | {
+        open: true;
+        mode: "edit";
+        budgetId: string;
+        initial: {
+          recommendedModernizationYear: string;
+          measures: string;
+          budgetAmount: string;
+        };
+      }
+  >({ open: false });
+
+  const createEventMutation = useMutation({
+    mutationFn: (input: {
+      elevatorId: string;
+      type: ElevatorEventType;
+      occurredAt: string;
+      title: string;
+      description?: string | null;
+      cost?: number | null;
+      performedBy?: string | null;
+    }) => createElevatorEvent({ data: input }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["elevator", "events", id] });
+      queryClient.invalidateQueries({ queryKey: ["elevator", id] });
+      toast.success("Händelse registrerad");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Kunde inte spara");
+    },
+  });
+
+  const createModernizationMutation = useMutation({
+    mutationFn: (input: ModernizationWizardSubmit & { elevatorId: string }) =>
+      createModernizationEvent({
+        data: {
+          elevatorId: input.elevatorId,
+          occurredAt: input.occurredAt,
+          description: input.description,
+          cost: input.cost,
+          performedBy: input.performedBy,
+          changes: input.changes,
+        },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["elevator", "events", id] });
+      queryClient.invalidateQueries({ queryKey: ["elevator", "details", id] });
+      queryClient.invalidateQueries({ queryKey: ["elevator", id] });
+      toast.success("Modernisering registrerad");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Kunde inte spara");
+    },
+  });
+
+  const updateEventMutation = useMutation({
+    mutationFn: (input: {
+      id: string;
+      elevatorId: string;
+      type: ElevatorEventType;
+      occurredAt: string;
+      title: string;
+      description?: string | null;
+      cost?: number | null;
+      performedBy?: string | null;
+    }) => updateElevatorEvent({ data: input }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["elevator", "events", id] });
+      queryClient.invalidateQueries({ queryKey: ["elevator", id] });
+      toast.success("Händelse uppdaterad");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Kunde inte spara");
+    },
+  });
+
+  async function handleEventSubmit(values: EventFormSubmit) {
+    if (!eventDialog.open) return;
+    if (eventDialog.mode === "edit") {
+      await updateEventMutation.mutateAsync({
+        id: eventDialog.eventId,
+        elevatorId: id,
+        type: values.type,
+        occurredAt: values.occurredAt,
+        title: values.title,
+        description: values.description,
+        cost: values.cost,
+        performedBy: values.performedBy,
+      });
+    } else {
+      await createEventMutation.mutateAsync({
+        elevatorId: id,
+        type: values.type,
+        occurredAt: values.occurredAt,
+        title: values.title,
+        description: values.description,
+        cost: values.cost,
+        performedBy: values.performedBy,
+      });
+    }
+    setEventDialog({ open: false });
+  }
+
+  function openCreateDialog(type: ElevatorEventType) {
+    // Modernization has a bespoke wizard; the generic dialog handles
+    // inspections, repairs, and free-text notes. Replacement is a
+    // dedicated page (see the "Ersätt hiss" Link in the event menu).
+    if (type === "modernization") {
+      setModernizationOpen(true);
+      return;
+    }
+    setEventDialog({ open: true, mode: "create", type });
+  }
+
+  async function handleModernizationSubmit(values: ModernizationWizardSubmit) {
+    await createModernizationMutation.mutateAsync({
+      elevatorId: id,
+      ...values,
+    });
+  }
+
+  // ── Budget (planerad modernisering) mutations ───────────────────────
+
+  const invalidateBudgetQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ["elevator", "budgets", id] });
+    queryClient.invalidateQueries({ queryKey: ["elevator", "budget", id] });
+    queryClient.invalidateQueries({ queryKey: ["elevator", id] });
+  };
+
+  const createBudgetMutation = useMutation({
+    mutationFn: (
+      input: BudgetFormSubmit & { elevatorId: string },
+    ) =>
+      createElevatorBudget({
+        data: {
+          elevatorId: input.elevatorId,
+          recommendedModernizationYear:
+            input.recommendedModernizationYear ?? undefined,
+          measures: input.measures ?? undefined,
+          budgetAmount: input.budgetAmount ?? undefined,
+        },
+      }),
+    onSuccess: () => {
+      invalidateBudgetQueries();
+      toast.success("Planerad modernisering skapad");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Kunde inte spara");
+    },
+  });
+
+  const updateBudgetMutation = useMutation({
+    mutationFn: (input: BudgetFormSubmit & { id: string }) =>
+      updateElevatorBudget({
+        data: {
+          id: input.id,
+          recommendedModernizationYear:
+            input.recommendedModernizationYear ?? undefined,
+          measures: input.measures ?? undefined,
+          budgetAmount: input.budgetAmount ?? undefined,
+        },
+      }),
+    onSuccess: () => {
+      invalidateBudgetQueries();
+      toast.success("Planerad modernisering uppdaterad");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Kunde inte spara");
+    },
+  });
+
+  const deleteBudgetMutation = useMutation({
+    mutationFn: (budgetId: string) =>
+      deleteElevatorBudget({ data: { id: budgetId } }),
+    onSuccess: () => {
+      invalidateBudgetQueries();
+      toast.success("Planerad modernisering borttagen");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Kunde inte ta bort");
+    },
+  });
+
+  async function handleBudgetSubmit(values: BudgetFormSubmit) {
+    if (!budgetDialog.open) return;
+    if (budgetDialog.mode === "edit") {
+      await updateBudgetMutation.mutateAsync({
+        id: budgetDialog.budgetId,
+        ...values,
+      });
+    } else {
+      await createBudgetMutation.mutateAsync({
+        elevatorId: id,
+        ...values,
+      });
+    }
+    setBudgetDialog({ open: false });
+  }
+
+  async function handleBudgetDelete() {
+    if (!budgetDialog.open || budgetDialog.mode !== "edit") return;
+    await deleteBudgetMutation.mutateAsync(budgetDialog.budgetId);
+    setBudgetDialog({ open: false });
+  }
+
+  function openEditPlanDialog(plan: EditorialPlan) {
+    setBudgetDialog({
+      open: true,
+      mode: "edit",
+      budgetId: plan.id,
+      initial: {
+        recommendedModernizationYear:
+          plan.recommendedYear != null ? String(plan.recommendedYear) : "",
+        measures: plan.measures ?? "",
+        budgetAmount:
+          plan.budgetAmount != null ? String(plan.budgetAmount) : "",
+      },
+    });
+  }
+
+  function openEditEventDialog(event: EditorialEvent) {
+    // Synthetic installation row is never editable — the pencil is hidden
+    // in EventRow but guard here as well for type narrowing.
+    if (event.type === "installation") return;
+    const occurredAt =
+      typeof event.occurredAt === "string"
+        ? event.occurredAt.slice(0, 10)
+        : event.occurredAt.toISOString().slice(0, 10);
+    setEventDialog({
+      open: true,
+      mode: "edit",
+      type: event.type,
+      eventId: event.id,
+      initial: {
+        occurredAt,
+        title: event.title,
+        description: event.description ?? "",
+        cost: event.cost != null ? String(event.cost) : "",
+        performedBy: event.performedBy ?? "",
+      },
+    });
+  }
 
   if (hiss === null) {
     return (
@@ -124,14 +394,6 @@ function HissDetail() {
       </div>
     );
   }
-
-  const statusLabel: Record<string, string> = {
-    active: "Aktiv",
-    demolished: "Rivd",
-    archived: "Arkiverad",
-  };
-
-  const statusVariant = hiss.status === "active" ? "default" : "secondary";
 
   async function handleArchive() {
     setIsArchiving(true);
@@ -144,36 +406,139 @@ function HissDetail() {
     }
   }
 
+  const identityData: IdentityData = {
+    elevatorNumber: hiss.elevatorNumber,
+    address: hiss.address,
+    district: hiss.district,
+    organizationName: hiss.organization?.name ?? null,
+    contactPersonName: hiss.contactPersonName,
+    maintenanceCompany: hiss.maintenanceCompany,
+    inspectionAuthority: hiss.inspectionAuthority,
+    inspectionMonth: hiss.inspectionMonth,
+    warrantyExpiresAt: hiss.warrantyExpiresAt,
+    createdAt: hiss.createdAt,
+    lastUpdatedAt: hiss.lastUpdatedAt,
+  };
+
+  // Editorial rows — plans newest-urgency-first (soonest on top)
+  const editorialPlans: EditorialPlan[] = budgets
+    .map((b) => ({
+      id: b.id,
+      recommendedYear: b.recommendedModernizationYear
+        ? Number(b.recommendedModernizationYear)
+        : null,
+      measure: firstMeasure(b.measures),
+      measures: b.measures,
+      budgetAmount: b.budgetAmount != null ? Number(b.budgetAmount) : null,
+    }))
+    .sort((a, b) => {
+      // Null years sink to the bottom.
+      if (a.recommendedYear == null && b.recommendedYear == null) return 0;
+      if (a.recommendedYear == null) return 1;
+      if (b.recommendedYear == null) return -1;
+      return a.recommendedYear - b.recommendedYear;
+    });
+
+  // Events newest first for the Historik section (reverse of lifeline order)
+  const editorialEvents: EditorialEvent[] = events
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
+    )
+    .map((e) => ({
+      id: e.id,
+      type: e.type,
+      occurredAt: e.occurredAt,
+      title: e.title,
+      description: e.description,
+      cost: e.cost,
+      currency: e.currency,
+      performedBy: e.performedBy,
+      metadata: e.metadata,
+    }));
+
+  // Current snapshot of every modernization-eligible detail field, keyed by
+  // the column name. Pre-fills step 2 of the wizard and drives the "Nu:"
+  // display in step 1.
+  const currentDetailValues: Partial<Record<ModernizationFieldKey, unknown>> =
+    details
+      ? {
+          controlSystemType: details.controlSystemType,
+          machineType: details.machineType,
+          driveSystem: details.driveSystem,
+          machinePlacement: details.machinePlacement,
+          suspension: details.suspension,
+          doorType: details.doorType,
+          doorOpening: details.doorOpening,
+          doorCount: details.doorCount,
+          doorCarrier: details.doorCarrier,
+          doorMachine: details.doorMachine,
+          cabSize: details.cabSize,
+          passthrough: details.passthrough,
+          dispatchMode: details.dispatchMode,
+          speed: details.speed,
+          loadCapacity: details.loadCapacity,
+          liftHeight: details.liftHeight,
+          floorCount: details.floorCount,
+          shaftLighting: details.shaftLighting,
+          emergencyPhoneModel: details.emergencyPhoneModel,
+          emergencyPhoneType: details.emergencyPhoneType,
+        }
+      : {};
+
+  // Synthetic installation row from buildYear — UI-only, never persisted.
+  // Appended last so it sits at the bottom of the newest-first list (it's
+  // always the oldest event by definition).
+  if (hiss.buildYear != null) {
+    editorialEvents.push({
+      id: `synthetic-installation-${hiss.id}`,
+      type: "installation",
+      occurredAt: new Date(Date.UTC(hiss.buildYear, 0, 1)),
+      title: "",
+    });
+  }
+
+  // Derived KPIs for the strip under the Lifeline
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Link to="/register">
-              <Button variant="ghost" size="icon" className="size-8">
-                <ArrowLeft className="size-4" />
-              </Button>
-            </Link>
-            <h1 className="text-2xl font-bold">{hiss.elevatorNumber}</h1>
-            <Badge variant={statusVariant}>
-              {statusLabel[hiss.status] ?? hiss.status}
-            </Badge>
-          </div>
-          {hiss.address && (
-            <p className="ml-10 text-sm text-muted-foreground">{hiss.address}</p>
+    <div className="mx-auto max-w-5xl space-y-6">
+      {/* ─── Header ──────────────────────────────────────────── */}
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Link to="/register">
+            <Button variant="ghost" size="icon" className="size-7">
+              <ArrowLeft className="size-4" />
+            </Button>
+          </Link>
+          <Link to="/register" className="hover:underline">
+            Register
+          </Link>
+          {hiss.organization && (
+            <>
+              <span>›</span>
+              <span className="hover:underline">{hiss.organization.name}</span>
+            </>
           )}
-          {org && (
-            <p className="ml-10 text-sm text-muted-foreground">
-              {org.name}
-            </p>
-          )}
+          <span>›</span>
+          <span className="font-medium text-foreground">
+            {hiss.elevatorNumber}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           {hiss.status === "active" && (
-            <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+            <RegisterEventMenu
+              onSelect={openCreateDialog}
+              elevatorId={id}
+            />
+          )}
+          {hiss.status === "active" && (
+            <Dialog
+              open={archiveDialogOpen}
+              onOpenChange={setArchiveDialogOpen}
+            >
               <DialogTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" size="sm">
                   <Archive className="mr-2 size-4" />
                   Arkivera
                 </Button>
@@ -182,13 +547,19 @@ function HissDetail() {
                 <DialogHeader>
                   <DialogTitle>Arkivera hiss {hiss.elevatorNumber}</DialogTitle>
                   <DialogDescription>
-                    Hissen tas bort från aktiva vyer, KPI:er och budgetberäkningar.
-                    Data bevaras i databasen för historisk referens.
+                    Hissen tas bort från aktiva vyer, KPI:er och
+                    budgetberäkningar. Data bevaras i databasen för historisk
+                    referens.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Ny status</label>
-                  <Select value={archiveStatus} onValueChange={(v) => setArchiveStatus(v as "demolished" | "archived")}>
+                  <Select
+                    value={archiveStatus}
+                    onValueChange={(v) =>
+                      setArchiveStatus(v as "demolished" | "archived")
+                    }
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -199,7 +570,10 @@ function HissDetail() {
                   </Select>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setArchiveDialogOpen(false)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setArchiveDialogOpen(false)}
+                  >
                     Avbryt
                   </Button>
                   <Button onClick={handleArchive} disabled={isArchiving}>
@@ -210,180 +584,369 @@ function HissDetail() {
             </Dialog>
           )}
           <Link to="/hiss/$id/redigera" params={{ id }}>
-            <Button>
+            <Button size="sm" variant="outline">
               <Pencil className="mr-2 size-4" />
               Redigera
             </Button>
           </Link>
         </div>
-      </div>
+      </header>
 
-      <Separator />
+      {/* ─── Hero: identity as a banner, not a side panel ───────── */}
+      <IdentityHero data={identityData} />
 
-      {/* Identifiering */}
-      <DetailSection title="Identifiering">
-        <DetailField label="Hissnummer" value={hiss.elevatorNumber} />
-        <DetailField label="Adress" value={hiss.address} />
-        <DetailField label="Klassificering" value={hiss.elevatorClassification} />
-        <DetailField label="Distrikt" value={hiss.district} />
-      </DetailSection>
+      <Tabs defaultValue="oversikt">
+        <TabsList variant="line" className="w-full justify-start">
+          <TabsTrigger value="oversikt">Översikt</TabsTrigger>
+          <TabsTrigger value="teknik">Teknik</TabsTrigger>
+        </TabsList>
 
-      {/* Teknisk specifikation */}
-      <DetailSection title="Teknisk specifikation">
-        <DetailField label="Hisstyp" value={hiss.elevatorType} />
-        <DetailField label="Fabrikat" value={hiss.manufacturer} />
-        <DetailField label="Byggår" value={hiss.buildYear} />
-        <DetailField label="Hastighet" value={details?.speed} />
-        <DetailField label="Lyfthöjd" value={details?.liftHeight} />
-        <DetailField label="Marklast" value={details?.loadCapacity} />
-        <DetailField label="Antal plan" value={details?.floorCount} />
-        <DetailField label="Antal dörrar" value={details?.doorCount} />
-      </DetailSection>
+        {/* ─── Översikt: Planerat then Historik. Explicit section labels
+             carry the past/future split — no implicit "Nu" divider. ── */}
+        <TabsContent value="oversikt" className="mt-8 space-y-16">
+          <section>
+            <div className="flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+                Planerat
+                {editorialPlans.length > 0 && (
+                  <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-muted px-1.5 text-xs font-medium tabular-nums text-muted-foreground">
+                    {editorialPlans.length}
+                  </span>
+                )}
+              </h2>
+              {hiss.status === "active" && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={() =>
+                    setBudgetDialog({ open: true, mode: "create" })
+                  }
+                >
+                  <Plus className="mr-1 size-3.5" />
+                  Ny planerad
+                </Button>
+              )}
+            </div>
+            <div className="mt-6">
+              {editorialPlans.length > 0 ? (
+                <PlanList
+                  plans={editorialPlans}
+                  onEdit={
+                    hiss.status === "active" ? openEditPlanDialog : undefined
+                  }
+                />
+              ) : (
+                <p className="pl-14 py-2 text-sm text-muted-foreground">
+                  Inga planerade moderniseringar.
+                </p>
+              )}
+            </div>
+          </section>
 
-      {/* Dörrar och korg */}
-      <DetailSection title="Dörrar och korg">
-        <DetailField label="Typ dörrar" value={details?.doorType} />
-        <DetailField label="Genomgång" value={details?.passthrough} />
-        <DetailField label="Manövrering" value={details?.dispatchMode} />
-        <DetailField label="Korgstorlek" value={details?.cabSize} />
-        <DetailField label="Dörröppning" value={details?.doorOpening} />
-        <DetailField label="Dörrbärare" value={details?.doorCarrier} />
-        <DetailField label="Dörrmaskin" value={details?.doorMachine} />
-      </DetailSection>
+          <section>
+            <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+              Historik
+              {editorialEvents.length > 0 && (
+                <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-muted px-1.5 text-xs font-medium tabular-nums text-muted-foreground">
+                  {editorialEvents.length}
+                </span>
+              )}
+            </h2>
+            <div className="mt-6">
+              {editorialEvents.length > 0 ? (
+                <EventList
+                  events={editorialEvents}
+                  onEdit={openEditEventDialog}
+                />
+              ) : (
+                <p className="pl-14 py-2 text-sm text-muted-foreground">
+                  Inga registrerade händelser ännu.
+                </p>
+              )}
+            </div>
+          </section>
+        </TabsContent>
 
-      {/* Maskineri */}
-      <DetailSection title="Maskineri">
-        <DetailField label="Drivsystem" value={details?.driveSystem} />
-        <DetailField label="Upphängning" value={details?.suspension} />
-        <DetailField label="Maskinplacering" value={details?.machinePlacement} />
-        <DetailField label="Typ maskin" value={details?.machineType} />
-        <DetailField label="Typ styrsystem" value={details?.controlSystemType} />
-      </DetailSection>
+        {/* ─── Teknik: all spec blocks use the same Definition row
+             pattern so the grid reads as one table split by theme. ── */}
+        <TabsContent value="teknik" className="mt-8">
+          <div className="grid grid-cols-1 gap-x-10 gap-y-10 md:grid-cols-2">
+            <div>
+              <h4 className="text-base font-semibold">Dörrar &amp; korg</h4>
+              <DefinitionList>
+                <Definition label="Typ dörrar" value={details?.doorType} />
+                <Definition
+                  label="Genomgång"
+                  value={formatBool(details?.passthrough)}
+                />
+                <Definition
+                  label="Manövrering"
+                  value={details?.dispatchMode}
+                />
+                <Definition
+                  label="Korgstorlek"
+                  value={details?.cabSize}
+                  mono
+                />
+                <Definition
+                  label="Dörröppning"
+                  value={details?.doorOpening}
+                  mono
+                />
+                <Definition label="Dörrmaskin" value={details?.doorMachine} />
+              </DefinitionList>
+            </div>
 
-      {/* Besiktning & underhåll */}
-      <DetailSection title="Besiktning och underhåll">
-        <DetailField label="Besiktningsorgan" value={hiss.inspectionAuthority} />
-        <DetailField label="Besiktningsmånad" value={hiss.inspectionMonth} />
-        <DetailField label="Skötselföretag" value={hiss.maintenanceCompany} />
-        <DetailField label="Schaktbelysning" value={details?.shaftLighting} />
-      </DetailSection>
+            <div>
+              <h4 className="text-base font-semibold">Maskineri</h4>
+              <DefinitionList>
+                <Definition label="Drivsystem" value={details?.driveSystem} />
+                <Definition
+                  label="Upphängning"
+                  value={details?.suspension}
+                  mono
+                />
+                <Definition
+                  label="Maskinplacering"
+                  value={details?.machinePlacement}
+                />
+                <Definition label="Typ maskin" value={details?.machineType} />
+                <Definition
+                  label="Typ styrsystem"
+                  value={details?.controlSystemType}
+                />
+                <Definition
+                  label="Schaktbelysning"
+                  value={details?.shaftLighting}
+                />
+              </DefinitionList>
+            </div>
 
-      {/* Modernisering */}
-      <DetailSection title="Modernisering">
-        <DetailField label="Moderniserad" value={hiss.modernizationYear} />
-        <DetailField label="Garanti" value={budget?.warranty} />
-        <DetailField
-          label="Rekommenderat moderniseringsår"
-          value={budget?.recommendedModernizationYear}
-        />
-        <DetailField
-          label="Budget"
-          value={
-            budget?.budgetAmount != null
-              ? `${Number(budget.budgetAmount).toLocaleString("sv-SE")} kr`
-              : undefined
+            <div>
+              <h4 className="text-base font-semibold">Teknisk specifikation</h4>
+              <DefinitionList>
+                <Definition label="Hisstyp" value={hiss.elevatorType} />
+                <Definition label="Fabrikat" value={hiss.manufacturer} />
+                <Definition label="Byggår" value={hiss.buildYear} mono />
+                <Definition label="Hastighet (m/s)" value={details?.speed} mono />
+                <Definition label="Lyfthöjd (m)" value={details?.liftHeight} mono />
+                <Definition label="Märklast (kg)" value={details?.loadCapacity} mono />
+                <Definition
+                  label="Antal plan"
+                  value={details?.floorCount}
+                  mono
+                />
+                <Definition
+                  label="Antal dörrar"
+                  value={details?.doorCount}
+                  mono
+                />
+                <Definition
+                  label="Moderniserad"
+                  value={hiss.modernizationYear ?? "Ej ombyggd"}
+                />
+              </DefinitionList>
+            </div>
+
+            <div>
+              <h4 className="text-base font-semibold">Nödtelefon</h4>
+              <DefinitionList>
+                <Definition
+                  label="Har nödtelefon"
+                  value={formatBool(hiss.hasEmergencyPhone)}
+                />
+                <Definition
+                  label="Behöver uppgradering"
+                  value={formatBool(hiss.needsUpgrade)}
+                />
+                <Definition
+                  label="Modell"
+                  value={details?.emergencyPhoneModel}
+                />
+                <Definition label="Typ" value={details?.emergencyPhoneType} />
+                <Definition
+                  label="Pris"
+                  value={
+                    details?.emergencyPhonePrice != null
+                      ? formatAmount(Number(details.emergencyPhonePrice))
+                      : null
+                  }
+                  mono
+                />
+              </DefinitionList>
+            </div>
+
+            {details?.comments && (
+              <div className="md:col-span-2">
+                <h4 className="text-base font-semibold">Kommentarer</h4>
+                <p className="mt-2 max-w-prose whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                  {details.comments}
+                </p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+
+      {eventDialog.open && (
+        <EventDialog
+          open={eventDialog.open}
+          onOpenChange={(open) => {
+            if (!open) setEventDialog({ open: false });
+          }}
+          type={eventDialog.type}
+          mode={eventDialog.mode}
+          initialValues={
+            eventDialog.mode === "edit" ? eventDialog.initial : undefined
           }
+          onSubmit={handleEventSubmit}
         />
-        <DetailField
-          label="Åtgärder vid modernisering"
-          value={budget?.measures}
-        />
-      </DetailSection>
-
-      {/* Nödtelefon */}
-      <DetailSection
-        title="Nödtelefon"
-        icon={<Phone className="size-4" />}
-      >
-        <DetailField label="Har nödtelefon" value={hiss.hasEmergencyPhone} />
-        <DetailField label="Modell" value={details?.emergencyPhoneModel} />
-        <DetailField label="Typ" value={details?.emergencyPhoneType} />
-        <DetailField
-          label="Behöver uppgradering"
-          value={hiss.needsUpgrade}
-        />
-        <DetailField
-          label="Pris"
-          value={
-            details?.emergencyPhonePrice != null
-              ? `${Number(details.emergencyPhonePrice).toLocaleString("sv-SE")} kr`
-              : undefined
-          }
-        />
-      </DetailSection>
-
-      {/* Kommentarer */}
-      {details?.comments && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <MessageSquare className="size-4" />
-              Kommentarer
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap text-sm">{details.comments}</p>
-          </CardContent>
-        </Card>
       )}
 
-      {/* Metadata */}
-      <div className="text-xs text-muted-foreground">
-        <p>
-          Skapad:{" "}
-          {new Date(hiss.createdAt).toLocaleDateString("sv-SE")}
-        </p>
-        {hiss.lastUpdatedAt && (
-          <p>
-            Senast uppdaterad:{" "}
-            {new Date(hiss.lastUpdatedAt).toLocaleDateString("sv-SE")}
-          </p>
-        )}
-      </div>
+      <ModernizationWizard
+        open={modernizationOpen}
+        onOpenChange={setModernizationOpen}
+        elevatorId={id}
+        currentValues={currentDetailValues}
+        onSubmit={handleModernizationSubmit}
+      />
+
+      {budgetDialog.open && (
+        <BudgetDialog
+          open={budgetDialog.open}
+          onOpenChange={(open) => {
+            if (!open) setBudgetDialog({ open: false });
+          }}
+          mode={budgetDialog.mode}
+          initialValues={
+            budgetDialog.mode === "edit" ? budgetDialog.initial : undefined
+          }
+          onSubmit={handleBudgetSubmit}
+          onDelete={
+            budgetDialog.mode === "edit" ? handleBudgetDelete : undefined
+          }
+        />
+      )}
     </div>
   );
 }
 
+// ────────────────────────────────────────────────────────────────────────
+// Small helpers / components
+// ────────────────────────────────────────────────────────────────────────
+
+function RegisterEventMenu({
+  onSelect,
+  elevatorId,
+}: {
+  onSelect: (t: ElevatorEventType) => void;
+  elevatorId: string;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm">
+          <Plus className="mr-2 size-4" />
+          Händelse
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={() => onSelect("modernization")}>
+          <Sparkles className="mr-2 size-4" />
+          Modernisering
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => onSelect("inspection")}>
+          <ShieldCheck className="mr-2 size-4" />
+          Besiktning
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => onSelect("repair")}>
+          <Wrench className="mr-2 size-4" />
+          Reparation
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => onSelect("note")}>
+          <MessageSquarePlus className="mr-2 size-4" />
+          Notering
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link
+            to="/hiss/$id/ersatt"
+            params={{ id: elevatorId }}
+            className="flex w-full cursor-default items-center"
+          >
+            <Replace className="mr-2 size-4" />
+            Ersätt hiss
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function DefinitionList({ children }: { children: React.ReactNode }) {
+  return (
+    <dl className="mt-3 divide-y divide-border/40 text-sm">{children}</dl>
+  );
+}
+
+function Definition({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-1.5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={mono ? "text-sm tabular-nums" : "text-sm"}>
+        {value != null && value !== "" ? value : "—"}
+      </dd>
+    </div>
+  );
+}
+
+function formatBool(v: boolean | null | undefined): string | null {
+  if (v == null) return null;
+  return v ? "Ja" : "Nej";
+}
+
+function formatAmount(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  return `${Math.round(n).toLocaleString("sv-SE")} kr`;
+}
+
+function firstMeasure(measures: string | null): string | null {
+  if (!measures) return null;
+  const first = measures.split(",")[0]?.trim();
+  return first && first.length > 0 ? first : null;
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Skeleton
+// ────────────────────────────────────────────────────────────────────────
+
 function DetailSkeleton() {
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Skeleton className="size-8" />
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-5 w-16 rounded-full" />
-          </div>
-          <Skeleton className="ml-10 h-4 w-64" />
-          <Skeleton className="ml-10 h-4 w-40" />
-        </div>
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-9 w-28" />
-          <Skeleton className="h-9 w-28" />
-        </div>
+    <div className="mx-auto max-w-5xl space-y-10">
+      <div className="flex items-center justify-between gap-4">
+        <Skeleton className="h-6 w-64" />
+        <Skeleton className="h-9 w-64" />
       </div>
-      <Separator />
-      {/* Card sections */}
-      {Array.from({ length: 7 }).map((_, i) => (
-        <Card key={i}>
-          <CardHeader className="pb-3">
-            <Skeleton className="h-5 w-48" />
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
-              {Array.from({ length: i === 0 ? 4 : i === 1 ? 8 : 5 }).map(
-                (_, j) => (
-                  <div key={j} className="space-y-1">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-4 w-32" />
-                  </div>
-                ),
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+      <div className="space-y-3">
+        <Skeleton className="h-10 w-56" />
+        <Skeleton className="h-5 w-80" />
+        <Skeleton className="h-5 w-64" />
+      </div>
+      <div className="space-y-8">
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-40 w-full" />
+      </div>
     </div>
   );
 }

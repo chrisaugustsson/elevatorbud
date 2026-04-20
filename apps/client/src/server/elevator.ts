@@ -20,15 +20,17 @@ import {
   elevatorBudgets,
   organizations,
 } from "@elevatorbud/db/schema";
-import { authMiddleware } from "./auth";
+import { authMiddlewareRead } from "./auth";
+import { getContextOrgIds } from "./context";
 
 const NOT_MODERNIZED = "Ej ombyggd";
 
 // ---------------------------------------------------------------------------
-// Filter schema (client version — no organizationId, always user's org)
+// Filter schema (client version — parentOrgId scopes to parent + children)
 // ---------------------------------------------------------------------------
 
 const filterSchema = z.object({
+  parentOrgId: z.string().uuid(),
   search: z.string().optional(),
   district: z.array(z.string()).optional(),
   elevatorType: z.array(z.string()).optional(),
@@ -39,12 +41,17 @@ const filterSchema = z.object({
   buildYearMax: z.number().optional(),
   modernized: z.boolean().optional(),
   status: z.enum(["active", "demolished", "archived", "all"]).optional(),
+  subOrgId: z.string().uuid().optional(),
 });
 
 type FilterInput = z.infer<typeof filterSchema>;
 
-function buildWhereConditions(filters: FilterInput, orgId: string) {
-  const conditions = [eq(elevators.organizationId, orgId)];
+function buildWhereConditions(filters: FilterInput, contextOrgIds: string[]) {
+  const conditions = [inArray(elevators.organizationId, contextOrgIds)];
+
+  if (filters.subOrgId) {
+    conditions.push(eq(elevators.organizationId, filters.subOrgId));
+  }
 
   const status = filters.status ?? "active";
   if (status !== "all") {
@@ -109,14 +116,14 @@ function buildWhereConditions(filters: FilterInput, orgId: string) {
 // ---------------------------------------------------------------------------
 
 export const getElevator = createServerFn()
-  .middleware([authMiddleware])
-  .inputValidator(z.object({ id: z.string().uuid() }))
+  .middleware([authMiddlewareRead])
+  .inputValidator(z.object({ id: z.string().uuid(), parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
     const elevator = await context.db.query.elevators.findFirst({
       where: and(
         eq(elevators.id, data.id),
-        eq(elevators.organizationId, orgId),
+        inArray(elevators.organizationId, contextOrgIds),
       ),
       with: { organization: true },
     });
@@ -126,23 +133,22 @@ export const getElevator = createServerFn()
     return elevator;
   });
 
-export const elevatorOptions = (id: string) =>
+export const elevatorOptions = (id: string, parentOrgId: string) =>
   queryOptions({
-    queryKey: ["elevator", id],
-    queryFn: () => getElevator({ data: { id } }),
+    queryKey: ["elevator", id, parentOrgId],
+    queryFn: () => getElevator({ data: { id, parentOrgId } }),
   });
 
 export const getElevatorDetails = createServerFn()
-  .middleware([authMiddleware])
-  .inputValidator(z.object({ elevatorId: z.string().uuid() }))
+  .middleware([authMiddlewareRead])
+  .inputValidator(z.object({ elevatorId: z.string().uuid(), parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
 
-    // Verify elevator belongs to user's org
     const elevator = await context.db.query.elevators.findFirst({
       where: and(
         eq(elevators.id, data.elevatorId),
-        eq(elevators.organizationId, orgId),
+        inArray(elevators.organizationId, contextOrgIds),
       ),
       columns: { organizationId: true },
     });
@@ -153,23 +159,22 @@ export const getElevatorDetails = createServerFn()
     });
   });
 
-export const elevatorDetailsOptions = (elevatorId: string) =>
+export const elevatorDetailsOptions = (elevatorId: string, parentOrgId: string) =>
   queryOptions({
-    queryKey: ["elevator", "details", elevatorId],
-    queryFn: () => getElevatorDetails({ data: { elevatorId } }),
+    queryKey: ["elevator", "details", elevatorId, parentOrgId],
+    queryFn: () => getElevatorDetails({ data: { elevatorId, parentOrgId } }),
   });
 
 export const getLatestBudget = createServerFn()
-  .middleware([authMiddleware])
-  .inputValidator(z.object({ elevatorId: z.string().uuid() }))
+  .middleware([authMiddlewareRead])
+  .inputValidator(z.object({ elevatorId: z.string().uuid(), parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
 
-    // Verify elevator belongs to user's org
     const elevator = await context.db.query.elevators.findFirst({
       where: and(
         eq(elevators.id, data.elevatorId),
-        eq(elevators.organizationId, orgId),
+        inArray(elevators.organizationId, contextOrgIds),
       ),
       columns: { organizationId: true },
     });
@@ -181,17 +186,17 @@ export const getLatestBudget = createServerFn()
     });
   });
 
-export const elevatorBudgetOptions = (elevatorId: string) =>
+export const elevatorBudgetOptions = (elevatorId: string, parentOrgId: string) =>
   queryOptions({
-    queryKey: ["elevator", "budget", elevatorId],
-    queryFn: () => getLatestBudget({ data: { elevatorId } }),
+    queryKey: ["elevator", "budget", elevatorId, parentOrgId],
+    queryFn: () => getLatestBudget({ data: { elevatorId, parentOrgId } }),
   });
 
 export const searchElevators = createServerFn()
-  .middleware([authMiddleware])
-  .inputValidator(z.object({ search: z.string() }))
+  .middleware([authMiddlewareRead])
+  .inputValidator(z.object({ search: z.string(), parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
 
     if (!data.search.trim()) return [];
     const s = `%${data.search}%`;
@@ -207,7 +212,7 @@ export const searchElevators = createServerFn()
       .leftJoin(organizations, eq(elevators.organizationId, organizations.id))
       .where(
         and(
-          eq(elevators.organizationId, orgId),
+          inArray(elevators.organizationId, contextOrgIds),
           eq(elevators.status, "active"),
           or(
             ilike(elevators.elevatorNumber, s),
@@ -218,10 +223,10 @@ export const searchElevators = createServerFn()
       .limit(20);
   });
 
-export const searchElevatorsOptions = (search: string) =>
+export const searchElevatorsOptions = (search: string, parentOrgId: string) =>
   queryOptions({
-    queryKey: ["elevator", "search", search],
-    queryFn: () => searchElevators({ data: { search } }),
+    queryKey: ["elevator", "search", search, parentOrgId],
+    queryFn: () => searchElevators({ data: { search, parentOrgId } }),
   });
 
 const listInputSchema = filterSchema.extend({
@@ -243,15 +248,18 @@ const listInputSchema = filterSchema.extend({
 });
 
 export const listElevators = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(listInputSchema)
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
+    if (data.subOrgId && !contextOrgIds.includes(data.subOrgId)) {
+      throw new Error("Underorganisation hittades inte");
+    }
     const page = data.page ?? 1;
     const pageSize = data.pageSize ?? 50;
     const sortBy = data.sortBy ?? "elevatorNumber";
     const sortOrder = data.sortOrder ?? "asc";
-    const where = buildWhereConditions(data, orgId);
+    const where = buildWhereConditions(data, contextOrgIds);
     const offset = (page - 1) * pageSize;
 
     const [items, countResult] = await Promise.all([
@@ -321,11 +329,14 @@ export const elevatorListOptions = (
   });
 
 export const exportElevatorData = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddlewareRead])
   .inputValidator(filterSchema)
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
-    const where = buildWhereConditions(data, orgId);
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
+    if (data.subOrgId && !contextOrgIds.includes(data.subOrgId)) {
+      throw new Error("Underorganisation hittades inte");
+    }
+    const where = buildWhereConditions(data, contextOrgIds);
 
     return context.db
       .select({

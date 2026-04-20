@@ -5,19 +5,22 @@ import {
   useQuery,
   keepPreviousData,
 } from "@tanstack/react-query";
-import { meOptions } from "../../server/user";
+import { meOptions } from "../../../server/user";
 import {
   elevatorListOptions,
   exportElevatorDataOptions,
-} from "../../server/elevator";
-import { suggestedValuesOptions } from "../../server/suggested-values";
+} from "../../../server/elevator";
+import { suggestedValuesOptions } from "../../../server/suggested-values";
+import { childOrgsOptions } from "../../../server/context";
 import { downloadCSV, downloadExcel } from "@elevatorbud/utils/export";
 import type { SortingState } from "@tanstack/react-table";
+import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
-import { RegisterToolbar } from "../../features/register/components/register-toolbar";
-import { RegisterFilters } from "../../features/register/components/register-filters";
-import { RegisterTable } from "../../features/register/components/register-table";
-import { RegisterPagination } from "../../features/register/components/register-pagination";
+import { Building2 } from "lucide-react";
+import { RegisterToolbar } from "../../../features/register/components/register-toolbar";
+import { RegisterFilters } from "../../../features/register/components/register-filters";
+import { RegisterTable } from "../../../features/register/components/register-table";
+import { RegisterPagination } from "../../../features/register/components/register-pagination";
 
 type SortField =
   | "elevatorNumber"
@@ -51,6 +54,7 @@ type RegisterSearch = {
   buildYearMin?: number;
   buildYearMax?: number;
   status?: string;
+  subOrg?: string;
   sortBy?: SortField;
   sortOrder?: "asc" | "desc";
   page?: number;
@@ -66,7 +70,7 @@ function parseStringArray(value: unknown): string[] | undefined {
   return undefined;
 }
 
-export const Route = createFileRoute("/_authenticated/register")({
+export const Route = createFileRoute("/_authenticated/$parentOrgId/register")({
   validateSearch: (search: Record<string, unknown>): RegisterSearch => ({
     search: typeof search.search === "string" && search.search ? search.search : undefined,
     district: parseStringArray(search.district),
@@ -81,6 +85,8 @@ export const Route = createFileRoute("/_authenticated/register")({
       typeof search.status === "string" && VALID_STATUSES.includes(search.status)
         ? search.status
         : undefined,
+    subOrg:
+      typeof search.subOrg === "string" && search.subOrg ? search.subOrg : undefined,
     sortBy: VALID_SORT_FIELDS.includes(search.sortBy as SortField)
       ? (search.sortBy as SortField)
       : undefined,
@@ -94,12 +100,13 @@ export const Route = createFileRoute("/_authenticated/register")({
         ? search.pageSize
         : undefined,
   }),
-  loader: ({ context }) => {
+  loader: ({ context, params }) => {
     context.queryClient.prefetchQuery(meOptions());
-    context.queryClient.prefetchQuery(elevatorListOptions({ page: 1, pageSize: 25, status: "active" }));
+    context.queryClient.prefetchQuery(elevatorListOptions({ parentOrgId: params.parentOrgId, page: 1, pageSize: 25, status: "active" }));
     context.queryClient.prefetchQuery(suggestedValuesOptions("district"));
     context.queryClient.prefetchQuery(suggestedValuesOptions("elevator_type"));
     context.queryClient.prefetchQuery(suggestedValuesOptions("manufacturer"));
+    context.queryClient.prefetchQuery(childOrgsOptions(params.parentOrgId));
   },
   component: RegisterPage,
   pendingComponent: RegisterSkeleton,
@@ -107,6 +114,7 @@ export const Route = createFileRoute("/_authenticated/register")({
 
 function RegisterPage() {
   const { data: user } = useSuspenseQuery(meOptions());
+  const { parentOrgId } = Route.useParams();
   const searchParams = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
@@ -185,6 +193,7 @@ function RegisterPage() {
           if (merged.buildYearMin === undefined) delete merged.buildYearMin;
           if (merged.buildYearMax === undefined) delete merged.buildYearMax;
           if (!merged.status || merged.status === "active") delete merged.status;
+          if (!merged.subOrg) delete merged.subOrg;
           if (!merged.sortBy) delete merged.sortBy;
           if (!merged.sortOrder) delete merged.sortOrder;
           if (!merged.page || merged.page === 1) delete merged.page;
@@ -281,11 +290,21 @@ function RegisterPage() {
     };
   }, [districtSuggestions, elevatorTypeSuggestions, manufacturerSuggestions]);
 
+  const { data: childOrgs } = useQuery(childOrgsOptions(parentOrgId));
+  const hasChildOrgs = (childOrgs?.length ?? 0) > 0;
+  const subOrgId = searchParams.subOrg;
+  const setSubOrg = useCallback(
+    (val: string | undefined) => updateSearch({ subOrg: val, page: undefined }),
+    [updateSearch],
+  );
+  const selectedSubOrgName = childOrgs?.find((o) => o.id === subOrgId)?.name;
+
   const sortField = sorting.length > 0 ? sorting[0].id : undefined;
   const sortOrder =
     sorting.length > 0 ? (sorting[0].desc ? "desc" : "asc") : undefined;
 
   const filterBaseArgs = {
+    parentOrgId,
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(filterDistrict.length > 0 ? { district: filterDistrict } : {}),
     ...(filterElevatorType.length > 0
@@ -303,10 +322,10 @@ function RegisterPage() {
     ...(buildYearMax && !isNaN(parseInt(buildYearMax))
       ? { buildYearMax: parseInt(buildYearMax) }
       : {}),
-    organizationId: user!.organizationId ?? undefined,
-    ...(statusFilter !== "alla"
+    ...(statusFilter !== "all"
       ? { status: statusFilter as "active" | "demolished" | "archived" | "all" }
       : {}),
+    ...(subOrgId ? { subOrgId } : {}),
   };
 
   const queryArgs = {
@@ -352,7 +371,8 @@ function RegisterPage() {
     filterMaintenanceCompany.length > 0 ||
     buildYearMin !== "" ||
     buildYearMax !== "" ||
-    statusFilter !== "active";
+    statusFilter !== "active" ||
+    !!subOrgId;
 
   function clearAllFilters() {
     updateSearch({
@@ -363,6 +383,7 @@ function RegisterPage() {
       buildYearMin: undefined,
       buildYearMax: undefined,
       status: undefined,
+      subOrg: undefined,
       page: undefined,
     });
   }
@@ -373,6 +394,12 @@ function RegisterPage() {
 
   return (
     <div className="space-y-4">
+      <h1
+        id="page-heading"
+        className="text-2xl font-bold text-foreground focus:outline-none"
+      >
+        Hissregister
+      </h1>
       <RegisterToolbar
         totalCount={totalCount}
         search={search}
@@ -396,7 +423,17 @@ function RegisterPage() {
         onBuildYearMaxChange={setBuildYearMax}
         hasActiveFilters={hasActiveFilters}
         onClearAllFilters={clearAllFilters}
+        childOrgs={childOrgs ?? undefined}
+        subOrgId={subOrgId}
+        onSubOrgChange={setSubOrg}
       />
+      <div aria-live="polite" className="sr-only">
+        {hasChildOrgs && totalCount !== undefined
+          ? selectedSubOrgName
+            ? `Visar ${totalCount} hissar i ${selectedSubOrgName}`
+            : `Visar ${totalCount} hissar i alla underorganisationer`
+          : ""}
+      </div>
       <RegisterTable
         data={result?.items ?? []}
         sorting={sorting}
@@ -404,6 +441,22 @@ function RegisterPage() {
         totalPages={totalPages}
         page={page}
         pageSize={limit}
+        showSubOrg={hasChildOrgs}
+        emptyMessage={
+          subOrgId && selectedSubOrgName ? (
+            <div className="flex flex-col items-center gap-3 text-muted-foreground">
+              <Building2 className="size-8" />
+              <p>Inga hissar i {selectedSubOrgName}.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSubOrg(undefined)}
+              >
+                Rensa filter
+              </Button>
+            </div>
+          ) : undefined
+        }
       />
       <RegisterPagination
         totalCount={totalCount}

@@ -1,15 +1,18 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listOrganizationsOptions, createOrganization, updateOrganization } from "~/server/organization";
+import { listOrganizationsOptions, createOrganization, updateOrganization, previewParentChange } from "~/server/organization";
 import { useForm } from "@tanstack/react-form";
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
+  getExpandedRowModel,
+  flexRender,
   createColumnHelper,
   type SortingState,
+  type ExpandedState,
 } from "@tanstack/react-table";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Input } from "@elevatorbud/ui/components/ui/input";
@@ -23,12 +26,6 @@ import {
   TableRow,
 } from "@elevatorbud/ui/components/ui/table";
 import {
-  DataGrid,
-  DataGridContainer,
-  DataGridTable,
-  DataGridColumnHeader,
-} from "@elevatorbud/ui/components/ui/data-grid-table";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -36,13 +33,45 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@elevatorbud/ui/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@elevatorbud/ui/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@elevatorbud/ui/components/ui/command";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@elevatorbud/ui/components/ui/tooltip";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus, Building2, UserPlus } from "lucide-react";
+import { Plus, Building2, UserPlus, Check, ChevronsUpDown, X, ChevronDown, ChevronRight, AlertTriangle, ArrowUp, ArrowDown, Pencil, Loader2 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@elevatorbud/ui/components/ui/collapsible";
+import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
+
+type OrgListSearch = { edit?: string };
 
 export const Route = createFileRoute(
   "/_authenticated/admin/organisationer/",
 )({
+  validateSearch: (search: Record<string, unknown>): OrgListSearch => {
+    const out: OrgListSearch = {};
+    if (typeof search.edit === "string") out.edit = search.edit;
+    return out;
+  },
   loader: ({ context }) => {
     context.queryClient.prefetchQuery(listOrganizationsOptions());
   },
@@ -54,51 +83,16 @@ type Organisation = {
   id: string;
   name: string;
   organizationNumber: string | null;
-  contactPerson: string | null;
-  phoneNumber: string | null;
-  email: string | null;
+  parentId: string | null;
   createdAt: Date;
 };
 
-const columnHelper = createColumnHelper<Organisation>();
+// TanStack Table reads `subRows` off each row to build its internal tree.
+// Attaching it to a copy (never the original) keeps the rest of the page free
+// to use the flat list shape.
+type OrganisationNode = Organisation & { subRows?: OrganisationNode[] };
 
-const columns = [
-  columnHelper.accessor("name", {
-    size: 220,
-    header: ({ column }) => (
-      <DataGridColumnHeader title="Namn" column={column} />
-    ),
-    cell: (info) => (
-      <span className="font-medium">{info.getValue()}</span>
-    ),
-  }),
-  columnHelper.accessor("organizationNumber", {
-    size: 140,
-    header: ({ column }) => (
-      <DataGridColumnHeader title="Org.nummer" column={column} />
-    ),
-    enableSorting: false,
-    cell: (info) => (
-      <span className="tabular-nums">{info.getValue() || "—"}</span>
-    ),
-  }),
-  columnHelper.accessor("contactPerson", {
-    size: 180,
-    header: ({ column }) => (
-      <DataGridColumnHeader title="Kontaktperson" column={column} />
-    ),
-    enableSorting: false,
-    cell: (info) => info.getValue() || "—",
-  }),
-  columnHelper.accessor("email", {
-    size: 240,
-    header: ({ column }) => (
-      <DataGridColumnHeader title="E-post" column={column} />
-    ),
-    enableSorting: false,
-    cell: (info) => info.getValue() || "—",
-  }),
-];
+const columnHelper = createColumnHelper<OrganisationNode>();
 
 function validateOrganisationsnummer(value: string): string | undefined {
   if (!value) return undefined;
@@ -111,13 +105,14 @@ function validateOrganisationsnummer(value: string): string | undefined {
 function Organisationer() {
   const queryClient = useQueryClient();
   const { data: orgs } = useSuspenseQuery(listOrganizationsOptions());
+  const { edit: editIdFromSearch } = Route.useSearch();
   const createOrg = useMutation({
-    mutationFn: (input: { name: string; organizationNumber?: string; contactPerson?: string; phoneNumber?: string; email?: string }) =>
+    mutationFn: (input: { name: string; organizationNumber?: string; parentId?: string | null }) =>
       createOrganization({ data: input }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["organization"] }); },
   });
   const updateOrg = useMutation({
-    mutationFn: (input: { id: string; name?: string; organizationNumber?: string; contactPerson?: string; phoneNumber?: string; email?: string }) =>
+    mutationFn: (input: { id: string; name?: string; organizationNumber?: string; parentId?: string | null }) =>
       updateOrganization({ data: input }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["organization"] }); },
   });
@@ -125,20 +120,169 @@ function Organisationer() {
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
+  // Carries the parent context when "+ Lägg till suborganisation" is clicked,
+  // so the create dialog can pre-fill parentId. Null parentId = top-level add
+  // from the page's main "Ny organisation" button.
+  const [createState, setCreateState] = useState<{ open: boolean; parentId: string | null }>({
+    open: false,
+    parentId: null,
+  });
   const [editOrg, setEditOrg] = useState<Organisation | null>(null);
+  // User's manual expand/collapse choices. When a search filter is active we
+  // override this with "expand all" so matches stay visible; clearing the
+  // filter reverts to what the user had before.
+  const [userExpanded, setUserExpanded] = useState<ExpandedState>({});
+
+  // Open the edit dialog when the URL contains ?edit=<id> (e.g. when
+  // navigating back from the detail page's edit button). Clears the
+  // param so the dialog doesn't reopen on subsequent re-renders.
+  useEffect(() => {
+    if (!editIdFromSearch) return;
+    const match = orgs.find((o) => o.id === editIdFromSearch);
+    if (match) setEditOrg(match);
+    navigate({
+      to: "/admin/organisationer",
+      search: {},
+      replace: true,
+    });
+  }, [editIdFromSearch, orgs, navigate]);
+
+  // Flat list → nested tree. One level deep is enforced by the DB trigger
+  // `enforce_one_level_org_hierarchy`, so we don't need recursion.
+  const tree = useMemo<OrganisationNode[]>(() => {
+    const childrenByParent = new Map<string, Organisation[]>();
+    for (const o of orgs) {
+      if (o.parentId) {
+        const arr = childrenByParent.get(o.parentId) ?? [];
+        arr.push(o);
+        childrenByParent.set(o.parentId, arr);
+      }
+    }
+    return orgs
+      .filter((o) => o.parentId === null)
+      .map((o) => ({ ...o, subRows: childrenByParent.get(o.id) ?? [] }));
+  }, [orgs]);
+
+  const rootCount = tree.length;
+  const subCount = orgs.length - rootCount;
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("name", {
+        header: "Namn",
+        cell: ({ row }) => {
+          const isParent = row.depth === 0;
+          const canExpand = row.getCanExpand();
+          const isExpanded = row.getIsExpanded();
+          return (
+            <div className={`flex items-center gap-2 ${isParent ? "" : "pl-10"}`}>
+              {isParent ? (
+                canExpand ? (
+                  <button
+                    type="button"
+                    className="inline-flex size-7 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                    aria-label={
+                      isExpanded
+                        ? `Dölj suborganisationer för ${row.original.name}`
+                        : `Visa suborganisationer för ${row.original.name}`
+                    }
+                    aria-expanded={isExpanded}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      row.toggleExpanded();
+                    }}
+                  >
+                    <ChevronRight
+                      className={`size-4 transition-transform motion-reduce:transition-none ${
+                        isExpanded ? "rotate-90" : ""
+                      }`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                ) : (
+                  // Spacer so parent names without a caret still line up with
+                  // parents that have one — keeps the left edge even.
+                  <span className="inline-block size-7" aria-hidden="true" />
+                )
+              ) : null}
+              <span className={isParent ? "font-medium" : ""}>{row.original.name}</span>
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor("organizationNumber", {
+        header: "Org.nummer",
+        enableSorting: false,
+        cell: (info) => (
+          <span className="tabular-nums text-muted-foreground">{info.getValue() || "—"}</span>
+        ),
+      }),
+      columnHelper.display({
+        id: "subOrgCount",
+        header: "Suborganisationer",
+        cell: ({ row }) => {
+          if (row.depth > 0) return <span className="text-muted-foreground">—</span>;
+          const count = row.original.subRows?.length ?? 0;
+          return (
+            <Badge variant={count > 0 ? "default" : "secondary"} className="tabular-nums">
+              {count}
+            </Badge>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: "actions",
+        enableSorting: false,
+        header: "",
+        cell: ({ row }) => (
+          <div className="flex items-center justify-end">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              aria-label={`Redigera ${row.original.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditOrg(row.original);
+              }}
+            >
+              <Pencil className="size-4" />
+            </Button>
+          </div>
+        ),
+      }),
+    ],
+    [],
+  );
+
+  // When a search filter is active, expand everything so matching children
+  // stay visible under their parents (VS Code file-search pattern). This is
+  // separate from the user's manual expansion, which is restored when the
+  // filter clears.
+  const expanded: ExpandedState = globalFilter ? true : userExpanded;
 
   const table = useReactTable({
-    data: orgs,
+    data: tree,
     columns,
-    columnResizeMode: "onChange",
-    state: { sorting, globalFilter },
+    state: { sorting, globalFilter, expanded },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
+    onExpandedChange: setUserExpanded,
+    getSubRows: (row) => row.subRows,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    // Match a parent when any of its children match the search. Without this,
+    // searching for a sub-org name would hide its parent and the sub-org with it.
+    filterFromLeafRows: true,
+    // Don't lose the user's expansion state every time the filter changes.
+    autoResetExpanded: false,
   });
+
+  const rows = table.getRowModel().rows;
+  const visibleRoots = rows.filter((r) => r.depth === 0).length;
+  const visibleSubs = rows.filter((r) => r.depth === 1).length;
 
   return (
     <div className="space-y-6">
@@ -149,7 +293,7 @@ function Organisationer() {
             Hantera kundorganisationer och deras kontaktuppgifter.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button onClick={() => setCreateState({ open: true, parentId: null })}>
           <Plus />
           Ny organisation
         </Button>
@@ -163,45 +307,115 @@ function Organisationer() {
           className="max-w-sm"
         />
         <p className="text-sm text-muted-foreground">
-          {table.getFilteredRowModel().rows.length} organisationer
+          <span className="text-foreground">{globalFilter ? visibleRoots : rootCount}</span> huvudorganisationer
+          <span className="mx-1 text-muted-foreground/60">·</span>
+          <span className="text-foreground">{globalFilter ? visibleSubs : subCount}</span> suborganisationer
         </p>
       </div>
 
-      <DataGrid
-        table={table}
-        recordCount={orgs.length}
-        tableLayout={{ width: "fixed", columnsResizable: true }}
-        onRowClick={(row) =>
-          navigate({
-            to: "/admin/organisationer/$id" as string,
-            params: { id: row.id },
-          })
-        }
-        emptyMessage={
-          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-            <Building2 className="size-8" />
-            <p>Inga organisationer hittades.</p>
-          </div>
-        }
-      >
-        <DataGridContainer>
-          <div className="overflow-x-auto">
-            <DataGridTable />
-          </div>
-        </DataGridContainer>
-      </DataGrid>
+      <div className="overflow-x-auto rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {table.getHeaderGroups()[0]?.headers.map((header) => (
+                <TableHead key={header.id} className={header.id === "actions" ? "w-14" : undefined}>
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="h-32">
+                  <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                    <Building2 className="size-8" />
+                    <p>Inga organisationer hittades.</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((row, i) => {
+                const next = rows[i + 1];
+                // The "+ Lägg till suborganisation" action is injected after the
+                // last visible child of an expanded parent. "Last" means either
+                // the next row is a different parent (depth 0) or we're at the
+                // end of the list.
+                const isLastChildOfParent =
+                  row.depth === 1 && (!next || next.depth === 0);
+                const parentRow = row.depth === 1 ? row.getParentRow() : undefined;
+                return (
+                  <Fragment key={row.id}>
+                    <TableRow
+                      aria-level={row.depth + 1}
+                      aria-expanded={
+                        row.getCanExpand() ? row.getIsExpanded() : undefined
+                      }
+                      className={`cursor-pointer ${row.depth > 0 ? "bg-muted/30" : ""}`}
+                      onClick={() =>
+                        navigate({
+                          to: "/admin/organisationer/$id" as string,
+                          params: { id: row.original.id },
+                        })
+                      }
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    {isLastChildOfParent && parentRow && (
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableCell colSpan={4} className="py-2">
+                          <div className="pl-10">
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-2 rounded-md border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-muted-foreground hover:bg-background hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                              aria-label={`Lägg till suborganisation till ${parentRow.original.name}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCreateState({
+                                  open: true,
+                                  parentId: parentRow.original.id,
+                                });
+                              }}
+                            >
+                              <Plus className="size-3.5" aria-hidden="true" />
+                              Lägg till suborganisation
+                            </button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       <CreateOrgDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
+        // Remounting on parent change resets the form's default parentId.
+        key={createState.parentId ?? "root"}
+        open={createState.open}
+        onOpenChange={(open) =>
+          setCreateState((s) => ({ ...s, open, parentId: open ? s.parentId : null }))
+        }
+        orgs={orgs}
+        initialParentId={createState.parentId}
         onSubmit={async (values) => {
           await createOrg.mutateAsync(values);
-          setCreateOpen(false);
+          setCreateState({ open: false, parentId: null });
         }}
       />
 
       <EditOrgDialog
         org={editOrg}
+        orgs={orgs}
         onOpenChange={(open) => {
           if (!open) setEditOrg(null);
         }}
@@ -215,36 +429,137 @@ function Organisationer() {
   );
 }
 
+function ParentOrgSelect({
+  value,
+  onChange,
+  orgs,
+  excludeId,
+  disabled,
+  disabledReason,
+}: {
+  value: string | null;
+  onChange: (value: string | null) => void;
+  orgs: Organisation[];
+  excludeId?: string;
+  disabled?: boolean;
+  disabledReason?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const rootOrgs = useMemo(
+    () => orgs.filter((o) => o.parentId === null && o.id !== excludeId),
+    [orgs, excludeId],
+  );
+
+  const selectedName = rootOrgs.find((o) => o.id === value)?.name;
+
+  const showClear = !!value && !disabled;
+
+  const trigger = (
+    <div className="relative w-full">
+      <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className={`w-full justify-between font-normal ${showClear ? "pr-16" : "pr-9"}`}
+            disabled={disabled}
+          >
+            <span className="truncate">
+              {selectedName ?? "Ingen (toppnivå)"}
+            </span>
+            <ChevronsUpDown className="size-4 opacity-50 shrink-0 ml-2" aria-hidden="true" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Sök organisation..." />
+            <CommandList>
+              <CommandEmpty>Inga organisationer hittades.</CommandEmpty>
+              <CommandGroup>
+                {rootOrgs.map((org) => (
+                  <CommandItem
+                    key={org.id}
+                    value={org.name}
+                    onSelect={() => {
+                      onChange(org.id === value ? null : org.id);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={org.id === value ? "opacity-100" : "opacity-0"}
+                    />
+                    {org.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {showClear && (
+        <button
+          type="button"
+          aria-label="Rensa val"
+          onClick={() => onChange(null)}
+          className="absolute right-8 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-sm hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          <X className="size-3.5" aria-hidden="true" />
+        </button>
+      )}
+    </div>
+  );
+
+  if (disabled && disabledReason) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>{trigger}</div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{disabledReason}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return trigger;
+}
+
 function CreateOrgDialog({
   open,
   onOpenChange,
+  orgs,
+  initialParentId,
   onSubmit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  orgs: Organisation[];
+  // Pre-fills the parent select. Set when opening the dialog via
+  // "+ Lägg till suborganisation" so the new org lands under the intended
+  // parent without the admin having to pick it again. Null = top-level.
+  initialParentId?: string | null;
   onSubmit: (values: {
     name: string;
     organizationNumber?: string;
-    contactPerson?: string;
-    phoneNumber?: string;
-    email?: string;
+    parentId?: string | null;
   }) => Promise<void>;
 }) {
   const form = useForm({
     defaultValues: {
       name: "",
       organizationNumber: "",
-      contactPerson: "",
-      phoneNumber: "",
-      email: "",
+      parentId: (initialParentId ?? null) as string | null,
     },
     onSubmit: async ({ value }) => {
       await onSubmit({
         name: value.name,
         organizationNumber: value.organizationNumber || undefined,
-        contactPerson: value.contactPerson || undefined,
-        phoneNumber: value.phoneNumber || undefined,
-        email: value.email || undefined,
+        parentId: value.parentId,
       });
       form.reset();
     },
@@ -336,44 +651,14 @@ function CreateOrgDialog({
             )}
           </form.Field>
 
-          <form.Field name="contactPerson">
+          <form.Field name="parentId">
             {(field) => (
               <div className="space-y-2">
-                <Label htmlFor={field.name}>Kontaktperson</Label>
-                <Input
-                  id={field.name}
+                <Label>Moderorganisation</Label>
+                <ParentOrgSelect
                   value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="Förnamn Efternamn"
-                />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="phoneNumber">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Telefonnummer</Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="070-123 45 67"
-                />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="email">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>E-post</Label>
-                <Input
-                  id={field.name}
-                  type="email"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="kontakt@foretag.se"
+                  onChange={(v) => field.handleChange(v)}
+                  orgs={orgs}
                 />
               </div>
             )}
@@ -405,17 +690,17 @@ function CreateOrgDialog({
 
 function EditOrgDialog({
   org,
+  orgs,
   onOpenChange,
   onSubmit,
 }: {
   org: Organisation | null;
+  orgs: Organisation[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
     name?: string;
     organizationNumber?: string;
-    contactPerson?: string;
-    phoneNumber?: string;
-    email?: string;
+    parentId?: string | null;
   }) => Promise<void>;
 }) {
   if (!org) return null;
@@ -424,197 +709,396 @@ function EditOrgDialog({
     <EditOrgDialogInner
       key={org.id}
       org={org}
+      orgs={orgs}
       onOpenChange={onOpenChange}
       onSubmit={onSubmit}
     />
   );
 }
 
+type AffectedUser = { id: string; name: string; email: string };
+type AccessImpact = { gained: AffectedUser[]; lost: AffectedUser[] };
+
+function ParentChangeWarningDialog({
+  open,
+  onOpenChange,
+  impact,
+  onConfirm,
+  isSubmitting,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  impact: AccessImpact;
+  onConfirm: () => void;
+  isSubmitting: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="size-5 text-amber-500" />
+            Ändring påverkar användaråtkomst
+          </DialogTitle>
+          <DialogDescription>
+            Att ändra moderorganisation påverkar vilka användare som har ärvd
+            åtkomst till denna organisation.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-3">
+            {impact.gained.length > 0 && (
+              <Badge variant="outline" className="gap-1.5 border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
+                <ArrowUp className="size-3" />
+                {impact.gained.length === 1
+                  ? "1 användare får åtkomst"
+                  : `${impact.gained.length} användare får åtkomst`}
+              </Badge>
+            )}
+            {impact.lost.length > 0 && (
+              <Badge variant="outline" className="gap-1.5 border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+                <ArrowDown className="size-3" />
+                {impact.lost.length === 1
+                  ? "1 användare förlorar åtkomst"
+                  : `${impact.lost.length} användare förlorar åtkomst`}
+              </Badge>
+            )}
+          </div>
+
+          <Collapsible open={expanded} onOpenChange={setExpanded}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1.5 px-2">
+                <ChevronDown
+                  className={`size-4 transition-transform ${expanded ? "rotate-180" : ""}`}
+                />
+                Visa berörda användare
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-2 max-h-48 space-y-2 overflow-y-auto rounded-md border p-3">
+                {impact.gained.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-green-700 dark:text-green-300">
+                      Får åtkomst
+                    </p>
+                    {impact.gained.map((u) => (
+                      <div key={u.id} className="flex items-center gap-2 text-sm">
+                        <ArrowUp className="size-3 shrink-0 text-green-600" />
+                        <span>{u.name}</span>
+                        <span className="text-muted-foreground">{u.email}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {impact.lost.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-red-700 dark:text-red-300">
+                      Förlorar åtkomst
+                    </p>
+                    {impact.lost.map((u) => (
+                      <div key={u.id} className="flex items-center gap-2 text-sm">
+                        <ArrowDown className="size-3 shrink-0 text-red-600" />
+                        <span>{u.name}</span>
+                        <span className="text-muted-foreground">{u.email}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            Avbryt
+          </Button>
+          <Button onClick={onConfirm} disabled={isSubmitting}>
+            {isSubmitting ? "Sparar..." : "Bekräfta ändring"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function EditOrgDialogInner({
   org,
+  orgs,
   onOpenChange,
   onSubmit,
 }: {
   org: Organisation;
+  orgs: Organisation[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: {
     name?: string;
     organizationNumber?: string;
-    contactPerson?: string;
-    phoneNumber?: string;
-    email?: string;
+    parentId?: string | null;
   }) => Promise<void>;
 }) {
+  const hasChildren = useMemo(
+    () => orgs.some((o) => o.parentId === org.id),
+    [orgs, org.id],
+  );
+
+  const [warningOpen, setWarningOpen] = useState(false);
+  const [accessImpact, setAccessImpact] = useState<AccessImpact | null>(null);
+  const [pendingValues, setPendingValues] = useState<{
+    name?: string;
+    organizationNumber?: string;
+    parentId?: string | null;
+  } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+
   const form = useForm({
     defaultValues: {
       name: org.name,
       organizationNumber: org.organizationNumber ?? "",
-      contactPerson: org.contactPerson ?? "",
-      phoneNumber: org.phoneNumber ?? "",
-      email: org.email ?? "",
+      parentId: org.parentId,
     },
     onSubmit: async ({ value }) => {
-      await onSubmit({
+      const values = {
         name: value.name,
         organizationNumber: value.organizationNumber || undefined,
-        contactPerson: value.contactPerson || undefined,
-        phoneNumber: value.phoneNumber || undefined,
-        email: value.email || undefined,
-      });
+        parentId: value.parentId,
+      };
+
+      const parentChanged = value.parentId !== org.parentId;
+
+      if (parentChanged) {
+        const impact = await previewParentChange({
+          data: {
+            orgId: org.id,
+            oldParentId: org.parentId,
+            newParentId: value.parentId,
+          },
+        });
+
+        if (impact.gained.length > 0 || impact.lost.length > 0) {
+          setAccessImpact(impact);
+          setPendingValues(values);
+          setWarningOpen(true);
+          return;
+        }
+      }
+
+      await onSubmit(values);
     },
   });
 
+  const handleConfirmParentChange = async () => {
+    if (!pendingValues) return;
+    setIsSubmitting(true);
+    try {
+      await onSubmit(pendingValues);
+    } finally {
+      setIsSubmitting(false);
+      setWarningOpen(false);
+      setPendingValues(null);
+      setAccessImpact(null);
+    }
+  };
+
+  // Gate closing the dialog on a dirty form: open confirm dialog first.
+  const requestClose = () => {
+    const isDirty = form.state.isDirty;
+    if (isDirty) {
+      setDiscardConfirmOpen(true);
+      return;
+    }
+    onOpenChange(false);
+  };
+
   return (
-    <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Redigera organisation</DialogTitle>
-          <DialogDescription>
-            Uppdatera organisationens uppgifter.
-          </DialogDescription>
-        </DialogHeader>
-        <div>
-          <Link
-            to="/admin/anvandare"
-            search={{ org: org.id, create: true }}
+    <>
+      <Dialog open onOpenChange={(next) => { if (!next) requestClose(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Redigera organisation</DialogTitle>
+            <DialogDescription>
+              Uppdatera organisationens uppgifter.
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Link
+              to="/admin/anvandare"
+              search={{ org: org.id, create: true }}
+            >
+              <Button variant="outline" size="sm" className="w-full">
+                <UserPlus className="mr-1 size-4" />
+                Lägg till kundanvändare
+              </Button>
+            </Link>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              form.handleSubmit();
+            }}
+            className="space-y-4"
           >
-            <Button variant="outline" size="sm" className="w-full">
-              <UserPlus className="mr-1 size-4" />
-              Lägg till kundanvändare
-            </Button>
-          </Link>
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            form.handleSubmit();
+            <form.Field
+              name="name"
+              validators={{
+                onChange: ({ value }) =>
+                  !value.trim() ? "Namn krävs" : undefined,
+              }}
+            >
+              {(field) => (
+                <div className="space-y-2">
+                  <Label htmlFor={field.name}>
+                    Namn <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id={field.name}
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                    aria-invalid={
+                      field.state.meta.isTouched &&
+                      field.state.meta.errors.length > 0
+                    }
+                  />
+                  {field.state.meta.isTouched &&
+                    field.state.meta.errors.map((error, i) => (
+                      <p key={i} className="text-sm text-destructive">
+                        {error}
+                      </p>
+                    ))}
+                </div>
+              )}
+            </form.Field>
+
+            <form.Field
+              name="organizationNumber"
+              validators={{
+                onChange: ({ value }) => validateOrganisationsnummer(value),
+              }}
+            >
+              {(field) => (
+                <div className="space-y-2">
+                  <Label htmlFor={field.name}>Organisationsnummer</Label>
+                  <Input
+                    id={field.name}
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                    placeholder="XXXXXX-XXXX"
+                    aria-invalid={
+                      field.state.meta.isTouched &&
+                      field.state.meta.errors.length > 0
+                    }
+                  />
+                  {field.state.meta.isTouched &&
+                    field.state.meta.errors.map((error, i) => (
+                      <p key={i} className="text-sm text-destructive">
+                        {error}
+                      </p>
+                    ))}
+                </div>
+              )}
+            </form.Field>
+
+            <form.Field name="parentId">
+              {(field) => (
+                <div className="space-y-2">
+                  <Label>Moderorganisation</Label>
+                  <ParentOrgSelect
+                    value={field.state.value}
+                    onChange={(v) => field.handleChange(v)}
+                    orgs={orgs}
+                    excludeId={org.id}
+                    disabled={hasChildren}
+                    disabledReason="Denna organisation har underorganisationer och kan inte själv ha en moderorganisation"
+                  />
+                </div>
+              )}
+            </form.Field>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={requestClose}
+              >
+                Avbryt
+              </Button>
+              <form.Subscribe
+                selector={(state) => [state.canSubmit, state.isSubmitting]}
+              >
+                {([canSubmit, isSubmitting]) => (
+                  <Button type="submit" disabled={!canSubmit}>
+                    {isSubmitting && (
+                      <Loader2
+                        className="mr-2 size-4 animate-spin motion-reduce:animate-none"
+                        aria-hidden="true"
+                      />
+                    )}
+                    {isSubmitting ? "Sparar..." : "Spara"}
+                  </Button>
+                )}
+              </form.Subscribe>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {accessImpact && (
+        <ParentChangeWarningDialog
+          open={warningOpen}
+          onOpenChange={(open) => {
+            setWarningOpen(open);
+            if (!open) {
+              setPendingValues(null);
+              setAccessImpact(null);
+            }
           }}
-          className="space-y-4"
-        >
-          <form.Field
-            name="name"
-            validators={{
-              onChange: ({ value }) =>
-                !value.trim() ? "Namn krävs" : undefined,
-            }}
-          >
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>
-                  Namn <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  aria-invalid={
-                    field.state.meta.isTouched &&
-                    field.state.meta.errors.length > 0
-                  }
-                />
-                {field.state.meta.isTouched &&
-                  field.state.meta.errors.map((error, i) => (
-                    <p key={i} className="text-sm text-destructive">
-                      {error}
-                    </p>
-                  ))}
-              </div>
-            )}
-          </form.Field>
+          impact={accessImpact}
+          onConfirm={handleConfirmParentChange}
+          isSubmitting={isSubmitting}
+        />
+      )}
 
-          <form.Field
-            name="organizationNumber"
-            validators={{
-              onChange: ({ value }) => validateOrganisationsnummer(value),
-            }}
-          >
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Organisationsnummer</Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder="XXXXXX-XXXX"
-                  aria-invalid={
-                    field.state.meta.isTouched &&
-                    field.state.meta.errors.length > 0
-                  }
-                />
-                {field.state.meta.isTouched &&
-                  field.state.meta.errors.map((error, i) => (
-                    <p key={i} className="text-sm text-destructive">
-                      {error}
-                    </p>
-                  ))}
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="contactPerson">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Kontaktperson</Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="phoneNumber">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Telefonnummer</Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="email">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>E-post</Label>
-                <Input
-                  id={field.name}
-                  type="email"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-              </div>
-            )}
-          </form.Field>
-
+      <Dialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Avbryta ändringar?</DialogTitle>
+            <DialogDescription>
+              Dina ändringar sparas inte.
+            </DialogDescription>
+          </DialogHeader>
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => setDiscardConfirmOpen(false)}
             >
-              Avbryt
+              Fortsätt redigera
             </Button>
-            <form.Subscribe
-              selector={(state) => [state.canSubmit, state.isSubmitting]}
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                setDiscardConfirmOpen(false);
+                onOpenChange(false);
+              }}
             >
-              {([canSubmit, isSubmitting]) => (
-                <Button type="submit" disabled={!canSubmit}>
-                  {isSubmitting ? "Sparar..." : "Spara"}
-                </Button>
-              )}
-            </form.Subscribe>
+              Avbryt ändringar
+            </Button>
           </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -635,7 +1119,7 @@ function OrganisationerSkeleton() {
         <Table>
           <TableHeader>
             <TableRow>
-              {["w-24", "w-28", "w-32", "w-44", "w-20"].map((w, i) => (
+              {["w-16", "w-24", "w-32", "w-8"].map((w, i) => (
                 <TableHead key={i}>
                   <Skeleton className={`h-4 ${w}`} />
                 </TableHead>
@@ -647,8 +1131,7 @@ function OrganisationerSkeleton() {
               <TableRow key={i}>
                 <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-10" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-8" /></TableCell>
               </TableRow>
             ))}

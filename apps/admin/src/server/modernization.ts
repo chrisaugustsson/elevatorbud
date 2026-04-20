@@ -2,8 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
-import type { Database } from "@elevatorbud/db";
-import { adminMiddleware } from "./auth";
+import type { DatabaseHttp } from "@elevatorbud/db";
+import { adminMiddlewareRead } from "./auth";
 
 // ---------------------------------------------------------------------------
 // Zod schemas (inlined from packages/api/src/routers/modernization.ts)
@@ -23,7 +23,7 @@ const priorityListInput = z.object({
 // Admin: organizationId is an optional FILTER, not a security boundary.
 // ---------------------------------------------------------------------------
 
-async function timeline(db: Database, organizationId: string | undefined) {
+async function timeline(db: DatabaseHttp, organizationId: string | undefined) {
   const orgFilter = organizationId
     ? sql`AND e.organization_id = ${organizationId}`
     : sql``;
@@ -53,7 +53,7 @@ async function timeline(db: Database, organizationId: string | undefined) {
   }));
 }
 
-async function budget(db: Database, organizationId: string | undefined) {
+async function budget(db: DatabaseHttp, organizationId: string | undefined) {
   const orgFilter = organizationId
     ? sql`AND e.organization_id = ${organizationId}`
     : sql``;
@@ -96,7 +96,7 @@ async function budget(db: Database, organizationId: string | undefined) {
 }
 
 async function priorityList(
-  db: Database,
+  db: DatabaseHttp,
   organizationId: string | undefined,
   input: {
     yearFrom?: number;
@@ -207,7 +207,7 @@ async function priorityList(
 // ---------------------------------------------------------------------------
 
 export const getTimeline = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ organizationId: z.string().uuid().optional() }).optional())
   .handler(async ({ data, context }) => {
     return timeline(context.db, data?.organizationId);
@@ -220,7 +220,7 @@ export const timelineOptions = (organizationId?: string) =>
   });
 
 export const getBudget = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ organizationId: z.string().uuid().optional() }).optional())
   .handler(async ({ data, context }) => {
     return budget(context.db, data?.organizationId);
@@ -233,7 +233,7 @@ export const budgetOptions = (organizationId?: string) =>
   });
 
 export const getPriorityList = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(priorityListInput)
   .handler(async ({ data, context }) => {
     return priorityList(context.db, data.organizationId, {

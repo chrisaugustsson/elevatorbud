@@ -8,7 +8,6 @@ import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
-  getFilteredRowModel,
   createColumnHelper,
   type SortingState,
 } from "@tanstack/react-table";
@@ -46,6 +45,19 @@ import {
   SelectValue,
 } from "@elevatorbud/ui/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@elevatorbud/ui/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@elevatorbud/ui/components/ui/command";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -60,9 +72,16 @@ import {
   UserX,
   UserCheck,
   Trash2,
+  Check,
+  ChevronsUpDown,
+  X,
 } from "lucide-react";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import { useUser } from "@elevatorbud/auth";
+import {
+  EditUserDialog,
+  type EditableUser,
+} from "~/features/user/components/edit-user-dialog";
 
 export const Route = createFileRoute("/_authenticated/admin/anvandare")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -76,22 +95,12 @@ export const Route = createFileRoute("/_authenticated/admin/anvandare")({
   pendingComponent: AnvandareSkeleton,
 });
 
-type Anvandare = {
-  id: string;
-  clerkUserId: string;
-  email: string;
-  name: string;
-  role: "admin" | "customer";
-  organizationId: string | null;
-  active: boolean;
-  createdAt: Date;
-  lastLogin: Date | null;
-  organization: { id: string; name: string; organizationNumber: string | null; contactPerson: string | null; phoneNumber: string | null; email: string | null; createdAt: Date } | null;
-};
+type Anvandare = EditableUser;
 
 type Organisation = {
   id: string;
   name: string;
+  parentId: string | null;
 };
 
 function Anvandare() {
@@ -143,12 +152,12 @@ function Anvandare() {
 
   const { user: currentClerkUser } = useUser();
   const createUser = useMutation({
-    mutationFn: (input: { name: string; email: string; role: "admin" | "customer"; organizationId?: string }) =>
+    mutationFn: (input: { name: string; email: string; role: "admin" | "customer"; organizationIds?: string[] }) =>
       createUserFn({ data: input }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
   });
   const updateUser = useMutation({
-    mutationFn: (input: { id: string; name?: string; email?: string; role?: "admin" | "customer"; organizationId?: string }) =>
+    mutationFn: (input: { id: string; name?: string; email?: string; role?: "admin" | "customer"; organizationIds?: string[] }) =>
       updateUserFn({ data: input }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
   });
@@ -169,11 +178,6 @@ function Anvandare() {
   );
   const [deletingUser, setDeletingUser] = useState<Anvandare | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-
-  const orgMap = new Map<string, string>();
-  for (const org of orgs) {
-    orgMap.set(org.id, org.name);
-  }
 
   const columnHelper = createColumnHelper<Anvandare>();
 
@@ -198,13 +202,15 @@ function Anvandare() {
         </Badge>
       ),
     }),
-    columnHelper.accessor("organizationId", {
+    columnHelper.display({
+      id: "organization",
       size: 180,
       header: ({ column }) => <DataGridColumnHeader title="Organisation" column={column} />,
       enableSorting: false,
-      cell: (info) => {
-        const orgId = info.getValue();
-        return orgId ? orgMap.get(orgId) ?? "—" : "—";
+      cell: ({ row }) => {
+        const orgs = row.original.userOrganizations;
+        if (orgs.length === 0) return "—";
+        return orgs.map((uo) => uo.organization.name).join(", ");
       },
     }),
     columnHelper.accessor("active", {
@@ -247,7 +253,7 @@ function Anvandare() {
               size="icon"
               className="size-8"
               onClick={() => setEditingUser(row)}
-              title="Redigera användare"
+              aria-label="Redigera användare"
             >
               <Pencil className="size-4" />
             </Button>
@@ -335,19 +341,11 @@ function Anvandare() {
             <SelectItem value="customer">Kund</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={orgFilter} onValueChange={setOrgFilter}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Organisation" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="alla">Alla organisationer</SelectItem>
-            {orgs.map((org) => (
-              <SelectItem key={org.id} value={org.id}>
-                {org.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <OrgFilterCombobox
+          value={orgFilter}
+          onChange={setOrgFilter}
+          orgs={orgs}
+        />
         <p className="text-sm text-muted-foreground">
           {table.getRowModel().rows.length} användare
         </p>
@@ -371,17 +369,23 @@ function Anvandare() {
         orgs={orgs}
         defaultOrgId={orgFromSearch}
         onSubmit={async (values) => {
-          await createUser.mutateAsync(values);
+          await createUser.mutateAsync({
+            name: values.name,
+            email: values.email,
+            role: values.role,
+            organizationIds: values.organizationId ? [values.organizationId] : undefined,
+          });
           setCreateOpen(false);
         }}
       />
 
       <EditUserDialog
         user={editingUser}
+        open={!!editingUser}
         onOpenChange={(open) => {
           if (!open) setEditingUser(null);
         }}
-        orgs={orgs}
+        allOrgs={orgs}
         onSubmit={async (values) => {
           await updateUser.mutateAsync(values);
           setEditingUser(null);
@@ -700,21 +704,16 @@ function CreateUserDialogInner({
                         Organisation{" "}
                         <span className="text-destructive">*</span>
                       </Label>
-                      <Select
+                      <OrgCombobox
                         value={field.state.value}
-                        onValueChange={field.handleChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Välj organisation" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {orgs.map((org) => (
-                            <SelectItem key={org.id} value={org.id}>
-                              {org.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onChange={field.handleChange}
+                        orgs={orgs}
+                        placeholder="Välj organisation"
+                        invalid={
+                          field.state.meta.isTouched &&
+                          field.state.meta.errors.length > 0
+                        }
+                      />
                       {field.state.meta.isTouched &&
                         field.state.meta.errors.map((error, i) => (
                           <p key={i} className="text-sm text-destructive">
@@ -752,262 +751,150 @@ function CreateUserDialogInner({
   );
 }
 
-function EditUserDialog({
-  user,
-  onOpenChange,
+function OrgCombobox({
+  value,
+  onChange,
   orgs,
-  onSubmit,
+  placeholder,
+  invalid,
 }: {
-  user: Anvandare | null;
-  onOpenChange: (open: boolean) => void;
+  value: string;
+  onChange: (value: string) => void;
   orgs: Organisation[];
-  onSubmit: (values: {
-    id: string;
-    name?: string;
-    email?: string;
-    role?: "admin" | "customer";
-    organizationId?: string;
-  }) => Promise<void>;
+  placeholder: string;
+  invalid?: boolean;
 }) {
-  if (!user) return null;
-
+  const [open, setOpen] = useState(false);
+  const selected = orgs.find((o) => o.id === value);
   return (
-    <EditUserDialogInner
-      key={user.id}
-      user={user}
-      orgs={orgs}
-      onOpenChange={onOpenChange}
-      onSubmit={onSubmit}
-    />
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          aria-invalid={invalid}
+          className="w-full justify-between font-normal"
+        >
+          <span className="truncate">
+            {selected ? (
+              selected.name
+            ) : (
+              <span className="text-muted-foreground">{placeholder}</span>
+            )}
+          </span>
+          <ChevronsUpDown className="size-4 opacity-50 shrink-0 ml-2" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Sök organisation..." />
+          <CommandList>
+            <CommandEmpty>Inga organisationer hittades.</CommandEmpty>
+            <CommandGroup>
+              {orgs.map((org) => (
+                <CommandItem
+                  key={org.id}
+                  value={org.name}
+                  onSelect={() => {
+                    onChange(org.id);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={org.id === value ? "opacity-100" : "opacity-0"}
+                  />
+                  {org.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
-function EditUserDialogInner({
-  user,
+function OrgFilterCombobox({
+  value,
+  onChange,
   orgs,
-  onOpenChange,
-  onSubmit,
 }: {
-  user: Anvandare;
+  /** "alla" or an org id */
+  value: string;
+  onChange: (value: string) => void;
   orgs: Organisation[];
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (values: {
-    id: string;
-    name?: string;
-    email?: string;
-    role?: "admin" | "customer";
-    organizationId?: string;
-  }) => Promise<void>;
 }) {
-  const form = useForm({
-    defaultValues: {
-      name: user.name,
-      email: user.email,
-      role: user.role as "admin" | "customer",
-      organizationId: user.organizationId ?? "",
-    },
-    onSubmit: async ({ value }) => {
-      await onSubmit({
-        id: user.id,
-        name: value.name,
-        email: value.email,
-        role: value.role,
-        organizationId: value.organizationId || undefined,
-      });
-      form.reset();
-    },
-  });
-
+  const [open, setOpen] = useState(false);
+  const selected = value !== "alla" ? orgs.find((o) => o.id === value) : undefined;
+  const isCleared = value === "alla";
   return (
-    <Dialog
-      open
-      onOpenChange={(next) => {
-        if (!next) form.reset();
-        onOpenChange(next);
-      }}
-    >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Redigera användare</DialogTitle>
-          <DialogDescription>
-            Ändra uppgifter för {user.name}.
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            form.handleSubmit();
-          }}
-          className="space-y-4"
+    <div className="relative w-[200px]">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between font-normal pr-9"
+          >
+            <span className="truncate">
+              {selected ? selected.name : "Alla organisationer"}
+            </span>
+            <ChevronsUpDown className="size-4 opacity-50 shrink-0 ml-2" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Sök organisation..." />
+            <CommandList>
+              <CommandEmpty>Inga organisationer hittades.</CommandEmpty>
+              <CommandGroup>
+                <CommandItem
+                  value="Alla organisationer"
+                  onSelect={() => {
+                    onChange("alla");
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={isCleared ? "opacity-100" : "opacity-0"}
+                  />
+                  Alla organisationer
+                </CommandItem>
+                {orgs.map((org) => (
+                  <CommandItem
+                    key={org.id}
+                    value={org.name}
+                    onSelect={() => {
+                      onChange(org.id);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={org.id === value ? "opacity-100" : "opacity-0"}
+                    />
+                    {org.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {!isCleared && (
+        <button
+          type="button"
+          aria-label="Rensa val"
+          onClick={() => onChange("alla")}
+          className="absolute right-8 top-1/2 -translate-y-1/2 rounded-sm p-0.5 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring inline-flex size-8 items-center justify-center"
         >
-          <form.Field
-            name="name"
-            validators={{
-              onChange: ({ value }) =>
-                !value.trim() ? "Namn krävs" : undefined,
-            }}
-          >
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>
-                  Namn <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder="Förnamn Efternamn"
-                  aria-invalid={
-                    field.state.meta.isTouched &&
-                    field.state.meta.errors.length > 0
-                  }
-                />
-                {field.state.meta.isTouched &&
-                  field.state.meta.errors.map((error, i) => (
-                    <p key={i} className="text-sm text-destructive">
-                      {error}
-                    </p>
-                  ))}
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field
-            name="email"
-            validators={{
-              onChange: ({ value }) => {
-                if (!value.trim()) return "E-post krävs";
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
-                  return "Ogiltig e-postadress";
-                return undefined;
-              },
-            }}
-          >
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>
-                  E-post <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id={field.name}
-                  type="email"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder="namn@foretag.se"
-                  aria-invalid={
-                    field.state.meta.isTouched &&
-                    field.state.meta.errors.length > 0
-                  }
-                />
-                {field.state.meta.isTouched &&
-                  field.state.meta.errors.map((error, i) => (
-                    <p key={i} className="text-sm text-destructive">
-                      {error}
-                    </p>
-                  ))}
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="role">
-            {(field) => (
-              <div className="space-y-2">
-                <Label>
-                  Roll <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={field.state.value}
-                  onValueChange={(val) => {
-                    field.handleChange(val as "admin" | "customer");
-                    if (val === "admin") {
-                      form.setFieldValue("organizationId", "");
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="customer">Kund</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </form.Field>
-
-          <form.Subscribe selector={(state) => state.values.role}>
-            {(role) =>
-              role === "customer" ? (
-                <form.Field
-                  name="organizationId"
-                  validators={{
-                    onChange: ({ value }) => {
-                      const currentRole = form.getFieldValue("role");
-                      if (currentRole === "customer" && !value)
-                        return "Organisation krävs för kundanvändare";
-                      return undefined;
-                    },
-                  }}
-                >
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label>
-                        Organisation{" "}
-                        <span className="text-destructive">*</span>
-                      </Label>
-                      <Select
-                        value={field.state.value}
-                        onValueChange={field.handleChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Välj organisation" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {orgs.map((org) => (
-                            <SelectItem key={org.id} value={org.id}>
-                              {org.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {field.state.meta.isTouched &&
-                        field.state.meta.errors.map((error, i) => (
-                          <p key={i} className="text-sm text-destructive">
-                            {error}
-                          </p>
-                        ))}
-                    </div>
-                  )}
-                </form.Field>
-              ) : null
-            }
-          </form.Subscribe>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Avbryt
-            </Button>
-            <form.Subscribe
-              selector={(state) => [state.canSubmit, state.isSubmitting]}
-            >
-              {([canSubmit, isSubmitting]) => (
-                <Button type="submit" disabled={!canSubmit}>
-                  {isSubmitting ? "Sparar..." : "Spara"}
-                </Button>
-              )}
-            </form.Subscribe>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+          <X className="size-3.5" aria-hidden="true" />
+        </button>
+      )}
+    </div>
   );
 }
 

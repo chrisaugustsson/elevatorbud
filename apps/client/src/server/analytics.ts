@@ -1,17 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
-import { eq, and, sql } from "drizzle-orm";
+import { and, sql, inArray } from "drizzle-orm";
+import { z } from "zod";
 import { elevators } from "@elevatorbud/db/schema";
-import { authMiddleware } from "./auth";
+import { authMiddlewareRead } from "./auth";
+import { getContextOrgIds } from "./context";
 
 const NOT_MODERNIZED = "Ej ombyggd";
 
 export const getStats = createServerFn()
-  .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const orgId = context.user.organizationId!;
-    const activeCondition = eq(elevators.status, "active");
-    const where = and(activeCondition, eq(elevators.organizationId, orgId));
+  .middleware([authMiddlewareRead])
+  .inputValidator(z.object({ parentOrgId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
+    const where = and(
+      sql`${elevators.status} = 'active'`,
+      inArray(elevators.organizationId, contextOrgIds),
+    );
 
     const currentYear = new Date().getFullYear();
 
@@ -40,7 +45,7 @@ export const getStats = createServerFn()
           LIMIT 1
         ) lb ON true
         WHERE e.status = 'active'
-        AND e.organization_id = ${orgId}
+        AND e.organization_id IN ${contextOrgIds}
       `),
     ]);
 
@@ -65,108 +70,127 @@ export const getStats = createServerFn()
     };
   });
 
-export const statsOptions = () =>
+export const statsOptions = (parentOrgId: string) =>
   queryOptions({
-    queryKey: ["analytics", "stats"],
-    queryFn: () => getStats(),
+    queryKey: ["analytics", "stats", parentOrgId],
+    queryFn: () => getStats({ data: { parentOrgId } }),
   });
 
-export const getChartData = createServerFn()
-  .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const orgId = context.user.organizationId!;
-    const orgFilter = sql`AND e.organization_id = ${orgId}`;
+const chartTypeEnum = z.enum([
+  "byDistrict",
+  "byElevatorType",
+  "topManufacturers",
+  "byMaintenanceCompany",
+  "ageDistribution",
+  "modernizationTimeline",
+]);
+
+export type ChartType = z.infer<typeof chartTypeEnum>;
+
+type ChartRow = { label: string; value: number };
+function toArray(r: { rows: Record<string, unknown>[] }): ChartRow[] {
+  return (r.rows as ChartRow[]).map((row) => ({
+    label: row.label,
+    value: row.value,
+  }));
+}
+
+export const getSingleChartData = createServerFn()
+  .middleware([authMiddlewareRead])
+  .inputValidator(
+    z.object({
+      parentOrgId: z.string().uuid(),
+      chartType: chartTypeEnum,
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    const contextOrgIds = await getContextOrgIds(
+      context.db,
+      context.user,
+      data.parentOrgId,
+    );
+    const orgFilter = sql`AND e.organization_id IN ${contextOrgIds}`;
     const activeFilter = sql`e.status = 'active'`;
 
-    const [
-      byDistrict,
-      byElevatorType,
-      topManufacturers,
-      byMaintenanceCompany,
-      ageDistribution,
-      modernizationTimeline,
-    ] = await Promise.all([
-      context.db.execute(sql`
-        SELECT district as label, count(*)::int as value
-        FROM elevators e
-        WHERE ${activeFilter} ${orgFilter}
-          AND district IS NOT NULL
-        GROUP BY district ORDER BY value DESC
-      `),
-      context.db.execute(sql`
-        SELECT elevator_type as label, count(*)::int as value
-        FROM elevators e
-        WHERE ${activeFilter} ${orgFilter}
-          AND elevator_type IS NOT NULL
-        GROUP BY elevator_type ORDER BY value DESC
-      `),
-      context.db.execute(sql`
-        SELECT manufacturer as label, count(*)::int as value
-        FROM elevators e
-        WHERE ${activeFilter} ${orgFilter}
-          AND manufacturer IS NOT NULL
-        GROUP BY manufacturer ORDER BY value DESC
-        LIMIT 10
-      `),
-      context.db.execute(sql`
-        SELECT maintenance_company as label, count(*)::int as value
-        FROM elevators e
-        WHERE ${activeFilter} ${orgFilter}
-          AND maintenance_company IS NOT NULL
-        GROUP BY maintenance_company ORDER BY value DESC
-      `),
-      context.db.execute(sql`
-        SELECT
-          CASE
-            WHEN build_year IS NULL THEN 'Okant'
-            WHEN ${new Date().getFullYear()} - build_year < 10 THEN '0-9 ar'
-            WHEN ${new Date().getFullYear()} - build_year < 20 THEN '10-19 ar'
-            WHEN ${new Date().getFullYear()} - build_year < 30 THEN '20-29 ar'
-            WHEN ${new Date().getFullYear()} - build_year < 40 THEN '30-39 ar'
-            WHEN ${new Date().getFullYear()} - build_year < 50 THEN '40-49 ar'
-            ELSE '50+ ar'
-          END as label,
-          count(*)::int as value
-        FROM elevators e
-        WHERE ${activeFilter} ${orgFilter}
-        GROUP BY label ORDER BY label
-      `),
-      context.db.execute(sql`
-        SELECT lb.recommended_modernization_year as label, count(*)::int as value
-        FROM elevators e
-        JOIN LATERAL (
-          SELECT recommended_modernization_year
-          FROM elevator_budgets
-          WHERE elevator_id = e.id
-          ORDER BY created_at DESC
-          LIMIT 1
-        ) lb ON true
-        WHERE ${activeFilter} ${orgFilter}
-          AND lb.recommended_modernization_year IS NOT NULL
-        GROUP BY lb.recommended_modernization_year
-        ORDER BY lb.recommended_modernization_year
-      `),
-    ]);
-
-    type ChartRow = { label: string; value: number };
-    const toArray = (r: { rows: Record<string, unknown>[] }) =>
-      (r.rows as ChartRow[]).map((row) => ({
-        label: row.label,
-        value: row.value,
-      }));
-
-    return {
-      byDistrict: toArray(byDistrict),
-      byElevatorType: toArray(byElevatorType),
-      topManufacturers: toArray(topManufacturers),
-      byMaintenanceCompany: toArray(byMaintenanceCompany),
-      ageDistribution: toArray(ageDistribution),
-      modernizationTimeline: toArray(modernizationTimeline),
+    const queries: Record<ChartType, () => Promise<{ rows: Record<string, unknown>[] }>> = {
+      byDistrict: () =>
+        context.db.execute(sql`
+          SELECT district as label, count(*)::int as value
+          FROM elevators e
+          WHERE ${activeFilter} ${orgFilter}
+            AND district IS NOT NULL
+          GROUP BY district ORDER BY value DESC
+        `),
+      byElevatorType: () =>
+        context.db.execute(sql`
+          SELECT elevator_type as label, count(*)::int as value
+          FROM elevators e
+          WHERE ${activeFilter} ${orgFilter}
+            AND elevator_type IS NOT NULL
+          GROUP BY elevator_type ORDER BY value DESC
+        `),
+      topManufacturers: () =>
+        context.db.execute(sql`
+          SELECT manufacturer as label, count(*)::int as value
+          FROM elevators e
+          WHERE ${activeFilter} ${orgFilter}
+            AND manufacturer IS NOT NULL
+          GROUP BY manufacturer ORDER BY value DESC
+          LIMIT 10
+        `),
+      byMaintenanceCompany: () =>
+        context.db.execute(sql`
+          SELECT maintenance_company as label, count(*)::int as value
+          FROM elevators e
+          WHERE ${activeFilter} ${orgFilter}
+            AND maintenance_company IS NOT NULL
+          GROUP BY maintenance_company ORDER BY value DESC
+        `),
+      ageDistribution: () =>
+        context.db.execute(sql`
+          SELECT
+            CASE
+              WHEN build_year IS NULL THEN 'Okant'
+              WHEN ${new Date().getFullYear()} - build_year < 10 THEN '0-9 ar'
+              WHEN ${new Date().getFullYear()} - build_year < 20 THEN '10-19 ar'
+              WHEN ${new Date().getFullYear()} - build_year < 30 THEN '20-29 ar'
+              WHEN ${new Date().getFullYear()} - build_year < 40 THEN '30-39 ar'
+              WHEN ${new Date().getFullYear()} - build_year < 50 THEN '40-49 ar'
+              ELSE '50+ ar'
+            END as label,
+            count(*)::int as value
+          FROM elevators e
+          WHERE ${activeFilter} ${orgFilter}
+          GROUP BY label ORDER BY label
+        `),
+      modernizationTimeline: () =>
+        context.db.execute(sql`
+          SELECT lb.recommended_modernization_year as label, count(*)::int as value
+          FROM elevators e
+          JOIN LATERAL (
+            SELECT recommended_modernization_year
+            FROM elevator_budgets
+            WHERE elevator_id = e.id
+            ORDER BY created_at DESC
+            LIMIT 1
+          ) lb ON true
+          WHERE ${activeFilter} ${orgFilter}
+            AND lb.recommended_modernization_year IS NOT NULL
+          GROUP BY lb.recommended_modernization_year
+          ORDER BY lb.recommended_modernization_year
+        `),
     };
+
+    const result = await queries[data.chartType]();
+    return toArray(result);
   });
 
-export const chartDataOptions = () =>
+export const singleChartOptions = (
+  parentOrgId: string,
+  chartType: ChartType,
+) =>
   queryOptions({
-    queryKey: ["analytics", "chartData"],
-    queryFn: () => getChartData(),
+    queryKey: ["analytics", "chart", parentOrgId, chartType],
+    queryFn: () =>
+      getSingleChartData({ data: { parentOrgId, chartType } }),
   });

@@ -1,1 +1,1 @@
-export { authMiddleware } from "@elevatorbud/auth/middleware";
+export { authMiddleware, authMiddlewareRead } from "@elevatorbud/auth/middleware";

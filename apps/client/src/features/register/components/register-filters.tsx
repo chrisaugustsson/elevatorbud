@@ -9,12 +9,15 @@ import {
   SelectValue,
 } from "@elevatorbud/ui/components/ui/select";
 import { X } from "lucide-react";
+import { FilterChip } from "../../../shared/components/filter-chip";
 
 interface FilterOptions {
   district: string[];
   elevator_type: string[];
   manufacturer: string[];
 }
+
+type SubOrg = { id: string; name: string };
 
 interface RegisterFiltersProps {
   filterOptions: FilterOptions | null;
@@ -32,6 +35,9 @@ interface RegisterFiltersProps {
   onBuildYearMaxChange: (value: string) => void;
   hasActiveFilters: boolean;
   onClearAllFilters: () => void;
+  childOrgs?: SubOrg[];
+  subOrgId?: string;
+  onSubOrgChange?: (value: string | undefined) => void;
 }
 
 export function RegisterFilters({
@@ -50,47 +56,72 @@ export function RegisterFilters({
   onBuildYearMaxChange,
   hasActiveFilters,
   onClearAllFilters,
+  childOrgs,
+  subOrgId,
+  onSubOrgChange,
 }: RegisterFiltersProps) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {filterOptions && (
-        <>
-          <MultiSelectFilter
-            title="Distrikt"
-            options={filterOptions.district}
-            selected={filterDistrict}
-            onSelectedChange={onFilterDistrictChange}
-            emptyText="Inga alternativ"
-            clearText="Rensa"
-          />
-          <MultiSelectFilter
-            title="Hisstyp"
-            options={filterOptions.elevator_type}
-            selected={filterElevatorType}
-            onSelectedChange={onFilterElevatorTypeChange}
-            emptyText="Inga alternativ"
-            clearText="Rensa"
-          />
-          <MultiSelectFilter
-            title="Fabrikat"
-            options={filterOptions.manufacturer}
-            selected={filterManufacturer}
-            onSelectedChange={onFilterManufacturerChange}
-            emptyText="Inga alternativ"
-            clearText="Rensa"
-          />
-        </>
-      )}
+  const selectedSubOrgName = childOrgs?.find((o) => o.id === subOrgId)?.name;
 
-      <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-        <SelectTrigger className="h-9 w-36">
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {childOrgs && childOrgs.length > 0 && onSubOrgChange && (
+          <Select
+            value={subOrgId ?? "__all__"}
+            onValueChange={(v) => onSubOrgChange(v === "__all__" ? undefined : v)}
+          >
+            <SelectTrigger className="h-10 w-48">
+              <SelectValue placeholder="Alla underorganisationer" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Alla underorganisationer</SelectItem>
+              {childOrgs.map((org) => (
+                <SelectItem key={org.id} value={org.id}>
+                  {org.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {filterOptions && (
+          <>
+            <MultiSelectFilter
+              title="Distrikt"
+              options={filterOptions.district}
+              selected={filterDistrict}
+              onSelectedChange={onFilterDistrictChange}
+              emptyText="Inga alternativ"
+              clearText="Rensa"
+            />
+            <MultiSelectFilter
+              title="Hisstyp"
+              options={filterOptions.elevator_type}
+              selected={filterElevatorType}
+              onSelectedChange={onFilterElevatorTypeChange}
+              emptyText="Inga alternativ"
+              clearText="Rensa"
+            />
+            <MultiSelectFilter
+              title="Fabrikat"
+              options={filterOptions.manufacturer}
+              selected={filterManufacturer}
+              onSelectedChange={onFilterManufacturerChange}
+              emptyText="Inga alternativ"
+              clearText="Rensa"
+            />
+          </>
+        )}
+
+        <Select value={statusFilter} onValueChange={onStatusFilterChange}>
+        <SelectTrigger className="h-10 w-36">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="active">Aktiva</SelectItem>
           <SelectItem value="demolished">Rivda</SelectItem>
           <SelectItem value="archived">Arkiverade</SelectItem>
-          <SelectItem value="alla">Alla</SelectItem>
+          <SelectItem value="all">Alla</SelectItem>
         </SelectContent>
       </Select>
 
@@ -101,7 +132,7 @@ export function RegisterFilters({
           placeholder="Från"
           value={buildYearMin}
           onChange={(e) => onBuildYearMinChange(e.target.value)}
-          className="h-9 w-20"
+          className="h-10 w-20"
         />
         <span className="text-muted-foreground">{"–"}</span>
         <Input
@@ -109,15 +140,25 @@ export function RegisterFilters({
           placeholder="Till"
           value={buildYearMax}
           onChange={(e) => onBuildYearMaxChange(e.target.value)}
-          className="h-9 w-20"
+          className="h-10 w-20"
         />
       </div>
 
-      {hasActiveFilters && (
-        <Button variant="ghost" size="sm" onClick={onClearAllFilters}>
-          <X className="mr-1 size-3" />
-          Rensa filter
-        </Button>
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={onClearAllFilters}>
+            <X className="mr-1 size-3" />
+            Rensa filter
+          </Button>
+        )}
+      </div>
+
+      {subOrgId && selectedSubOrgName && onSubOrgChange && (
+        <div className="flex items-center gap-2">
+          <FilterChip
+            label={selectedSubOrgName}
+            onRemove={() => onSubOrgChange(undefined)}
+          />
+        </div>
       )}
     </div>
   );

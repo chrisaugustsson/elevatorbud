@@ -3,8 +3,8 @@ import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import { eq, and, sql } from "drizzle-orm";
 import { elevators } from "@elevatorbud/db/schema";
-import type { Database } from "@elevatorbud/db";
-import { adminMiddleware } from "./auth";
+import type { DatabaseHttp } from "@elevatorbud/db";
+import { adminMiddlewareRead } from "./auth";
 
 const NOT_MODERNIZED = "Ej ombyggd";
 
@@ -12,7 +12,7 @@ const NOT_MODERNIZED = "Ej ombyggd";
 // Inlined query logic (from packages/api/src/routers/analytics.ts)
 // ---------------------------------------------------------------------------
 
-async function stats(db: Database, organizationId: string | undefined) {
+async function stats(db: DatabaseHttp, organizationId: string | undefined) {
   const orgCondition = organizationId
     ? eq(elevators.organizationId, organizationId)
     : undefined;
@@ -70,7 +70,7 @@ async function stats(db: Database, organizationId: string | undefined) {
   };
 }
 
-async function chartData(db: Database, organizationId: string | undefined) {
+async function chartData(db: DatabaseHttp, organizationId: string | undefined) {
   const orgFilter = organizationId
     ? sql`AND e.organization_id = ${organizationId}`
     : sql``;
@@ -168,7 +168,7 @@ async function chartData(db: Database, organizationId: string | undefined) {
 // ---------------------------------------------------------------------------
 
 export const getStats = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ organizationId: z.string().uuid().optional() }).optional())
   .handler(async ({ data, context }) => {
     return stats(context.db, data?.organizationId);
@@ -181,7 +181,7 @@ export const statsOptions = (organizationId?: string) =>
   });
 
 export const getChartData = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ organizationId: z.string().uuid().optional() }).optional())
   .handler(async ({ data, context }) => {
     return chartData(context.db, data?.organizationId);

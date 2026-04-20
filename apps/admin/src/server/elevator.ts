@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import { eq, and, or, ilike, inArray, gte, lte, ne, sql, desc, asc } from "drizzle-orm";
-import type { Database } from "@elevatorbud/db";
+import type { Database, DatabaseHttp } from "@elevatorbud/db";
 import {
   elevators,
   elevatorDetails,
@@ -10,7 +10,13 @@ import {
   organizations,
   suggestedValues,
 } from "@elevatorbud/db/schema";
-import { adminMiddleware } from "./auth";
+import { adminMiddleware, adminMiddlewareRead } from "./auth";
+
+// Local alias for read helpers: either driver works, pick the faster HTTP
+// one at the middleware layer. Write helpers keep `Database` so the type
+// system prevents accidentally routing a mutation through a driver that
+// can't roll back.
+type ReadDb = Database | DatabaseHttp;
 
 // ---------------------------------------------------------------------------
 // Constants & helpers (inlined from packages/api/src/routers/elevator.ts)
@@ -67,6 +73,53 @@ const filterSchema = z.object({
 
 type FilterInput = z.infer<typeof filterSchema>;
 
+// Year-field validators. Kept in sync with the import parsers
+// (packages/utils/src/excel-import/parsers.ts): only accept a 4-digit year
+// in the plausible range 1800–2100. modernizationYear also accepts the
+// "Ej ombyggd" sentinel for backwards compatibility with existing rows.
+// Empty strings are coerced to undefined so the UI can clear a value.
+const yearLike = z
+  .string()
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined;
+    const t = v.trim();
+    return t === "" ? undefined : t;
+  })
+  .refine(
+    (v) => v === undefined || /^\d{4}$/.test(v),
+    "Endast 4-siffriga år accepteras (t.ex. 2025).",
+  )
+  .refine(
+    (v) => {
+      if (v === undefined) return true;
+      const year = Number(v);
+      return year >= 1800 && year <= 2100;
+    },
+    "Året måste ligga mellan 1800 och 2100.",
+  );
+
+const modernizationYearLike = z
+  .string()
+  .optional()
+  .transform((v) => {
+    if (v === undefined) return undefined;
+    const t = v.trim();
+    return t === "" ? undefined : t;
+  })
+  .refine(
+    (v) => v === undefined || v === "Ej ombyggd" || /^\d{4}$/.test(v),
+    'Endast 4-siffriga år eller "Ej ombyggd" accepteras.',
+  )
+  .refine(
+    (v) => {
+      if (v === undefined || v === "Ej ombyggd") return true;
+      const year = Number(v);
+      return year >= 1800 && year <= 2100;
+    },
+    "Året måste ligga mellan 1800 och 2100.",
+  );
+
 const createInput = z.object({
   // Core
   elevatorNumber: z.string().min(1),
@@ -79,7 +132,17 @@ const createInput = z.object({
   inspectionAuthority: z.string().optional(),
   inspectionMonth: z.string().optional(),
   maintenanceCompany: z.string().optional(),
-  modernizationYear: z.string().optional(),
+  modernizationYear: modernizationYearLike,
+  // ISO YYYY-MM-DD or empty/undefined; warranty expiration date for the
+  // most recent modernization. Empty string is normalized to undefined
+  // by the form-converter helper.
+  warrantyExpiresAt: z
+    .string()
+    .refine(
+      (v) => /^\d{4}-\d{2}-\d{2}$/.test(v),
+      "warrantyExpiresAt: ISO YYYY-MM-DD krävs.",
+    )
+    .optional(),
   hasEmergencyPhone: z.boolean().optional(),
   needsUpgrade: z.boolean().optional(),
   organizationId: z.string().uuid(),
@@ -107,11 +170,9 @@ const createInput = z.object({
   emergencyPhonePrice: z.number().optional(),
   comments: z.string().optional(),
   // Budget
-  revisionYear: z.number(),
-  recommendedModernizationYear: z.string().optional(),
+  recommendedModernizationYear: yearLike,
   budgetAmount: z.number().optional(),
   measures: z.string().optional(),
-  warranty: z.boolean().optional(),
 });
 
 const updateInput = z.object({
@@ -127,7 +188,14 @@ const updateInput = z.object({
   inspectionAuthority: z.string().optional(),
   inspectionMonth: z.string().optional(),
   maintenanceCompany: z.string().optional(),
-  modernizationYear: z.string().optional(),
+  modernizationYear: modernizationYearLike,
+  warrantyExpiresAt: z
+    .string()
+    .refine(
+      (v) => /^\d{4}-\d{2}-\d{2}$/.test(v),
+      "warrantyExpiresAt: ISO YYYY-MM-DD krävs.",
+    )
+    .optional(),
   hasEmergencyPhone: z.boolean().optional(),
   needsUpgrade: z.boolean().optional(),
   organizationId: z.string().uuid().optional(),
@@ -155,11 +223,9 @@ const updateInput = z.object({
   emergencyPhonePrice: z.number().optional(),
   comments: z.string().optional(),
   // Budget
-  revisionYear: z.number().optional(),
-  recommendedModernizationYear: z.string().optional(),
+  recommendedModernizationYear: yearLike,
   budgetAmount: z.number().optional(),
   measures: z.string().optional(),
-  warranty: z.boolean().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -192,11 +258,9 @@ const DETAIL_KEYS = new Set([
 ]);
 
 const BUDGET_KEYS = new Set([
-  "revisionYear",
   "recommendedModernizationYear",
   "budgetAmount",
   "measures",
-  "warranty",
 ]);
 
 const NUMERIC_FIELDS = new Set(["emergencyPhonePrice", "budgetAmount"]);
@@ -297,7 +361,7 @@ function buildWhereConditions(
 // Inlined query functions — no org-scoping security boundary for admin.
 // ---------------------------------------------------------------------------
 
-async function getElevatorFn(db: Database, id: string) {
+async function getElevatorFn(db: ReadDb, id: string) {
   const elevator = await db.query.elevators.findFirst({
     where: eq(elevators.id, id),
     with: { organization: true },
@@ -308,34 +372,54 @@ async function getElevatorFn(db: Database, id: string) {
   return elevator;
 }
 
-async function getDetailsFn(db: Database, elevatorId: string) {
+async function getDetailsFn(db: ReadDb, elevatorId: string) {
   return db.query.elevatorDetails.findFirst({
     where: eq(elevatorDetails.elevatorId, elevatorId),
   });
 }
 
-async function getLatestBudgetFn(db: Database, elevatorId: string) {
+async function getLatestBudgetFn(db: ReadDb, elevatorId: string) {
   return db.query.elevatorBudgets.findFirst({
     where: eq(elevatorBudgets.elevatorId, elevatorId),
     orderBy: [desc(elevatorBudgets.createdAt)],
   });
 }
 
+async function listBudgetsFn(db: ReadDb, elevatorId: string) {
+  return db.query.elevatorBudgets.findMany({
+    where: eq(elevatorBudgets.elevatorId, elevatorId),
+    // Planned year ascending (soonest first); fall back to createdAt for
+    // entries without a recommended year so they sink to the bottom.
+    orderBy: [
+      sql`${elevatorBudgets.recommendedModernizationYear} NULLS LAST`,
+      desc(elevatorBudgets.createdAt),
+    ],
+  });
+}
+
 async function checkElevatorNumberFn(
-  db: Database,
+  db: ReadDb,
   elevatorNumber: string,
+  organizationId: string | undefined,
   excludeId?: string,
 ) {
-  if (!elevatorNumber) return { exists: false };
+  // Uniqueness is scoped to (organizationId, elevatorNumber) per the
+  // elevators_organization_id_elevator_number_unique composite index. A
+  // cross-org check would flag "H1" in org B as a duplicate of an unrelated
+  // "H1" in org A, which would not actually conflict on save.
+  if (!elevatorNumber || !organizationId) return { exists: false };
   const existing = await db.query.elevators.findFirst({
-    where: eq(elevators.elevatorNumber, elevatorNumber),
+    where: and(
+      eq(elevators.elevatorNumber, elevatorNumber),
+      eq(elevators.organizationId, organizationId),
+    ),
   });
   if (!existing) return { exists: false };
   if (excludeId && existing.id === excludeId) return { exists: false };
   return { exists: true };
 }
 
-async function searchFn(db: Database, searchTerm: string) {
+async function searchFn(db: ReadDb, searchTerm: string) {
   if (!searchTerm.trim()) return [];
   const s = `%${searchTerm}%`;
 
@@ -363,7 +447,7 @@ async function searchFn(db: Database, searchTerm: string) {
 }
 
 async function listFn(
-  db: Database,
+  db: ReadDb,
   filters: FilterInput & {
     page?: number;
     pageSize?: number;
@@ -468,7 +552,7 @@ async function listFn(
   };
 }
 
-async function exportDataFn(db: Database, filters: FilterInput) {
+async function exportDataFn(db: ReadDb, filters: FilterInput) {
   const where = buildWhereConditions(filters, filters.organizationId);
 
   return db
@@ -540,7 +624,6 @@ async function createFn(
   if (budget.recommendedModernizationYear || budget.budgetAmount) {
     await db.insert(elevatorBudgets).values({
       elevatorId: elevator.id,
-      revisionYear: input.revisionYear,
       recommendedModernizationYear:
         budget.recommendedModernizationYear as string | undefined,
       budgetAmount:
@@ -548,7 +631,6 @@ async function createFn(
           ? String(budget.budgetAmount)
           : undefined,
       measures: budget.measures as string | undefined,
-      warranty: budget.warranty as boolean | undefined,
       createdBy: userId,
     });
   }
@@ -625,8 +707,6 @@ async function updateFn(
   ) {
     await db.insert(elevatorBudgets).values({
       elevatorId: id,
-      revisionYear:
-        (budget.revisionYear as number) ?? new Date().getFullYear(),
       recommendedModernizationYear:
         budget.recommendedModernizationYear as string | undefined,
       budgetAmount:
@@ -634,7 +714,6 @@ async function updateFn(
           ? String(budget.budgetAmount)
           : undefined,
       measures: budget.measures as string | undefined,
-      warranty: budget.warranty as boolean | undefined,
       createdBy: userId,
     });
   }
@@ -672,7 +751,7 @@ async function archiveFn(
 // ---------------------------------------------------------------------------
 
 export const getElevator = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     return getElevatorFn(context.db, data.id);
@@ -685,7 +764,7 @@ export const elevatorOptions = (id: string) =>
   });
 
 export const getElevatorDetails = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ elevatorId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     return getDetailsFn(context.db, data.elevatorId);
@@ -698,7 +777,7 @@ export const elevatorDetailsOptions = (elevatorId: string) =>
   });
 
 export const getLatestBudget = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ elevatorId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     return getLatestBudgetFn(context.db, data.elevatorId);
@@ -710,8 +789,21 @@ export const elevatorBudgetOptions = (elevatorId: string) =>
     queryFn: () => getLatestBudget({ data: { elevatorId } }),
   });
 
+export const listElevatorBudgets = createServerFn()
+  .middleware([adminMiddlewareRead])
+  .inputValidator(z.object({ elevatorId: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    return listBudgetsFn(context.db, data.elevatorId);
+  });
+
+export const elevatorBudgetsOptions = (elevatorId: string) =>
+  queryOptions({
+    queryKey: ["elevator", "budgets", elevatorId],
+    queryFn: () => listElevatorBudgets({ data: { elevatorId } }),
+  });
+
 export const searchElevators = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ search: z.string() }))
   .handler(async ({ data, context }) => {
     return searchFn(context.db, data.search);
@@ -724,7 +816,7 @@ export const searchElevatorsOptions = (search: string) =>
   });
 
 export const listElevators = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(
     filterSchema.extend({
       page: z.number().optional(),
@@ -764,7 +856,7 @@ export const listElevatorsOptions = (
   });
 
 export const exportElevatorData = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(filterSchema)
   .handler(async ({ data, context }) => {
     return exportDataFn(context.db, data);
@@ -783,10 +875,11 @@ export const exportElevatorDataOptions = (
 // ---------------------------------------------------------------------------
 
 export const checkElevatorNumber = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(
     z.object({
       elevatorNumber: z.string(),
+      organizationId: z.string().uuid().optional(),
       excludeId: z.string().uuid().optional(),
     }),
   )
@@ -794,6 +887,7 @@ export const checkElevatorNumber = createServerFn()
     return checkElevatorNumberFn(
       context.db,
       data.elevatorNumber,
+      data.organizationId,
       data.excludeId,
     );
   });
@@ -822,4 +916,83 @@ export const archiveElevator = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     return archiveFn(context.db, data.id, data.status, context.user.id);
+  });
+
+// ─── Budget (planerad modernisering) CRUD ─────────────────────────────
+//
+// Each row in `elevator_budgets` is a standalone planned modernization.
+// Elevators have 0..N budgets, sorted by recommendedModernizationYear for
+// display. Create/update/delete are per-row; the "latest" budget used in
+// list views is a denormalization of the MAX(createdAt) row.
+
+const budgetMutationFields = z.object({
+  recommendedModernizationYear: yearLike,
+  measures: z.string().optional(),
+  budgetAmount: z.number().min(0).optional(),
+});
+
+export const createElevatorBudget = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .inputValidator(
+    budgetMutationFields.extend({
+      elevatorId: z.string().uuid(),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    const [row] = await context.db
+      .insert(elevatorBudgets)
+      .values({
+        elevatorId: data.elevatorId,
+        recommendedModernizationYear: data.recommendedModernizationYear,
+        measures: data.measures?.trim() || null,
+        budgetAmount:
+          data.budgetAmount != null ? String(data.budgetAmount) : null,
+        createdBy: context.user.id,
+      })
+      .returning();
+    return row;
+  });
+
+export const updateElevatorBudget = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .inputValidator(
+    budgetMutationFields.extend({
+      id: z.string().uuid(),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    const { id, ...fields } = data;
+    const existing = await context.db.query.elevatorBudgets.findFirst({
+      where: eq(elevatorBudgets.id, id),
+    });
+    if (!existing) throw new Error("Planerad modernisering hittades inte");
+
+    await context.db
+      .update(elevatorBudgets)
+      .set({
+        recommendedModernizationYear:
+          fields.recommendedModernizationYear ??
+          existing.recommendedModernizationYear,
+        measures:
+          fields.measures !== undefined
+            ? fields.measures.trim() || null
+            : existing.measures,
+        budgetAmount:
+          fields.budgetAmount !== undefined
+            ? String(fields.budgetAmount)
+            : existing.budgetAmount,
+      })
+      .where(eq(elevatorBudgets.id, id));
+
+    return { id };
+  });
+
+export const deleteElevatorBudget = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .inputValidator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data, context }) => {
+    await context.db
+      .delete(elevatorBudgets)
+      .where(eq(elevatorBudgets.id, data.id));
+    return { id: data.id };
   });

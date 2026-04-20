@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { useSuspenseQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listUsersOptions, updateUser as updateUserFn, deactivateUser as deactivateUserFn, activateUser as activateUserFn, deleteUser as deleteUserFn } from "~/server/user";
 import { listOrganizationsOptions } from "~/server/organization";
-import { useForm } from "@tanstack/react-form";
 import {
   useReactTable,
   getCoreRowModel,
@@ -12,7 +11,6 @@ import {
 } from "@tanstack/react-table";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Input } from "@elevatorbud/ui/components/ui/input";
-import { Label } from "@elevatorbud/ui/components/ui/label";
 import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import {
@@ -30,13 +28,6 @@ import {
   DialogFooter,
 } from "@elevatorbud/ui/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@elevatorbud/ui/components/ui/select";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -52,21 +43,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { useUser } from "@elevatorbud/auth";
+import {
+  EditUserDialog,
+  type EditableUser,
+} from "~/features/user/components/edit-user-dialog";
 
-type UserRecord = {
-  id: string;
-  clerkUserId: string;
-  email: string;
-  name: string;
-  role: "admin" | "customer";
-  organizationId: string | null;
-  active: boolean;
-  createdAt: Date;
-  lastLogin: Date | null;
-  organization: { id: string; name: string; organizationNumber: string | null; contactPerson: string | null; phoneNumber: string | null; email: string | null; createdAt: Date } | null;
-};
-
-type Organisation = { id: string; name: string };
+type UserRecord = EditableUser;
 
 export function OrgUsersView({
   organizationId,
@@ -90,9 +72,12 @@ export function OrgUsersView({
     search: searchText || undefined,
   };
   const { data: users } = useSuspenseQuery(listUsersOptions(userListArgs));
+  // Prefetch orgs so the shared EditUserDialog renders without a loading
+  // flash when opened from within the org detail page.
+  const { data: allOrgs } = useSuspenseQuery(listOrganizationsOptions());
 
   const updateUser = useMutation({
-    mutationFn: (input: { id: string; name?: string; email?: string; role?: "admin" | "customer"; organizationId?: string }) =>
+    mutationFn: (input: { id: string; name?: string; email?: string; role?: "admin" | "customer"; organizationIds?: string[] }) =>
       updateUserFn({ data: input }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["user"] }); },
   });
@@ -181,7 +166,7 @@ export function OrgUsersView({
               size="icon"
               className="size-8"
               onClick={() => setEditingUser(row)}
-              title="Redigera användare"
+              aria-label="Redigera användare"
             >
               <Pencil className="size-4" />
             </Button>
@@ -265,20 +250,20 @@ export function OrgUsersView({
         </DataGridContainer>
       </DataGrid>
 
-      {/* Edit dialog */}
-      {editingUser && (
-        <EditUserDialogInner
-          key={editingUser.id}
-          user={editingUser}
-          onOpenChange={(open) => {
-            if (!open) setEditingUser(null);
-          }}
-          onSubmit={async (values) => {
-            await updateUser.mutateAsync(values);
-            setEditingUser(null);
-          }}
-        />
-      )}
+      {/* Edit dialog — shared component */}
+      <EditUserDialog
+        user={editingUser}
+        open={!!editingUser}
+        onOpenChange={(open) => {
+          if (!open) setEditingUser(null);
+        }}
+        allOrgs={allOrgs}
+        contextOrgId={organizationId}
+        onSubmit={async (values) => {
+          await updateUser.mutateAsync(values);
+          setEditingUser(null);
+        }}
+      />
 
       {/* Deactivate / Activate confirmation dialog */}
       <Dialog
@@ -383,235 +368,6 @@ export function OrgUsersView({
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-function EditUserDialogInner({
-  user,
-  onOpenChange,
-  onSubmit,
-}: {
-  user: UserRecord;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (values: {
-    id: string;
-    name?: string;
-    email?: string;
-    role?: "admin" | "customer";
-    organizationId?: string;
-  }) => Promise<void>;
-}) {
-  const { data: orgs } = useQuery(listOrganizationsOptions());
-
-  const form = useForm({
-    defaultValues: {
-      name: user.name,
-      email: user.email,
-      role: user.role as "admin" | "customer",
-      organizationId: user.organizationId ?? "",
-    },
-    onSubmit: async ({ value }) => {
-      await onSubmit({
-        id: user.id,
-        name: value.name,
-        email: value.email,
-        role: value.role,
-        organizationId: value.organizationId || undefined,
-      });
-      form.reset();
-    },
-  });
-
-  return (
-    <Dialog
-      open
-      onOpenChange={(next) => {
-        if (!next) form.reset();
-        onOpenChange(next);
-      }}
-    >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Redigera användare</DialogTitle>
-          <DialogDescription>
-            Ändra uppgifter för {user.name}.
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            form.handleSubmit();
-          }}
-          className="space-y-4"
-        >
-          <form.Field
-            name="name"
-            validators={{
-              onChange: ({ value }) =>
-                !value.trim() ? "Namn krävs" : undefined,
-            }}
-          >
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>
-                  Namn <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder="Förnamn Efternamn"
-                  aria-invalid={
-                    field.state.meta.isTouched &&
-                    field.state.meta.errors.length > 0
-                  }
-                />
-                {field.state.meta.isTouched &&
-                  field.state.meta.errors.map((error, i) => (
-                    <p key={i} className="text-sm text-destructive">
-                      {error}
-                    </p>
-                  ))}
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field
-            name="email"
-            validators={{
-              onChange: ({ value }) => {
-                if (!value.trim()) return "E-post krävs";
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
-                  return "Ogiltig e-postadress";
-                return undefined;
-              },
-            }}
-          >
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>
-                  E-post <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id={field.name}
-                  type="email"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                  placeholder="namn@foretag.se"
-                  aria-invalid={
-                    field.state.meta.isTouched &&
-                    field.state.meta.errors.length > 0
-                  }
-                />
-                {field.state.meta.isTouched &&
-                  field.state.meta.errors.map((error, i) => (
-                    <p key={i} className="text-sm text-destructive">
-                      {error}
-                    </p>
-                  ))}
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field name="role">
-            {(field) => (
-              <div className="space-y-2">
-                <Label>
-                  Roll <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={field.state.value}
-                  onValueChange={(val) => {
-                    field.handleChange(val as "admin" | "customer");
-                    if (val === "admin") {
-                      form.setFieldValue("organizationId", "");
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="customer">Kund</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </form.Field>
-
-          <form.Subscribe selector={(state) => state.values.role}>
-            {(role) =>
-              role === "customer" ? (
-                <form.Field
-                  name="organizationId"
-                  validators={{
-                    onChange: ({ value }) => {
-                      const currentRole = form.getFieldValue("role");
-                      if (currentRole === "customer" && !value)
-                        return "Organisation krävs för kundanvändare";
-                      return undefined;
-                    },
-                  }}
-                >
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label>
-                        Organisation{" "}
-                        <span className="text-destructive">*</span>
-                      </Label>
-                      <Select
-                        value={field.state.value}
-                        onValueChange={field.handleChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Välj organisation" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {orgs?.map((org) => (
-                            <SelectItem key={org.id} value={org.id}>
-                              {org.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {field.state.meta.isTouched &&
-                        field.state.meta.errors.map((error, i) => (
-                          <p key={i} className="text-sm text-destructive">
-                            {error}
-                          </p>
-                        ))}
-                    </div>
-                  )}
-                </form.Field>
-              ) : null
-            }
-          </form.Subscribe>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Avbryt
-            </Button>
-            <form.Subscribe
-              selector={(state) => [state.canSubmit, state.isSubmitting]}
-            >
-              {([canSubmit, isSubmitting]) => (
-                <Button type="submit" disabled={!canSubmit}>
-                  {isSubmitting ? "Sparar..." : "Spara"}
-                </Button>
-              )}
-            </form.Subscribe>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 

@@ -6,6 +6,10 @@ export type ParsedElevator = {
   address?: string;
   elevator_designation?: string;
   district?: string;
+  // ISO date string (YYYY-MM-DD). The Excel column "Inventerings datum"
+  // often carries year-month only (e.g. "2021-10") — normalized to the
+  // first of the month on parse.
+  inventory_date?: string;
 
   // Teknisk specifikation
   elevator_type?: string;
@@ -41,23 +45,21 @@ export type ParsedElevator = {
 
   // Modernisering
   modernization_year?: string;
-  warranty?: boolean;
+  // Warranty expiration date for the most recent modernization. ISO
+  // YYYY-MM-DD when the source cell was a parseable date; undefined for
+  // sentinel strings ("Ja"/"Nej"/"?"/"okänt"/empty).
+  warranty_expires_at?: string;
   recommended_modernization_year?: string;
   budget_amount?: number;
   modernization_measures?: string;
 
-  // Nodtelefon
-  has_emergency_phone?: boolean;
-  emergency_phone_model?: string;
-  emergency_phone_type?: string;
-  needs_upgrade?: boolean;
-  emergency_phone_price?: number;
-
   // Kommentarer
   comments?: string;
 
-  // Status (set during import: 'aktiv' for Hissar, 'rivd' for Rivna hissar)
-  status?: "active" | "demolished" | "arkiverad";
+  // Kontaktperson
+  contact_person_name?: string;
+  contact_person_phone?: string;
+  contact_person_email?: string;
 
   // Import metadata (not stored in DB, used during import processing)
   _organisation_namn?: string;
@@ -83,37 +85,30 @@ export type ColumnDef = {
   letter: string; // Excel column letter (for error messages)
   field: string; // Target field name or special parser key
   mandatory?: boolean;
-  parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_daylight_opening" | "compound_emergency_phone" | "build_year" | "modernization_year" | "boolean" | "number" | "budget";
+  parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_daylight_opening" | "build_year" | "modernization_year" | "recommended_modernization_year" | "inventory_date" | "warranty_date" | "boolean" | "number" | "budget";
 };
 
-export type EmergencyPhoneEntry = {
-  elevator_number: string;
-  district?: string;
-  has_emergency_phone?: boolean;
-  emergency_phone_model?: string;
-  emergency_phone_type?: string;
-  needs_upgrade?: boolean;
-  emergency_phone_price?: number;
-  _source_row: number;
-};
-
-export type EmergencyPhoneParseResult = {
-  entries: EmergencyPhoneEntry[];
-  warnings: ImportWarning[];
+export type SheetMappingConfig = {
   sheetName: string;
+  mappings: ColumnMapping[];
+  headerRowIndex: number;
 };
 
 export type FullImportResult = {
   elevators: ParsedElevator[];
-  demolished: ParsedElevator[];
-  combined: ParsedElevator[];
   warnings: ImportWarning[];
   invalidRows: { row: number; sheet: string; reason: string }[];
   sheets: {
     elevators: { found: boolean; count: number };
-    emergencyPhones: { found: boolean; count: number; joined: number };
-    demolished: { found: boolean; count: number };
   };
+};
+
+// --- Sheet Info Types ---
+
+export type SheetInfo = {
+  name: string;
+  rowCount: number;
+  firstRowPreview: string[];
 };
 
 // --- Column Mapping Types ---

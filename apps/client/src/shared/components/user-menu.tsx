@@ -1,6 +1,6 @@
 import { ChevronsUpDown, LogOut, Moon, Sun, UserCog } from "lucide-react";
 import { useClerk, useUser } from "@elevatorbud/auth";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { useTheme } from "@elevatorbud/ui/hooks/use-theme";
 import {
   Avatar,
@@ -38,6 +38,8 @@ export function UserMenu() {
   const { isMobile } = useSidebar();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const routeParams = useParams({ strict: false }) as { parentOrgId?: string };
+  const parentOrgId = routeParams.parentOrgId;
 
   if (!user) return null;
 
@@ -88,7 +90,7 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem
-            onClick={() => navigate({ to: "/profil" })}
+            onClick={() => parentOrgId && navigate({ to: "/$parentOrgId/profil", params: { parentOrgId } })}
             className="cursor-pointer"
           >
             <UserCog />

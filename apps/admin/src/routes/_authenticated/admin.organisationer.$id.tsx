@@ -1,5 +1,5 @@
 import { useState, Suspense } from "react";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { organizationOptions } from "~/server/organization";
 import { statsOptions, chartDataOptions } from "~/server/analytics";
@@ -33,6 +33,7 @@ import {
   Users,
   ClipboardList,
   Wrench,
+  Pencil,
 } from "lucide-react";
 import {
   OrgRegisterView,
@@ -96,6 +97,7 @@ function getInitialTab(): TabSlug {
 function OrganisationDetail() {
   const { id } = Route.useParams();
   const router = useRouter();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabSlug>(getInitialTab);
 
   const { data: org } = useSuspenseQuery(organizationOptions(id));
@@ -179,16 +181,29 @@ function OrganisationDetail() {
               size="icon"
               className="size-8"
               onClick={() => router.history.back()}
+              aria-label="Tillbaka"
             >
               <ArrowLeft className="size-4" />
             </Button>
             <h1 className="text-2xl font-bold">{org.name}</h1>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-1 gap-1.5"
+              onClick={() =>
+                navigate({
+                  to: "/admin/organisationer",
+                  search: { edit: id },
+                })
+              }
+              aria-label="Redigera organisation"
+            >
+              <Pencil className="size-4" />
+              <span>Redigera</span>
+            </Button>
           </div>
           <div className="ml-10 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
             {org.organizationNumber && <span>{org.organizationNumber}</span>}
-            {org.contactPerson && <span>{org.contactPerson}</span>}
-            {org.email && <span>{org.email}</span>}
-            {org.phoneNumber && <span>{org.phoneNumber}</span>}
           </div>
         </div>
       </div>

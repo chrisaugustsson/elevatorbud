@@ -77,7 +77,7 @@ export function TechnicalSpecsSection({
           <form.Field name="speed">
             {(field) => (
               <div className="space-y-1.5">
-                <Label htmlFor="speed">Hastighet</Label>
+                <Label htmlFor="speed">Hastighet (m/s)</Label>
                 <Input
                   id="speed"
                   className="h-11"
@@ -99,7 +99,7 @@ export function TechnicalSpecsSection({
           <form.Field name="lift_height">
             {(field) => (
               <div className="space-y-1.5">
-                <Label htmlFor="lift_height">Lyfthöjd</Label>
+                <Label htmlFor="lift_height">Lyfthöjd (m)</Label>
                 <Input
                   id="lift_height"
                   className="h-11"
@@ -122,7 +122,7 @@ export function TechnicalSpecsSection({
         <form.Field name="load_capacity">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="load_capacity">Marklast</Label>
+              <Label htmlFor="load_capacity">Märklast (kg)</Label>
               <Input
                 id="load_capacity"
                 className="h-11"

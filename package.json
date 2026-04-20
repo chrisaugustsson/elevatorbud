@@ -11,6 +11,8 @@
     "dev:db": "docker compose up -d",
     "db:generate": "pnpm --filter @elevatorbud/db db:generate",
     "db:migrate": "pnpm --filter @elevatorbud/db db:migrate",
+    "db:migrate:dev": "pnpm --filter @elevatorbud/db db:migrate:dev",
+    "db:migrate:prod": "pnpm --filter @elevatorbud/db db:migrate:prod",
     "db:studio": "pnpm --filter @elevatorbud/db db:studio",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck"

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import type { FullImportResult } from "@elevatorbud/utils";
 import { Button } from "@elevatorbud/ui/components/ui/button";
 import {
@@ -14,160 +14,152 @@ import {
   AlertTriangle,
   XCircle,
   Loader2,
-  ArrowLeft,
-  Info,
 } from "lucide-react";
 import { SheetCard } from "./sheet-card";
-import type { AnalysisResult } from "../hooks/use-import-machine";
+import type { AnalysisResult, ResolvedOrgMapping } from "../hooks/use-import-machine";
 
 export function PreviewSection({
   fileName,
   parseResult,
   analysis,
+  resolvedOrgMapping,
+  selectedSheets,
   onConfirm,
-  onCancel,
+  onBack,
+  headingRef,
 }: {
   fileName: string;
   parseResult: FullImportResult;
   analysis: AnalysisResult | undefined;
+  resolvedOrgMapping?: ResolvedOrgMapping | null;
+  selectedSheets?: string[];
   onConfirm: () => void;
-  onCancel: () => void;
+  onBack: () => void;
+  headingRef?: React.RefObject<HTMLHeadingElement | null>;
 }) {
   const [showWarnings, setShowWarnings] = useState(false);
   const [showInvalidRows, setShowInvalidRows] = useState(false);
 
   const hasWarnings = parseResult.warnings.length > 0;
   const hasInvalidRows = parseResult.invalidRows.length > 0;
-  const hasElevators = parseResult.combined.length > 0;
+  const hasElevators = parseResult.elevators.length > 0;
   const analysisReady = !!analysis;
+
+  // Build the sheet summary title from the actual selected sheets rather
+  // than hardcoding "Hissar" — the import supports arbitrary sheet names.
+  const sheetTitle = (() => {
+    if (!selectedSheets || selectedSheets.length === 0) return "Valda ark";
+    if (selectedSheets.length === 1) return selectedSheets[0];
+    if (selectedSheets.length <= 3) return selectedSheets.join(", ");
+    return `${selectedSheets.length} ark`;
+  })();
+  const sheetExtra =
+    selectedSheets && selectedSheets.length > 3
+      ? selectedSheets.join(", ")
+      : undefined;
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
-          <div>
-            <p className="font-medium">{fileName}</p>
-            <p className="text-xs text-muted-foreground">
-              {parseResult.combined.length} hissar totalt
-            </p>
-          </div>
+      {/* Header — no redundant "choose another file" action here; the
+          stepper + bottom Back button handle navigation (FR-28). */}
+      <div className="flex items-center gap-3">
+        <FileSpreadsheet
+          className="h-5 w-5 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <div>
+          <p className="font-medium">{fileName}</p>
+          <p className="text-xs text-muted-foreground">
+            {parseResult.elevators.length} hissar totalt
+          </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Välj annan fil
-        </Button>
       </div>
 
-      {/* Sheet summary cards */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      {/* Sheet summary card — reflects the sheets the admin selected. */}
+      <div className="grid gap-3 sm:grid-cols-1">
         <SheetCard
-          title="Hissar"
+          title={sheetTitle}
           found={parseResult.sheets.elevators.found}
           count={parseResult.sheets.elevators.count}
           required
-        />
-        <SheetCard
-          title="Nödtelefoner"
-          found={parseResult.sheets.emergencyPhones.found}
-          count={parseResult.sheets.emergencyPhones.count}
-          extra={
-            parseResult.sheets.emergencyPhones.joined > 0
-              ? `${parseResult.sheets.emergencyPhones.joined} kopplade`
-              : undefined
-          }
-        />
-        <SheetCard
-          title="Rivna hissar"
-          found={parseResult.sheets.demolished.found}
-          count={parseResult.sheets.demolished.count}
+          extra={sheetExtra}
         />
       </div>
 
-      {/* Server analysis */}
-      {analysisReady ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Analys</CardTitle>
-            <CardDescription>
-              Jämförelse med befintlig data i systemet
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard
-                label="Nya hissar"
-                value={analysis.summary.newElevators}
-                variant="success"
-              />
-              <StatCard
-                label="Uppdateras"
-                value={analysis.summary.updatedElevators}
-                variant="warning"
-              />
-              <StatCard
-                label="Matchade org."
-                value={analysis.summary.matchedOrgs}
-                variant="default"
-              />
-              <StatCard
-                label="Nya org."
-                value={analysis.summary.newOrgs}
-                variant={analysis.summary.newOrgs > 0 ? "info" : "default"}
-              />
-            </div>
-            {analysis.newOrgNames.length > 0 && (
-              <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950">
-                <div className="flex items-start gap-2">
-                  <Info className="mt-0.5 h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <div>
-                    <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                      Nya organisationer skapas automatiskt
-                    </p>
-                    <ul className="mt-1 space-y-0.5 text-xs text-blue-700 dark:text-blue-300">
-                      {analysis.newOrgNames.map((name) => (
-                        <li key={name}>• {name}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
+      {/* Server analysis — aria-live="polite" on the wrapper so the
+          completion of the analysis (skeleton → summary transition) is
+          announced to screen readers rather than happening silently. */}
+      <div aria-live="polite" aria-busy={!analysisReady}>
+        {analysisReady ? (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base" ref={headingRef} tabIndex={-1}>Granska & importera</CardTitle>
+              <CardDescription>
+                Jämförelse med befintlig data i systemet
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <StatCard
+                  label="Nya hissar"
+                  value={analysis.summary.newElevators}
+                  variant="success"
+                />
+                <StatCard
+                  label="Matchade org."
+                  value={resolvedOrgMapping ? resolvedOrgMapping.matchedOrgs.length : analysis.summary.matchedOrgs}
+                  variant="default"
+                />
+                <StatCard
+                  label="Nya org."
+                  value={resolvedOrgMapping ? resolvedOrgMapping.newOrgNames.length : analysis.summary.newOrgs}
+                  variant="default"
+                />
               </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="flex items-center justify-center py-8">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            <span className="text-sm text-muted-foreground">
-              Analyserar mot befintlig data...
-            </span>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="flex items-center justify-center py-8">
+              <Loader2
+                className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+              <span className="text-sm text-muted-foreground">
+                Analyserar mot befintlig data...
+              </span>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* Warnings */}
       {hasWarnings && (
         <Card>
-          <CardHeader
-            className="cursor-pointer pb-3"
-            onClick={() => setShowWarnings(!showWarnings)}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <CardHeader className="p-0">
+            <button
+              type="button"
+              aria-expanded={showWarnings}
+              aria-controls="import-warnings-panel"
+              onClick={() => setShowWarnings(!showWarnings)}
+              className="flex w-full items-center justify-between gap-2 rounded-xl px-6 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <span className="flex items-center gap-2">
+                <AlertTriangle
+                  className="h-4 w-4 text-amber-500"
+                  aria-hidden="true"
+                />
                 <CardTitle className="text-base">
                   Varningar ({parseResult.warnings.length})
                 </CardTitle>
-              </div>
+              </span>
               <span className="text-xs text-muted-foreground">
                 {showWarnings ? "Dölj" : "Visa"}
               </span>
-            </div>
+            </button>
           </CardHeader>
           {showWarnings && (
-            <CardContent>
+            <CardContent id="import-warnings-panel">
               <div className="max-h-60 space-y-1 overflow-y-auto">
                 {parseResult.warnings.map((w, i) => (
                   <div
@@ -190,24 +182,30 @@ export function PreviewSection({
       {/* Invalid rows */}
       {hasInvalidRows && (
         <Card>
-          <CardHeader
-            className="cursor-pointer pb-3"
-            onClick={() => setShowInvalidRows(!showInvalidRows)}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-destructive" />
+          <CardHeader className="p-0">
+            <button
+              type="button"
+              aria-expanded={showInvalidRows}
+              aria-controls="import-invalid-rows-panel"
+              onClick={() => setShowInvalidRows(!showInvalidRows)}
+              className="flex w-full items-center justify-between gap-2 rounded-xl px-6 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <span className="flex items-center gap-2">
+                <XCircle
+                  className="h-4 w-4 text-destructive"
+                  aria-hidden="true"
+                />
                 <CardTitle className="text-base">
                   Ogiltiga rader ({parseResult.invalidRows.length})
                 </CardTitle>
-              </div>
+              </span>
               <span className="text-xs text-muted-foreground">
                 {showInvalidRows ? "Dölj" : "Visa"}
               </span>
-            </div>
+            </button>
           </CardHeader>
           {showInvalidRows && (
-            <CardContent>
+            <CardContent id="import-invalid-rows-panel">
               <div className="max-h-60 space-y-1 overflow-y-auto">
                 {parseResult.invalidRows.map((r, i) => (
                   <div
@@ -228,11 +226,11 @@ export function PreviewSection({
 
       {/* Action buttons */}
       <div className="flex gap-3">
-        <Button variant="outline" onClick={onCancel}>
-          Avbryt
+        <Button variant="outline" onClick={onBack}>
+          Tillbaka
         </Button>
         <Button onClick={onConfirm} disabled={!analysisReady || !hasElevators}>
-          Importera {parseResult.combined.length} hissar
+          Importera {parseResult.elevators.length} hissar
         </Button>
       </div>
     </div>

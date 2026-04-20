@@ -15,6 +15,83 @@
       "when": 1775502562944,
       "tag": "0001_daily_songbird",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776194146504,
+      "tag": "0002_steep_mentor",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776194757376,
+      "tag": "0003_same_alex_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776195137793,
+      "tag": "0004_panoramic_mikhail_rasputin",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776244264852,
+      "tag": "0005_narrow_peter_quill",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776246635538,
+      "tag": "0006_wild_cerebro",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776500000000,
+      "tag": "0007_stale_spiral",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776251232256,
+      "tag": "0008_dizzy_paibok",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1776600000000,
+      "tag": "0009_previous_santa_claus",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1776700000000,
+      "tag": "0010_elevator_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1776800000000,
+      "tag": "0011_typical_sphinx",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1776900000000,
+      "tag": "0012_public_newton_destine",
+      "breakpoints": true
     }
   ]
 }

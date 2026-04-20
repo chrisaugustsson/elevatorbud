@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { searchElevatorsOptions } from "../../server/elevator";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import {
   BarChart3,
   ClipboardList,
@@ -63,11 +63,11 @@ function removeRecentSearch(query: string) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
 }
 
-const quickNav = [
-  { title: "Dashboard", href: "/dashboard", icon: BarChart3 },
-  { title: "Register", href: "/register", icon: ClipboardList },
-  { title: "Modernisering", href: "/modernisering", icon: HardHat },
-  { title: "Underhåll", href: "/underhall", icon: Wrench },
+const quickNavItems = [
+  { title: "Dashboard", path: "dashboard", icon: BarChart3 },
+  { title: "Register", path: "register", icon: ClipboardList },
+  { title: "Modernisering", path: "modernisering", icon: HardHat },
+  { title: "Underhåll", path: "underhall", icon: Wrench },
 ] as const;
 
 export function GlobalSearch() {
@@ -76,6 +76,8 @@ export function GlobalSearch() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
   const navigate = useNavigate();
+  const routeParams = useParams({ strict: false }) as { parentOrgId?: string };
+  const parentOrgId = routeParams.parentOrgId;
 
   useEffect(() => {
     if (open) {
@@ -104,31 +106,33 @@ export function GlobalSearch() {
   }, []);
 
   const { data: results, isFetching } = useQuery({
-    ...searchElevatorsOptions(debouncedSearch),
-    enabled: !!debouncedSearch,
+    ...searchElevatorsOptions(debouncedSearch, parentOrgId ?? ""),
+    enabled: !!debouncedSearch && !!parentOrgId,
   });
 
   const handleSelect = useCallback(
     (id: string) => {
+      if (!parentOrgId) return;
       if (search.trim()) {
         saveRecentSearch(search.trim());
       }
       setOpen(false);
       setSearch("");
       setDebouncedSearch("");
-      navigate({ to: "/hiss/$id", params: { id } });
+      navigate({ to: "/$parentOrgId/hiss/$id", params: { parentOrgId, id } });
     },
-    [navigate, search],
+    [navigate, search, parentOrgId],
   );
 
   const handleNavigate = useCallback(
-    (href: string) => {
+    (path: string) => {
+      if (!parentOrgId) return;
       setOpen(false);
       setSearch("");
       setDebouncedSearch("");
-      navigate({ to: href });
+      navigate({ to: `/$parentOrgId/${path}`, params: { parentOrgId } });
     },
-    [navigate],
+    [navigate, parentOrgId],
   );
 
   const handleRecentClick = useCallback(
@@ -153,9 +157,9 @@ export function GlobalSearch() {
   const showDefaultState = !isSearching;
 
   const filteredNav = useMemo(() => {
-    if (!search.trim()) return quickNav;
+    if (!search.trim()) return quickNavItems;
     const lower = search.toLowerCase();
-    return quickNav.filter((item) => item.title.toLowerCase().includes(lower));
+    return quickNavItems.filter((item) => item.title.toLowerCase().includes(lower));
   }, [search]);
 
   return (
@@ -249,9 +253,9 @@ export function GlobalSearch() {
               <CommandGroup heading="Gå till">
                 {filteredNav.map((item) => (
                   <CommandItem
-                    key={item.href}
+                    key={item.path}
                     value={`nav-${item.title}`}
-                    onSelect={() => handleNavigate(item.href)}
+                    onSelect={() => handleNavigate(item.path)}
                   >
                     <item.icon className="size-4 text-muted-foreground" />
                     <span>{item.title}</span>
@@ -267,9 +271,9 @@ export function GlobalSearch() {
               <CommandGroup heading="Gå till">
                 {filteredNav.map((item) => (
                   <CommandItem
-                    key={item.href}
+                    key={item.path}
                     value={`nav-${item.title}`}
-                    onSelect={() => handleNavigate(item.href)}
+                    onSelect={() => handleNavigate(item.path)}
                   >
                     <item.icon className="size-4 text-muted-foreground" />
                     <span>{item.title}</span>

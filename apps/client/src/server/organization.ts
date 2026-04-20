@@ -1,28 +1,28 @@
 import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { organizations } from "@elevatorbud/db/schema";
-import { authMiddleware } from "./auth";
+import { authMiddlewareRead } from "./auth";
+import { getContextOrgIds } from "./context";
 
 export const getOrganization = createServerFn()
-  .middleware([authMiddleware])
-  .inputValidator(z.object({ id: z.string().uuid() }))
+  .middleware([authMiddlewareRead])
+  .inputValidator(z.object({ id: z.string().uuid(), parentOrgId: z.string().uuid() }))
   .handler(async ({ data, context }) => {
-    const orgId = context.user.organizationId!;
+    const contextOrgIds = await getContextOrgIds(context.db, context.user, data.parentOrgId);
 
-    // Client can only fetch their own organization
-    if (data.id !== orgId) {
+    if (!contextOrgIds.includes(data.id)) {
       throw new Error("Saknar behörighet att se denna organisation");
     }
 
     return context.db.query.organizations.findFirst({
-      where: eq(organizations.id, orgId),
+      where: eq(organizations.id, data.id),
     });
   });
 
-export const organizationOptions = (id: string) =>
+export const organizationOptions = (id: string, parentOrgId: string) =>
   queryOptions({
-    queryKey: ["organization", id],
-    queryFn: () => getOrganization({ data: { id } }),
+    queryKey: ["organization", id, parentOrgId],
+    queryFn: () => getOrganization({ data: { id, parentOrgId } }),
   });

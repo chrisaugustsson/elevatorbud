@@ -12,6 +12,7 @@ import {
   DataGridColumnHeader,
 } from "@elevatorbud/ui/components/ui/data-grid-table";
 import { Building2 } from "lucide-react";
+import { useNavigate, useParams } from "@tanstack/react-router";
 
 type HissRow = {
   id: string;
@@ -39,6 +40,8 @@ interface RegisterTableProps {
   totalPages: number;
   page: number;
   pageSize: number;
+  showSubOrg?: boolean;
+  emptyMessage?: React.ReactNode;
 }
 
 export function RegisterTable({
@@ -48,18 +51,39 @@ export function RegisterTable({
   totalPages,
   page,
   pageSize,
+  showSubOrg = false,
+  emptyMessage: emptyMessageProp,
 }: RegisterTableProps) {
+  const { parentOrgId } = useParams({ strict: false }) as { parentOrgId: string };
+  const navigate = useNavigate();
   const columnHelper = createColumnHelper<HissRow>();
-  const columns = useMemo(
-    () => [
+  const columns = useMemo(() => {
+    const cols = [
       columnHelper.accessor("elevatorNumber", {
         size: 130,
         header: ({ column }) => (
           <DataGridColumnHeader title="Hissnummer" column={column} />
         ),
-        cell: (info) => (
-          <span className="font-medium tabular-nums">{info.getValue()}</span>
-        ),
+        cell: (info) => {
+          const row = info.row.original;
+          return (
+            <div className="flex flex-col">
+              <span className="font-medium tabular-nums">{info.getValue()}</span>
+              {/*
+                Mobile-only secondary line: shows the sub-org name inline
+                when the sub-org column itself is hidden below md. Keeps
+                the sub-org visible at <768px without reserving column
+                space. Only rendered when the register is showing multi-
+                org data (showSubOrg === true).
+              */}
+              {showSubOrg && row.organizationName && (
+                <span className="md:hidden text-xs text-muted-foreground">
+                  {row.organizationName}
+                </span>
+              )}
+            </div>
+          );
+        },
       }),
       columnHelper.accessor("address", {
         size: 200,
@@ -68,6 +92,29 @@ export function RegisterTable({
         ),
         cell: (info) => info.getValue() || "—",
       }),
+      ...(showSubOrg
+        ? [
+            columnHelper.accessor("organizationName", {
+              id: "organizationName",
+              size: 160,
+              enableSorting: false,
+              header: () => (
+                <span className="text-sm font-medium">Organisation</span>
+              ),
+              cell: (info) => (
+                <span className="text-muted-foreground">
+                  {info.getValue() || "—"}
+                </span>
+              ),
+              // US-025b: hide this column below md; the sub-org name is
+              // shown inline under the elevator number on mobile instead.
+              meta: {
+                cellClassName: "hidden md:table-cell",
+                headerClassName: "hidden md:table-cell",
+              },
+            }),
+          ]
+        : []),
       columnHelper.accessor("district", {
         size: 140,
         header: ({ column }) => (
@@ -107,10 +154,9 @@ export function RegisterTable({
           <span className="tabular-nums">{info.getValue() || "—"}</span>
         ),
       }),
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+    ];
+    return cols;
+  }, [showSubOrg, columnHelper]);
 
   const table = useReactTable({
     data,
@@ -139,13 +185,20 @@ export function RegisterTable({
       recordCount={data.length}
       tableLayout={{ width: "fixed", columnsResizable: true }}
       onRowClick={(row) => {
-        window.location.href = `/hiss/${row.id}`;
+        // Use the router so we keep client-side state and the context
+        // crossfade — a full page reload defeats both.
+        navigate({
+          to: "/$parentOrgId/hiss/$id",
+          params: { parentOrgId, id: row.id },
+        });
       }}
       emptyMessage={
-        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-          <Building2 className="size-8" />
-          <p>Inga hissar hittades.</p>
-        </div>
+        emptyMessageProp ?? (
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <Building2 className="size-8" />
+            <p>Inga hissar hittades.</p>
+          </div>
+        )
       }
     >
       <DataGridContainer>

@@ -4,33 +4,61 @@ import {
   integer,
   boolean,
   timestamp,
+  date,
   uuid,
   index,
   unique,
   jsonb,
   numeric,
   check,
+  primaryKey,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
 // ─── Organizations ───────────────────────────────────────────────────────────
 
-export const organizations = pgTable("organizations", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  organizationNumber: text("organization_number"),
-  contactPerson: text("contact_person"),
-  phoneNumber: text("phone_number"),
-  email: text("email"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const organizations = pgTable(
+  "organizations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    organizationNumber: text("organization_number"),
+    // Self-reference: use AnyPgColumn to break the circular type reference
+    // instead of `: any`. This is the Drizzle-recommended pattern.
+    //
+    // Hierarchy depth (one level) is enforced by the DB trigger
+    // `enforce_one_level_org_hierarchy` in migration 0002. Residual race under
+    // concurrent writes at READ COMMITTED: two simultaneous transactions could
+    // each pass the "target parent has no parent" / "this org has no children"
+    // checks and produce a 2-level chain. Acceptable for admin-app traffic
+    // (low concurrency, small number of admin users). If concurrent org edits
+    // become real, upgrade the trigger to `SELECT ... FOR UPDATE` on the
+    // target parent row inside the transaction.
+    parentId: uuid("parent_id").references(
+      (): AnyPgColumn => organizations.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("organizations_parent_id_idx").on(t.parentId)],
+);
 
-export const organizationsRelations = relations(organizations, ({ many }) => ({
-  elevators: many(elevators),
-  users: many(users),
-}));
+export const organizationsRelations = relations(
+  organizations,
+  ({ one, many }) => ({
+    parent: one(organizations, {
+      fields: [organizations.parentId],
+      references: [organizations.id],
+      relationName: "parentChild",
+    }),
+    children: many(organizations, { relationName: "parentChild" }),
+    elevators: many(elevators),
+    userOrganizations: many(userOrganizations),
+  }),
+);
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
@@ -44,7 +72,6 @@ export const users = pgTable(
     role: text("role", { enum: ["admin", "customer"] })
       .notNull()
       .default("customer"),
-    organizationId: uuid("organization_id").references(() => organizations.id),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -54,18 +81,50 @@ export const users = pgTable(
   (t) => [
     unique("users_clerk_user_id_unique").on(t.clerkUserId),
     unique("users_email_unique").on(t.email),
-    index("users_organization_id_idx").on(t.organizationId),
     index("users_role_idx").on(t.role),
     check("users_role_check", sql`${t.role} IN ('admin', 'customer')`),
   ],
 );
 
-export const usersRelations = relations(users, ({ one }) => ({
-  organization: one(organizations, {
-    fields: [users.organizationId],
-    references: [organizations.id],
-  }),
+export const usersRelations = relations(users, ({ many }) => ({
+  userOrganizations: many(userOrganizations),
 }));
+
+// ─── User–Organization join table ───────────────────────────────────────────
+
+export const userOrganizations = pgTable(
+  "user_organizations",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.organizationId] }),
+    index("user_organizations_user_id_idx").on(t.userId),
+    index("user_organizations_organization_id_idx").on(t.organizationId),
+  ],
+);
+
+export const userOrganizationsRelations = relations(
+  userOrganizations,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userOrganizations.userId],
+      references: [users.id],
+    }),
+    organization: one(organizations, {
+      fields: [userOrganizations.organizationId],
+      references: [organizations.id],
+    }),
+  }),
+);
 
 // ─── Elevators (core) ────────────────────────────────────────────────────────
 
@@ -93,10 +152,21 @@ export const elevators = pgTable(
 
     // Modernization (historical — when it WAS modernized)
     modernizationYear: text("modernization_year"),
+    // Warranty expiration date for the most recent modernization. NULL
+    // when there's no warranty data, the warranty is unknown, or the
+    // import value couldn't be parsed as a date (the Excel column also
+    // contains sentinel strings like "Ja"/"Nej"/"?"/"okänt" — we only
+    // store dates).
+    warrantyExpiresAt: date("warranty_expires_at"),
 
     // Emergency phone (summary flags for charts)
     hasEmergencyPhone: boolean("has_emergency_phone"),
     needsUpgrade: boolean("needs_upgrade"),
+
+    // Contact person
+    contactPersonName: text("contact_person_name"),
+    contactPersonPhone: text("contact_person_phone"),
+    contactPersonEmail: text("contact_person_email"),
 
     // Metadata
     organizationId: uuid("organization_id")
@@ -105,11 +175,11 @@ export const elevators = pgTable(
     status: text("status", { enum: ["active", "demolished", "archived"] })
       .notNull()
       .default("active"),
-    createdBy: uuid("created_by").references(() => users.id),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    lastUpdatedBy: uuid("last_updated_by").references(() => users.id),
+    lastUpdatedBy: uuid("last_updated_by").references(() => users.id, { onDelete: "set null" }),
     lastUpdatedAt: timestamp("last_updated_at", { withTimezone: true }),
   },
   (t) => [
@@ -122,6 +192,13 @@ export const elevators = pgTable(
     index("elevators_district_idx").on(t.district),
     index("elevators_manufacturer_idx").on(t.manufacturer),
     index("elevators_elevator_type_idx").on(t.elevatorType),
+    // (organization_id, elevator_number) is unique — re-imports and edits
+    // both rely on this to detect duplicates. The plain index on
+    // elevator_number above is kept for cross-org search.
+    unique("elevators_organization_id_elevator_number_unique").on(
+      t.organizationId,
+      t.elevatorNumber,
+    ),
     check("elevators_status_check", sql`${t.status} IN ('active', 'demolished', 'archived')`),
     check("elevators_build_year_check", sql`${t.buildYear} IS NULL OR (${t.buildYear} >= 1800 AND ${t.buildYear} <= 2100)`),
   ],
@@ -144,6 +221,7 @@ export const elevatorsRelations = relations(elevators, ({ one, many }) => ({
   }),
   details: one(elevatorDetails),
   budgets: many(elevatorBudgets),
+  events: many(elevatorEvents),
 }));
 
 // ─── Elevator Details (technical specs) ──────────────────────────────────────
@@ -204,7 +282,7 @@ export const elevatorDetailsRelations = relations(
   }),
 );
 
-// ─── Elevator Budgets (revision history) ─────────────────────────────────────
+// ─── Elevator Budgets (planned modernizations) ───────────────────────────────
 
 export const elevatorBudgets = pgTable(
   "elevator_budgets",
@@ -213,23 +291,15 @@ export const elevatorBudgets = pgTable(
     elevatorId: uuid("elevator_id")
       .notNull()
       .references(() => elevators.id, { onDelete: "cascade" }),
-    revisionYear: integer("revision_year").notNull(),
     recommendedModernizationYear: text("recommended_modernization_year"),
     budgetAmount: numeric("budget_amount", { precision: 12, scale: 2 }),
     measures: text("measures"),
-    warranty: boolean("warranty"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    createdBy: uuid("created_by").references(() => users.id),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   },
-  (t) => [
-    index("elevator_budgets_elevator_id_idx").on(t.elevatorId),
-    index("elevator_budgets_elevator_id_revision_year_idx").on(
-      t.elevatorId,
-      t.revisionYear,
-    ),
-  ],
+  (t) => [index("elevator_budgets_elevator_id_idx").on(t.elevatorId)],
 );
 
 export const elevatorBudgetsRelations = relations(
@@ -245,6 +315,123 @@ export const elevatorBudgetsRelations = relations(
     }),
   }),
 );
+
+// ─── Elevator Events (append-only history / timeline) ───────────────────────
+//
+// Event-sourced record of everything that happens to an elevator in the real
+// world: inventory surveys, inspections, modernizations, repairs, free-form
+// notes. The `elevators` row keeps "current state" (latest inventoryDate,
+// latest modernizationYear) as denormalized caches for list/filter queries;
+// `elevator_events` is the source of truth for history and cost tracking.
+//
+// Event rows are editable (typo fixes) but never deleted once the elevator
+// lifetime matters: use `elevators.status = 'archived'` to hide an elevator
+// instead of removing its event history.
+
+export const ELEVATOR_EVENT_TYPES = [
+  "inventory",
+  "inspection",
+  "repair",
+  "service",
+  "modernization",
+  "replacement",
+  "note",
+] as const;
+
+export type ElevatorEventType = (typeof ELEVATOR_EVENT_TYPES)[number];
+
+export const elevatorEvents = pgTable(
+  "elevator_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    elevatorId: uuid("elevator_id")
+      .notNull()
+      .references(() => elevators.id, { onDelete: "cascade" }),
+
+    type: text("type", { enum: ELEVATOR_EVENT_TYPES }).notNull(),
+
+    // When it happened in the real world (NOT when it was recorded).
+    // Date-only is fine for this domain; we keep it as a timestamp so the
+    // timeline can sort and so future sub-day events (repairs with a time)
+    // don't need another migration.
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+
+    title: text("title").notNull(),
+    description: text("description"),
+
+    cost: numeric("cost", { precision: 12, scale: 2 }),
+    currency: text("currency").default("SEK"),
+
+    // Free-text supplier / inspector / technician name
+    performedBy: text("performed_by"),
+
+    // Type-specific fields live here. Shape is validated in app code per
+    // type (see apps/*/server/elevator-events.ts). Examples:
+    //   inspection:    { authority, result, nextDue }
+    //   modernization: { parts: [...], warrantyYears }
+    //   repair:        { component, downtimeHours }
+    //   replacement:   { previousManufacturer, previousBuildYear, ... }
+    //
+    // `any` at the DB layer is intentional — TanStack Start's server-fn
+    // return-type serializer and drizzle's insert-value check disagree on
+    // every stricter variant (`unknown`, `Record<string, unknown>`,
+    // `Record<string, {}>`). `any` is assignable in both directions and
+    // keeps the RPC boundary happy. The shape is validated per event
+    // type in app code (see apps/*/server/elevator-events.ts).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    metadata: jsonb("metadata").$type<any>(),
+
+    // Future-proofing for inspection PDFs etc. Storage backend (S3-compatible)
+    // to be decided when the first attachment feature ships.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    attachments: jsonb("attachments").$type<any>(),
+
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // Pragmatic edits: owner can fix typos; we record who/when but don't
+    // version the row. If strict immutability is needed later, add a
+    // correction-event pattern (reference the original by id).
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("elevator_events_elevator_id_idx").on(t.elevatorId),
+    index("elevator_events_elevator_id_occurred_at_idx").on(
+      t.elevatorId,
+      t.occurredAt.desc(),
+    ),
+    index("elevator_events_type_idx").on(t.type),
+    index("elevator_events_occurred_at_idx").on(t.occurredAt),
+    check(
+      "elevator_events_type_check",
+      sql`${t.type} IN ('inventory','inspection','repair','service','modernization','replacement','note')`,
+    ),
+    check(
+      "elevator_events_cost_nonneg",
+      sql`${t.cost} IS NULL OR ${t.cost} >= 0`,
+    ),
+  ],
+);
+
+export const elevatorEventsRelations = relations(elevatorEvents, ({ one }) => ({
+  elevator: one(elevators, {
+    fields: [elevatorEvents.elevatorId],
+    references: [elevators.id],
+  }),
+  createdByUser: one(users, {
+    fields: [elevatorEvents.createdBy],
+    references: [users.id],
+    relationName: "eventCreatedByUser",
+  }),
+  updatedByUser: one(users, {
+    fields: [elevatorEvents.updatedBy],
+    references: [users.id],
+    relationName: "eventUpdatedByUser",
+  }),
+}));
 
 // ─── Suggested Values (reference data) ───────────────────────────────────────
 

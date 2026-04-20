@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   TARGET_FIELDS,
   type AutoMapResult,
@@ -35,15 +35,21 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 export function ColumnMappingSection({
   autoMapResult,
   sheetData,
+  sheetName,
+  sheetProgress,
   onConfirm,
   onHeaderRowChange,
-  onCancel,
+  onBack,
+  headingRef,
 }: {
   autoMapResult: AutoMapResult;
   sheetData: unknown[][];
+  sheetName?: string;
+  sheetProgress?: { current: number; total: number };
   onConfirm: (mappings: ColumnMapping[]) => void;
   onHeaderRowChange: (rowIndex: number) => void;
-  onCancel: () => void;
+  onBack: () => void;
+  headingRef?: React.RefObject<HTMLHeadingElement | null>;
 }) {
   // Build initial field map: sourceIndex -> field
   const [fieldMap, setFieldMap] = useState<Record<number, string>>(() => {
@@ -115,6 +121,30 @@ export function ColumnMappingSection({
 
   return (
     <div className="space-y-4">
+      {/* Sheet progress indicator */}
+      {sheetProgress && sheetProgress.total > 1 && (
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="text-sm font-medium">
+            Ark {sheetProgress.current} av {sheetProgress.total}
+            {sheetName ? `: ${sheetName}` : ""}
+          </Badge>
+          <div className="flex gap-1">
+            {Array.from({ length: sheetProgress.total }, (_, i) => (
+              <div
+                key={i}
+                className={`h-2 w-8 rounded-full ${
+                  i < sheetProgress.current - 1
+                    ? "bg-primary"
+                    : i === sheetProgress.current - 1
+                      ? "bg-primary/60"
+                      : "bg-muted"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Header row selector */}
       <Card>
         <CardContent className="flex items-center gap-4 pt-6">
@@ -145,27 +175,45 @@ export function ColumnMappingSection({
           {matchedCount}/{totalColumns} kolumner matchade automatiskt
         </Badge>
         {autoMapResult.confidence >= 0.8 && (
-          <Badge variant="outline" className="text-green-600">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
+          <Badge
+            variant="outline"
+            className="text-emerald-700 dark:text-emerald-400"
+            aria-label="Hög automatisk matchningsgrad"
+          >
+            <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
             Hög matchning
           </Badge>
         )}
       </div>
 
-      {/* Missing mandatory warning */}
+      {/* Missing mandatory warning — role=alert + assertive so
+          screen readers announce the hard-failure state immediately. */}
       {missingMandatory.length > 0 && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950">
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="rounded-md border border-destructive/40 bg-destructive/5 p-3"
+        >
           <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertTriangle
+              className="mt-0.5 h-4 w-4 text-destructive"
+              aria-hidden="true"
+            />
             <div>
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+              <p className="text-sm font-medium text-destructive">
                 Obligatoriska fält saknar mappning
               </p>
-              <ul className="mt-1 space-y-0.5 text-xs text-amber-700 dark:text-amber-300">
+              <div className="mt-1 flex flex-wrap gap-1">
                 {missingMandatory.map((t) => (
-                  <li key={t.field}>• {t.label}</li>
+                  <Badge
+                    key={t.field}
+                    variant="destructive"
+                    className="text-xs"
+                  >
+                    {t.label}
+                  </Badge>
                 ))}
-              </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -174,7 +222,15 @@ export function ColumnMappingSection({
       {/* Mapping table */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Kolumnmappning</CardTitle>
+          <CardTitle className="text-base" ref={headingRef} tabIndex={-1}>
+            Kolumnmappning
+            {sheetProgress && sheetProgress.total > 1 && (
+              <span className="sr-only">
+                {" "}— Steg 3 av 5. Ark {sheetProgress.current} av {sheetProgress.total}
+                {sheetName ? `: ${sheetName}` : ""}
+              </span>
+            )}
+          </CardTitle>
           <CardDescription>
             Koppla kolumner i filen till rätt fält. Automatiskt matchade
             kolumner är förvalda.
@@ -252,17 +308,20 @@ export function ColumnMappingSection({
                       {isAutoMatched && (
                         <Badge
                           variant="secondary"
-                          className="text-green-600 text-xs"
+                          className="text-emerald-700 dark:text-emerald-400 text-xs"
+                          aria-label="Automatiskt matchad kolumn"
                         >
-                          <CheckCircle2 className="mr-1 h-3 w-3" />
+                          <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
                           Auto
                         </Badge>
                       )}
                       {isManuallyMapped && (
                         <Badge
                           variant="secondary"
-                          className="text-blue-600 text-xs"
+                          className="text-sky-700 dark:text-sky-400 text-xs"
+                          aria-label="Manuellt mappad kolumn"
                         >
+                          <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
                           Manuell
                         </Badge>
                       )}
@@ -270,8 +329,9 @@ export function ColumnMappingSection({
                         <Badge
                           variant="outline"
                           className="text-muted-foreground text-xs"
+                          aria-label="Kolumn hoppas över"
                         >
-                          Hoppas över
+                          — Hoppas över
                         </Badge>
                       )}
                     </TableCell>
@@ -285,10 +345,17 @@ export function ColumnMappingSection({
 
       {/* Actions */}
       <div className="flex gap-3">
-        <Button variant="outline" onClick={onCancel}>
-          Avbryt
+        <Button variant="outline" onClick={onBack}>
+          Tillbaka
         </Button>
-        <Button onClick={handleConfirm}>Bekräfta mappning</Button>
+        <Button
+          onClick={handleConfirm}
+          disabled={missingMandatory.length > 0}
+        >
+          {sheetProgress && sheetProgress.current < sheetProgress.total
+            ? "Nästa ark"
+            : "Bekräfta mappning"}
+        </Button>
       </div>
     </div>
   );

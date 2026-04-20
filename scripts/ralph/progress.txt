@@ -1,294 +1,636 @@
 # Ralph Progress Log
-Started: fre  3 apr. 2026 16:46:10 CEST
+Started: tis 14 apr. 2026 21:13:58 CEST
 ---
 
 ## Codebase Patterns
 
-### TanStack Query + Convex Integration
-- Package: `@convex-dev/react-query` provides `ConvexQueryClient`, `convexQuery`, `convexAction`
-- Package: `@tanstack/react-router-ssr-query` provides `setupRouterSsrQueryIntegration` (PRD references old name `@tanstack/react-router-with-query` / `routerWithQueryClient` — the API was renamed)
-- Setup: ConvexReactClient → ConvexQueryClient(convexClient) → QueryClient with hashFn/queryFn → connect → setupRouterSsrQueryIntegration
-- `setupRouterSsrQueryIntegration` wraps router's `Wrap` with `QueryClientProvider` (composes with existing Wrap)
-- Router `Wrap` has `ConvexProvider` for SSR; root route adds `ConvexProviderWithClerk` for client auth (inner overrides outer)
-- `convexQuery(api.foo.bar, args)` returns query options for `useQuery`/`useSuspenseQuery`
-- `convexQuery(api.foo.bar, "skip")` returns options with `enabled: false`
-- Mutations/actions stay on `convex/react` — only queries migrate to TanStack Query
-
-### useSuspenseQuery Type Workaround
-- `convexQuery()` returns a union type (skip vs non-skip) that `useSuspenseQuery` rejects
-- Workaround: extract `queryKey` and `staleTime` individually from the convexQuery result
-- The default `queryFn` on the QueryClient handles the actual fetching
-- Pattern: `const opts = convexQuery(api.foo, {}); useSuspenseQuery({ queryKey: opts.queryKey, staleTime: opts.staleTime })`
-- For `ensureQueryData` in loaders: pass `convexQuery()` directly (its type is accepted)
-
-### SSR Auth Pattern
-- Root route `beforeLoad` fetches Clerk token via `createServerFn` and sets it on `convexQueryClient.serverHttpClient?.setAuth(token)`
-- This enables authenticated Convex queries during SSR (e.g. `ensureQueryData` in loaders)
-- `serverHttpClient` is only present during SSR; on client it's `undefined` (safe with optional chaining)
-- Client-side auth handled by `ConvexProviderWithClerk` in root route component
-
-### Dependent/Conditional Queries
-- Primary query: `useSuspenseQuery` with queryKey/staleTime extraction
-- Dependent query: `useQuery` from `@tanstack/react-query` with `convexQuery(api.foo, condition ? args : "skip")` — spread directly
-- The "skip" variant sets `enabled: false` automatically, so no manual `enabled` flag needed
-- `useQuery` (not `useSuspenseQuery`) is correct here because the query may not fire
+- **Self-referential FK in Drizzle**: Use `(): any =>` for the references callback to avoid circular type issues. Use `relationName` on both sides of self-referential relations.
+- **DB-level constraints for hierarchy**: Use a BEFORE INSERT OR UPDATE trigger (not a check constraint) when enforcement requires querying other rows. Drizzle doesn't generate triggers, so add them manually to the migration SQL.
+- **Platform mismatch (macOS → Linux container)**: Must `npm install -g pnpm` and `CI=true pnpm install --no-frozen-lockfile` to get working node_modules. esbuild also needs the correct platform binary — install matching version via `npm install @esbuild/linux-arm64@<version>` in the package dir, then use `ESBUILD_BINARY_PATH` env var.
 
 ---
 
-## 2026-04-03 - US-001
-- Installed `@convex-dev/react-query`, `@tanstack/react-query`, `@tanstack/react-router-ssr-query`
-- Rewrote `apps/admin/src/router.tsx`: creates ConvexReactClient, ConvexQueryClient, QueryClient; wires hashFn/queryFn/connect; adds context and Wrap with ConvexProvider; enables defaultPreload:'intent'; exports RouterContext type
-- Files changed: `apps/admin/package.json`, `apps/admin/src/router.tsx`, `pnpm-lock.yaml`
+## 2026-04-14 - US-001
+- Added nullable `parentId` column to `organizations` table with self-referential FK (onDelete: set null)
+- Added Drizzle self-relation (`parent`/`children` with `relationName: "parentChild"`)
+- Created migration `0002_steep_mentor.sql` with trigger `enforce_one_level_org_hierarchy` that prevents:
+  - Setting a parent on an org that already has children
+  - Setting a parent that itself has a parent
+- Files changed: `packages/db/src/schema.ts`, `packages/db/drizzle/0002_steep_mentor.sql`, `packages/db/drizzle/meta/0002_snapshot.json`, `packages/db/drizzle/meta/_journal.json`
 - **Learnings for future iterations:**
-  - PRD references `@tanstack/react-router-with-query` and `routerWithQueryClient()` — these were renamed to `@tanstack/react-router-ssr-query` and `setupRouterSsrQueryIntegration()`
-  - `setupRouterSsrQueryIntegration` reads existing `router.options.Wrap` and composes with `QueryClientProvider` — set `Wrap` on `createRouter` BEFORE calling `setupRouterSsrQueryIntegration`
-  - `createRouter` `context` option works even when root route uses `createRootRoute` (not `createRootRouteWithContext`) — types pass, will be properly typed in US-002
+  - `drizzle-kit generate` must be run from `packages/db/` with correct esbuild binary
+  - Trigger SQL must be appended manually after drizzle-kit generates the base migration
 ---
 
-## 2026-04-03 - US-002
-- Rewrote `apps/admin/src/routes/__root.tsx` to use `createRootRouteWithContext<RouterContext>()`
-- Added `beforeLoad` with server function (`getConvexToken`) that fetches Clerk token and sets it on `convexQueryClient.serverHttpClient`
-- Split providers: `shellComponent` (RootDocument) is HTML shell only with ThemeProvider; `component` (RootLayout) renders ClerkProvider → ConvexProviderWithClerk → Outlet + Toaster
-- Removed module-level `ConvexReactClient` instantiation (now uses `convexClient` from route context, created in router.tsx)
-- Files changed: `apps/admin/src/routes/__root.tsx`
+## 2026-04-14 - US-002
+- Created `user_organizations` join table with composite PK (userId, organizationId), cascade delete on both FKs
+- Removed `organizationId` column from `users` table
+- Updated Drizzle relations: users → userOrganizations → organizations (many-to-many)
+- Updated `User` type: replaced `organizationId: string | null` with `organizationIds: string[]`
+- Updated auth middleware to query join table for user's organization IDs
+- Updated admin `user.ts`: listUsers filters via join table, createUser/updateUser manage join table rows
+- Updated all client app server functions: `context.user.organizationId!` → `context.user.organizationIds[0]`
+- Updated admin UI types (Anvandare, UserRecord, Organisation) to match Drizzle return shapes including `parentId`
+- Migration: `0003_same_alex_power.sql`
+- Files changed:
+  - `packages/db/src/schema.ts`
+  - `packages/types/src/index.ts`
+  - `packages/auth/src/middleware.ts`
+  - `apps/admin/src/server/user.ts`
+  - `apps/admin/src/routes/_authenticated/admin.anvandare.tsx`
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx`
+  - `apps/admin/src/features/organization/components/org-users-view.tsx`
+  - `apps/client/src/server/analytics.ts`
+  - `apps/client/src/server/elevator.ts`
+  - `apps/client/src/server/maintenance.ts`
+  - `apps/client/src/server/modernization.ts`
+  - `apps/client/src/server/organization.ts`
+  - `apps/client/src/routes/_authenticated.tsx`
+  - `apps/client/src/routes/_authenticated/register.tsx`
+  - `packages/db/drizzle/0003_same_alex_power.sql`
 - **Learnings for future iterations:**
-  - `ConvexQueryClient.serverHttpClient` is typed as `ConvexHttpClient | undefined` — exists during SSR, undefined on client. Use optional chaining `?.setAuth()` safely
-  - `import type { RouterContext }` avoids circular dependency: router.tsx → routeTree.gen.ts → __root.tsx → router.tsx — type-only imports are erased at compile time
-  - Provider nesting: Router Wrap has `ConvexProvider` (SSR), root route component has `ConvexProviderWithClerk` (client auth). Inner provider overrides outer context — both share the same `ConvexReactClient` instance
-  - `getConvexToken` server function wrapped in try-catch — failure means SSR queries are unauthenticated but client auth still works via ClerkProvider
+  - When removing a column from a table, grep for ALL references across the entire codebase (types, middleware, server functions, UI components)
+  - Local UI types must match Drizzle's full return shape including fields from related tables (e.g. `parentId` on organizations from US-001)
+  - `replace_all: true` with Edit tool is efficient for mechanical find-and-replace across a file
 ---
 
-## 2026-04-03 - US-003
-- Migrated `_authenticated.tsx` from manual ConvexHttpClient prefetch to `ensureQueryData` + `useSuspenseQuery`
-- Removed `ConvexHttpClient` import and `convex/browser` dependency
-- Simplified `authGuard` to only check authentication (no more server-side user prefetch)
-- Added `loader` with `ensureQueryData(convexQuery(api.users.me, {}))` for blocking SSR prefetch
-- Replaced `useQuery(api.users.me)` with `useSuspenseQuery` + extracted queryKey/staleTime
-- Removed `prefetchedUser / liveUser` fallback pattern and `if (user === undefined)` loading state
-- Kept null check (webhook not synced) and `user.role !== 'admin'` check
-- Files changed: `apps/admin/src/routes/_authenticated.tsx`
+## 2026-04-14 - US-003
+- Removed `contactPerson`, `phoneNumber`, `email` columns from `organizations` table
+- Added `contactPersonName`, `contactPersonPhone`, `contactPersonEmail` columns to `elevators` table
+- Updated organization server functions (create/update schemas) to remove contact fields
+- Updated organization list page: removed contact columns, form fields in create/edit dialogs, mutation types
+- Updated org detail page: removed contactPerson/email/phoneNumber display
+- Updated type definitions in anvandare.tsx and org-users-view.tsx to match new org shape
+- Migration: `0004_panoramic_mikhail_rasputin.sql`
+- Files changed:
+  - `packages/db/src/schema.ts`
+  - `packages/db/drizzle/0004_panoramic_mikhail_rasputin.sql`
+  - `apps/admin/src/server/organization.ts`
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx`
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.$id.tsx`
+  - `apps/admin/src/routes/_authenticated/admin.anvandare.tsx`
+  - `apps/admin/src/features/organization/components/org-users-view.tsx`
 - **Learnings for future iterations:**
-  - `convexQuery()` return type is a conditional union: when args type includes optional `"skip"`, TypeScript can't narrow the return to the non-skip branch
-  - `useSuspenseQuery` rejects the union because one branch has `queryFn: skipToken` — need to extract `queryKey` and `staleTime` individually
-  - `ensureQueryData` is more lenient with types — accepts the `convexQuery()` union directly
-  - `_authenticated` beforeLoad runs AFTER root's beforeLoad, so auth token is already set on serverHttpClient
+  - When moving fields between tables, update all local type aliases that mirror the Drizzle shape (they appear in multiple route files and feature components)
+  - Organization forms/dialogs need both the create and edit variants cleaned up independently
 ---
 
-## 2026-04-03 - US-004
-- Migrated `dashboard.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Removed `if (data === undefined)` loading check
-- Added `pendingComponent: DashboardSkeleton` to route definition (reuses existing skeleton)
-- Used `queryKey`/`staleTime` extraction pattern (same as US-003)
-- Kept `DashboardData` type assertion on destructured `data` since Convex return type is generic
-- Files changed: `apps/admin/src/routes/_authenticated/dashboard.tsx`
+## 2026-04-14 - US-004
+- Created `packages/db/src/reset-data.ts` — truncates elevator_budgets, elevator_details, elevators, user_organizations, organizations, users in FK order
+- Requires `--confirm` flag to execute; refuses to run against production-looking DATABASE_URLs
+- Added `db:reset` script to packages/db/package.json, runnable via `pnpm db:reset --confirm`
+- Files changed: `packages/db/src/reset-data.ts`, `packages/db/package.json`
 - **Learnings for future iterations:**
-  - Simple page migrations follow a repeatable pattern: swap import, extract opts, destructure with type assertion, add pendingComponent, remove loading check
-  - No mutations on dashboard — purely read-only, so no `convex/react` imports remain
+  - Neon HTTP driver + drizzle `sql.raw()` works for raw TRUNCATE statements
+  - TRUNCATE CASCADE handles FK dependencies even if table order is already correct
 ---
 
-## 2026-04-03 - US-005
-- Migrated `admin.organisationer.index.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Extracted inline skeleton loading state to `OrganisationerSkeleton` pendingComponent on route definition
-- Removed `if (orgs === undefined)` loading check
-- Removed `(orgs as Organisation[] | undefined) ?? []` type assertion — `useSuspenseQuery` guarantees data is defined
-- Kept `useMutation` calls (create, update) on `convex/react`
-- Files changed: `apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx`
+## 2026-04-14 - US-005
+- Created `getEffectiveOrganizationIds(db, userId)` in `packages/db/src/effective-org-ids.ts`
+- Two-step query: fetch direct grants from `userOrganizations`, then fetch children where `parentId IN directIds`, merge and deduplicate with `Set`
+- Exported from `packages/db/src/index.ts`
+- Added vitest to `packages/db` devDependencies, added `test` script
+- 5 unit tests with mocked DB covering: no grants, single grant (no children), grant with children, multiple roots with children, deduplication
+- Files changed: `packages/db/src/effective-org-ids.ts`, `packages/db/src/effective-org-ids.test.ts`, `packages/db/src/index.ts`, `packages/db/package.json`
 - **Learnings for future iterations:**
-  - Pages with mutations: keep `useMutation` import from `convex/react`, only migrate `useQuery` to TanStack Query
-  - Table data: `useSuspenseQuery` guarantees data, so `data ?? []` fallback is no longer needed — pass data directly to `useReactTable`
+  - Remote Neon DB may not have local migrations applied — mock-based unit tests avoid this dependency
+  - Drizzle's `inArray` works well for the "children of direct grants" query pattern
+  - vitest integrates cleanly with the existing tsconfig/ESM setup — no extra config needed
 ---
 
-## 2026-04-03 - US-006
-- Migrated `admin.anvandare.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Both `useQuery` calls migrated: `api.organizations.list` and `api.userAdmin.list` (with dynamic filter/search args)
-- Extracted inline skeleton loading state to `AnvandareSkeleton` pendingComponent on route definition
-- Removed `if (users === undefined || orgs === undefined)` loading check
-- Removed `(users as Anvandare[] | undefined) ?? []` and `(orgs as Organisation[])` type assertions
-- Kept `useAction` calls (create, update, deactivate, activate, remove) on `convex/react`
-- Files changed: `apps/admin/src/routes/_authenticated/admin.anvandare.tsx`
+## 2026-04-14 - US-006
+- Added `parentId` (nullable UUID) to create/update organization Zod schemas in server functions
+- Added searchable `ParentOrgSelect` component using Popover + Command (cmdk) pattern
+- Create dialog: includes parent org dropdown, filters to root orgs only
+- Edit dialog: includes parent org dropdown, excludes the org being edited, disabled with tooltip when org has children
+- Clearing the dropdown sets parentId to null (top-level org)
+- Files changed:
+  - `apps/admin/src/server/organization.ts`
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx`
 - **Learnings for future iterations:**
-  - Pages with `useAction` (not `useMutation`): same pattern — keep `useAction` import from `convex/react`, only migrate `useQuery`
-  - Dynamic query args (filters, debounced search): `convexQuery` generates a new `queryKey` when args change, `useSuspenseQuery` re-fetches automatically
-  - Multiple queries in one component: each gets its own `convexQuery` opts + `useSuspenseQuery` call
+  - Popover + Command (cmdk) is the standard searchable-select pattern in this codebase — use it over the Combobox component (which is designed for free-text with suggestions)
+  - Wrapping a disabled element in a Tooltip requires an extra `<div>` wrapper since disabled elements don't fire pointer events
 ---
 
-## 2026-04-03 - US-007
-- Migrated `admin.referensdata.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Extracted inline skeleton to `ReferensdataSkeleton` pendingComponent on route definition (enhanced with header/controls skeleton)
-- Removed `if (values === undefined)` loading check and `(values as SuggestedValue[] | undefined)` type assertions
-- Removed `filteredValues ?? []` fallback — `useSuspenseQuery` guarantees data
-- Kept `useMutation` calls (create, update, merge, deactivate, activate) on `convex/react`
-- Files changed: `apps/admin/src/routes/_authenticated/admin.referensdata.tsx`
+## 2026-04-14 - US-007
+- Updated server schemas: `organizationId` → `organizationIds: string[]` for updateUser and createUser
+- Updated `updateUserFn` to delete-all + batch-insert for multi-org sync
+- Updated `createUserFn` to accept and insert multiple org IDs
+- Added `getChildOrganizations` server function for inherited access display
+- Rewrote EditUserDialog (in both anvandare.tsx and org-users-view.tsx) to support multi-org management:
+  - Direct grants shown with solid border, `Link` icon, and "Direkt" badge
+  - Inherited (child) orgs shown below each parent grant with dashed border, `Unlink` icon, and "via [parent]" badge
+  - Searchable org picker (Popover + Command) to add orgs, filters out already-selected and child-of-selected orgs
+  - Toast notification on revoke listing lost inherited child orgs
+  - Effective access count shown when inherited orgs exist
+- CreateUserDialog still uses single-org select, converted to `organizationIds` array on submit
+- Files changed:
+  - `apps/admin/src/server/user.ts`
+  - `apps/admin/src/routes/_authenticated/admin.anvandare.tsx`
+  - `apps/admin/src/features/organization/components/org-users-view.tsx`
 - **Learnings for future iterations:**
-  - Pages with dynamic query args (category selector): same `useSuspenseQuery` pattern works — new queryKey triggers re-fetch automatically
-  - Skeleton pendingComponent can be enhanced beyond the original inline skeleton to include controls/header for a better loading experience
+  - Both anvandare.tsx and org-users-view.tsx have their own EditUserDialogInner — both must be updated in sync
+  - The `availableOrgs` filter that excludes children of selected parents is key to preventing redundant grants
+  - `useMemo` for org maps/lookups avoids re-computing on every render in dialogs with many orgs
 ---
 
-## 2026-04-03 - US-008
-- Migrated `admin.organisationer.$id.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- All three `useQuery` calls migrated: `api.organizations.get`, `api.elevators.analytics.stats`, `api.elevators.analytics.chartData`
-- Created new `DetailSkeleton` pendingComponent matching full page layout (header with back button, contact info, tab bar, KPI cards grid, charts grid)
-- Removed `OverviewSkeleton` (no longer used inline) — loading handled by route-level `pendingComponent`
-- Removed `if (org === undefined)` loading check; kept `if (org === null)` not-found check
-- Removed `stats === undefined || chartData === undefined` conditional in Översikt tab — data guaranteed by `useSuspenseQuery`
-- Removed conditional `stats ? [...] : []` for kpiItems — stats always defined
-- No mutations/actions in this file — no `convex/react` imports remain
-- Files changed: `apps/admin/src/routes/_authenticated/admin.organisationer.$id.tsx`
+## 2026-04-14 - US-008
+- Added `previewParentChange` server function to `apps/admin/src/server/organization.ts`
+  - Computes access diff: users with direct grant on old parent lose inherited access, users on new parent gain it
+  - Excludes users who have direct grant on the org itself (they keep access regardless)
+  - Returns empty diff when parentId hasn't changed
+- Added `ParentChangeWarningDialog` component to org list page
+  - Shows aggregate counts with green/red badges (gain/lose indicators with icons, not color alone)
+  - Expandable "Visa berörda användare" section using Collapsible, listing name + email + direction icon per user
+  - Admin must click "Bekräfta ändring" to proceed; "Avbryt" cancels
+  - No warning shown when change has no access impact (direct submit)
+- Intercepts form submit in `EditOrgDialogInner` when parentId changed to call preview before saving
+- Files changed:
+  - `apps/admin/src/server/organization.ts`
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx`
 - **Learnings for future iterations:**
-  - Pages with nullable query results (org can be `null` for not-found): `useSuspenseQuery` eliminates `undefined` (loading) but `null` remains a valid data value — keep null checks
-  - Pages with multiple queries that all feed the same view: all can use `useSuspenseQuery` — Suspense boundary (pendingComponent) handles the loading state for all of them simultaneously
-  - When a page has both inline skeletons (OverviewSkeleton) and a route-level skeleton (DetailSkeleton), the route-level pendingComponent replaces both — remove the inline one
+  - Form `onSubmit` can be async and used to intercept submit to show a confirmation dialog before applying
+  - Collapsible from radix-ui works well for expandable sections inside dialogs
+  - When computing access diffs, remember to exclude users with direct grants on the org being modified (they're unaffected by parent changes)
 ---
 
-## 2026-04-03 - US-009
-- Migrated `hiss.$id.index.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Hiss query: `useSuspenseQuery` with queryKey/staleTime extraction pattern
-- Org query: `useQuery` from `@tanstack/react-query` with `convexQuery(..., "skip")` pattern — conditional on hiss being non-null
-- Enhanced `DetailSkeleton` pendingComponent matching full page layout (header with back button + badge, separator, 7 card sections with varying field counts)
-- Changed `if (hiss === undefined)` loading check to `if (hiss === null)` not-found check with user-facing message
-- Kept `useMutation` (archive) on `convex/react`
-- Files changed: `apps/admin/src/routes/_authenticated/hiss.$id.index.tsx`
+## 2026-04-14 - US-009
+- Added effective access preview to user-org management in both edit user dialogs
+- "Effektiv åtkomst: N organisationer" always shown at top of org section (not just when inherited > 0)
+- Direct grant rows with children are now collapsible (Collapsible from radix-ui) — chevron toggle reveals child orgs
+- Direct grants without children render without expand affordance
+- Collapsed state shows "+N" count hint next to the Direkt badge
+- Inherited orgs remain read-only with dashed border, muted opacity, outline badge "via [parent]", and Unlink icon
+- Files changed:
+  - `apps/admin/src/routes/_authenticated/admin.anvandare.tsx`
+  - `apps/admin/src/features/organization/components/org-users-view.tsx`
 - **Learnings for future iterations:**
-  - Pages with dependent/conditional queries: use `useSuspenseQuery` for the primary query and `useQuery` (from @tanstack/react-query) for the dependent query with `convexQuery(api.foo, condition ? args : "skip")` — the "skip" variant sets `enabled: false` automatically
-  - Original code had no null handling for hiss (would crash on null) — migration is a good time to add proper not-found UI
+  - `[[data-state=open]>&]:rotate-90` is the Tailwind pattern for rotating a child icon based on Collapsible open state
+  - Both anvandare.tsx and org-users-view.tsx EditUserDialogInner must be updated in sync (same pattern, different data sources)
 ---
 
-## 2026-04-03 - US-010
-- Migrated `hiss.$id.redigera.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Both `useQuery` calls migrated: `api.elevators.crud.get` and `api.organizations.list` — both use `useSuspenseQuery` with queryKey/staleTime extraction
-- Created `RedigeraSkeleton` pendingComponent matching tabbed form layout (header, 4-tab bar, 3 card sections with form fields grid, save bar)
-- Removed `if (!hiss || !initialized)` loading spinner — Suspense handles loading via pendingComponent
-- Added `if (hiss === null)` not-found check with back button
-- Kept `useMutation` (update) on `convex/react`
-- Kept `useEffect` for form initialization from server data + `initialized` flag (needed for one-time form population)
-- Files changed: `apps/admin/src/routes/_authenticated/hiss.$id.redigera.tsx`
+## 2026-04-14 - US-010
+- Scoped all client-app queries to current parent org context (parent + direct children)
+- Created `apps/client/src/server/context.ts` with `getContextOrgIds(db, user, parentOrgId)` helper
+  - Validates parentOrgId is in user's direct grants, then fetches children
+  - Also provides `validateParentContext` and `getDefaultParentOrg` server functions
+- Restructured routes: all pages moved under `_authenticated/$parentOrgId/` path segment
+  - URL pattern is now `/:parentOrgId/dashboard`, `/:parentOrgId/register`, etc.
+  - `$parentOrgId.tsx` layout route validates access, redirects to default org on invalid
+  - `_authenticated/index.tsx` redirects to default parent org's dashboard
+- Updated all server functions to accept `parentOrgId` input:
+  - `elevator.ts`: `buildWhereConditions` uses `inArray(organizationId, contextOrgIds)` instead of `eq(organizationId, orgId)`
+  - `analytics.ts`, `maintenance.ts`, `modernization.ts`: raw SQL uses `= ANY(${contextOrgIds})` instead of `= ${orgId}`
+  - `organization.ts`: validates requested org is in context org IDs
+  - All query options now require `parentOrgId` parameter and include it in query keys
+- Updated navigation components:
+  - `app-sidebar.tsx`: dynamic links using `/$parentOrgId/...` with `useParams`
+  - `global-search.tsx`: dynamic navigation and search scoped to current parent
+  - `user-menu.tsx`: profile link includes parentOrgId
+  - `org-display.tsx`: accepts parentOrgId prop for organization query
+- Updated feature components with hardcoded `/hiss/` links:
+  - `register-table.tsx`, `priority-list.tsx`, `inspection-calendar-section.tsx` use `useParams` to build dynamic URLs
+- Files changed:
+  - `apps/client/src/server/context.ts` (new)
+  - `apps/client/src/server/elevator.ts`
+  - `apps/client/src/server/analytics.ts`
+  - `apps/client/src/server/maintenance.ts`
+  - `apps/client/src/server/modernization.ts`
+  - `apps/client/src/server/organization.ts`
+  - `apps/client/src/routes/_authenticated.tsx`
+  - `apps/client/src/routes/_authenticated/index.tsx`
+  - `apps/client/src/routes/_authenticated/$parentOrgId.tsx` (new)
+  - `apps/client/src/routes/_authenticated/$parentOrgId/dashboard.tsx` (moved)
+  - `apps/client/src/routes/_authenticated/$parentOrgId/register.tsx` (moved)
+  - `apps/client/src/routes/_authenticated/$parentOrgId/hiss.$id.tsx` (moved)
+  - `apps/client/src/routes/_authenticated/$parentOrgId/modernisering.tsx` (moved)
+  - `apps/client/src/routes/_authenticated/$parentOrgId/underhall.tsx` (moved)
+  - `apps/client/src/routes/_authenticated/$parentOrgId/profil.tsx` (moved)
+  - `apps/client/src/shared/components/app-sidebar.tsx`
+  - `apps/client/src/shared/components/global-search.tsx`
+  - `apps/client/src/shared/components/org-display.tsx`
+  - `apps/client/src/shared/components/user-menu.tsx`
+  - `apps/client/src/features/register/components/register-table.tsx`
+  - `apps/client/src/features/modernization/components/priority-list.tsx`
+  - `apps/client/src/features/maintenance/components/inspection-calendar-section.tsx`
 - **Learnings for future iterations:**
-  - Form edit pages: `useEffect` for one-time form initialization from server data still needed with Suspense — the `initialized` flag prevents re-populating on subscription updates
-  - `orgs` prop on `BasicInfoSection` accepts `undefined` but with `useSuspenseQuery` it's always defined — no breaking change
+  - `= ANY(${array})` is the cleanest pattern for drizzle raw SQL with postgres arrays — avoids IN-list construction
+  - `useParams({ strict: false })` enables accessing route params from shared components that aren't route-aware
+  - When restructuring routes in TanStack Router, run `@tanstack/router-cli generate` from the app directory to regenerate `routeTree.gen.ts`
+  - Feature components that use hardcoded URLs must also be updated when route structure changes — grep for `/hiss/` patterns
 ---
 
-## 2026-04-03 - US-011
-- Migrated `register.tsx` from `useQuery` (convex/react) to `useSuspenseQuery`/`useQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Two always-active queries (`suggestedValues.list`, `elevators.listing.list`) migrated to `useSuspenseQuery` with queryKey/staleTime extraction
-- Conditional export query (`elevators.listing.exportData`) migrated to `useQuery` from @tanstack/react-query with `convexQuery(..., "skip")` pattern
-- Removed `if (result === undefined)` loading check — Suspense handles loading via route-level `pendingComponent`
-- Added `pendingComponent: RegisterSkeleton` to route definition (reuses existing skeleton)
-- Removed redundant `as SuggestedValueItem[]` type assertion in `filterOptions` useMemo — data type already set in destructuring
-- Files changed: `apps/admin/src/routes/_authenticated/register.tsx`
+## 2026-04-14 - US-011
+- Built `OrgSwitcher` component replacing the read-only `OrgDisplay`
+- Added `getUserDirectOrgs` server function + `userDirectOrgsOptions` query to `context.ts`
+- Switcher behavior:
+  - 1 org: static text with tooltip (no dropdown)
+  - 2+ orgs: Popover dropdown on desktop, bottom Sheet on mobile (<768px via `useSidebar().isMobile`)
+  - 10+ orgs: type-to-filter input shown at top of dropdown
+  - Current selection shown with checkmark + `aria-current="true"`
+  - `aria-haspopup="menu"`, `aria-expanded`, `aria-label` on trigger button
+  - `aria-live="polite"` announcement on switch, focus moved to main heading
+  - Skeleton placeholder while orgs loading
+- Updated `_authenticated/index.tsx` to use localStorage for last-used org (key `elevatorbud:lastParentOrgId`), falling back to first org alphabetically
+- Updated `$parentOrgId.tsx` to show toast on invalid/inaccessible org redirect
+- Prefetch `userDirectOrgsOptions` in `_authenticated.tsx` loader and `$parentOrgId.tsx` loader
+- Removed `OrgDisplay` import from `_authenticated.tsx` (component file left but unused)
+- Files changed:
+  - `apps/client/src/shared/components/org-switcher.tsx` (new)
+  - `apps/client/src/routes/_authenticated.tsx`
+  - `apps/client/src/routes/_authenticated/$parentOrgId.tsx`
+  - `apps/client/src/routes/_authenticated/index.tsx`
+  - `apps/client/src/server/context.ts`
 - **Learnings for future iterations:**
-  - Pages with mixed query patterns: always-active queries → `useSuspenseQuery`, conditional queries (export, search) → `useQuery` from @tanstack/react-query with `convexQuery(..., "skip")`
-  - `RegisterFilters` already accepts `filterOptions: FilterOptions | null` — `useSuspenseQuery` guarantees non-null, so type is still compatible (no narrowing needed)
-  - Export pattern (click triggers query, useEffect triggers download) works unchanged with TanStack Query — `useQuery` with "skip" returns `undefined` when disabled, same behavior as Convex `useQuery` with "skip"
+  - `useSidebar().isMobile` provides the mobile breakpoint detection already available in this codebase — no need for custom media query hooks
+  - Sheet (bottom) works well as mobile replacement for Popover dropdowns
+  - `saveLastUsedOrg`/`getLastUsedOrg` exported from component file for reuse in index redirect — keeps localStorage key in one place
 ---
 
-## 2026-04-03 - US-012
-- Migrated `modernisering.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- All four `useQuery` calls migrated: `timeline`, `budget`, `measures`, `priorityList` — all use `useSuspenseQuery` with queryKey/staleTime extraction
-- Reused existing `ModernizationSkeleton` as route-level `pendingComponent`
-- Removed `if (tidslinje === undefined || budget === undefined || atgarder === undefined || prioritetslista === undefined)` loading check
-- Kept `prioritetslistaArgs` useMemo with dynamic args based on `selectedPeriod` state — `useSuspenseQuery` re-fetches when args change
-- Kept `as never` type assertion on `prioritetslistaArgs` (needed because the args object shape varies)
-- Files changed: `apps/admin/src/routes/_authenticated/modernisering.tsx`
+## 2026-04-14 - US-012
+- Added sub-org filter and sub-org column to register (elevator list) page
+- Added `getChildOrgs` server function + `childOrgsOptions` query to `context.ts`
+- Added `subOrgId` filter to `filterSchema` and `buildWhereConditions` in `elevator.ts`
+- Register page: `subOrg` URL param, fetches child orgs, passes to filters and table
+- `RegisterFilters`: single-select sub-org dropdown (only shown when parent has children), dismissable filter chip
+- `RegisterTable`: conditional `organizationName` column via `showSubOrg` prop
+- Empty state with sub-org name: "Inga hissar i [Sub-Org Name]" + "Rensa filter" action
+- `aria-live="polite"` region announces result count on filter change
+- Filter state persists in URL query params consistent with existing pattern
+- Files changed:
+  - `apps/client/src/server/context.ts`
+  - `apps/client/src/server/elevator.ts`
+  - `apps/client/src/routes/_authenticated/$parentOrgId/register.tsx`
+  - `apps/client/src/features/register/components/register-filters.tsx`
+  - `apps/client/src/features/register/components/register-table.tsx`
 - **Learnings for future iterations:**
-  - Straightforward migration when all queries are always-active (no conditional/skip queries)
-  - Dynamic query args via `useMemo` work seamlessly — `convexQuery` generates new queryKey when args change
-  - Existing skeleton components can be reused directly as `pendingComponent` without modification
+  - `HissRow` already includes `organizationId` and `organizationName` from the server join — no schema change needed to show org column
+  - For conditional columns in TanStack Table, use spread + ternary in the columns array and re-memoize on the toggle
+  - Sub-org filter uses `__all__` as sentinel value for "all" in Select since shadcn Select doesn't support empty string values
 ---
 
-## 2026-04-03 - US-013
-- Migrated `underhall.tsx` from `useQuery` (convex/react) to `useSuspenseQuery`/`useQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Three always-active queries (`inspectionCalendar`, `companies`, `emergencyPhoneStatus`) migrated to `useSuspenseQuery` with queryKey/staleTime extraction
-- Conditional query (`inspectionList`) migrated to `useQuery` from @tanstack/react-query with `convexQuery(..., "skip")` pattern — conditional on `selectedManad` state
-- Reused existing `MaintenanceSkeleton` as route-level `pendingComponent`
-- Removed `if (kalender === undefined || foretag === undefined || nodtelefon === undefined)` loading check
-- Removed intermediate variables (`foretagData`, `nodData`) — destructured directly from `useSuspenseQuery` with type assertions
-- Files changed: `apps/admin/src/routes/_authenticated/underhall.tsx`
+## 2026-04-15 - US-013
+- Split monolithic `getChartData` server function into parameterized `getSingleChartData` accepting a `chartType` enum
+- Each chart now loads independently via its own `singleChartOptions(parentOrgId, chartType)` query
+- Added `ChartErrorBoundary` (class component) wrapping each chart — shows retry button on failure, invalidates the specific chart query
+- Added `ChartWithBoundary` wrapper combining Suspense (with `ChartSkeleton`) + `ChartErrorBoundary` per chart
+- Added `EmptyChart` component showing "Ingen data ännu" with icon when a chart has zero data points
+- Removed the `stats.totalCount === 0` guard that hid all charts — each chart now independently handles empty state
+- Dashboard still uses `currentContextOrgIds` (parent + children) — no sub-org filter on dashboard
+- Chart drill-downs preserved: clicking bars/slices navigates to register/modernisering with relevant filters
+- Files changed:
+  - `apps/client/src/server/analytics.ts`
+  - `apps/client/src/routes/_authenticated/$parentOrgId/dashboard.tsx`
 - **Learnings for future iterations:**
-  - Mixed query pattern (always-active + conditional) same as US-011: `useSuspenseQuery` for always-active, `useQuery` with "skip" for conditional
-  - `convexQuery(..., "skip")` works with spread into `useQuery` options — no need for manual `enabled` flag
+  - Parameterized server function with enum input is cleaner than 6 separate functions for independent chart loading
+  - React class component ErrorBoundary is still required — no hook equivalent for `getDerivedStateFromError`
+  - `queryClient.invalidateQueries` with specific query key is the retry mechanism for error boundaries
 ---
 
-## 2026-04-03 - US-014
-- Migrated `ny.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Single `useQuery` call (`api.organizations.list`) migrated to `useSuspenseQuery` with queryKey/staleTime extraction
-- Created `NyHissSkeleton` pendingComponent matching wizard form layout (header, step indicator, form fields, bottom navigation)
-- Kept `useMutation` (create) on `convex/react`
-- No inline loading checks to remove — `orgs` was passed directly to `ElevatorWizard` which already handled `undefined`
-- With `useSuspenseQuery`, `orgs` is now always defined — still compatible with `ElevatorWizard` props (`Array | undefined`)
-- Files changed: `apps/admin/src/routes/_authenticated/ny.tsx`
+## 2026-04-15 - US-014
+- Added sub-org drill-down to modernisering page when parent has children
+- Added `subOrgId` filter parameter to `getTimeline`, `getBudget`, and `getPriorityList` server functions
+- Added `getSubOrgBreakdown` server function returning per-org elevator counts for modernization
+- Created `SubOrgBreakdownChart` component (horizontal bar chart) with click drill-down
+- Added `subOrg` URL search param to modernisering page for filter state persistence
+- Clicking a sub-org bar filters all other charts (timeline, budget, priority list) to that sub-org
+- Dismissable filter chip appears above chart grid and in priority list header when sub-org selected
+- `aria-live="polite"` region announces drill-down changes
+- When parent has no children, sub-org chart is not rendered at all
+- Added keyboard accessibility (Enter/Space drill-down) and cursor pointer hover states to all chart components (timeline, budget per year, budget per district, sub-org breakdown)
+- All charts now have `tabIndex={0}`, `role="img"`, `aria-label`, and `onKeyDown` handlers
+- Files changed:
+  - `apps/client/src/server/modernization.ts`
+  - `apps/client/src/features/modernization/components/sub-org-breakdown-chart.tsx` (new)
+  - `apps/client/src/features/modernization/components/timeline-chart.tsx`
+  - `apps/client/src/features/modernization/components/budget-overview.tsx`
+  - `apps/client/src/features/modernization/components/priority-list.tsx`
+  - `apps/client/src/routes/_authenticated/$parentOrgId/modernisering.tsx`
 - **Learnings for future iterations:**
-  - Simple single-query pages are the fastest to migrate — swap import, extract opts, add skeleton, done
-  - Components that already accept `T | undefined` props need no changes when switching to `useSuspenseQuery` (T is compatible with T | undefined)
+  - Chart.js `onHover` callback with canvas `style.cursor` toggle is the standard way to show pointer cursor on clickable bars
+  - Chart.js canvas elements accept `tabIndex`, `onKeyDown`, `role`, `aria-label` props for keyboard accessibility
+  - `chartRef.current.getActiveElements()` provides the currently focused/hovered element index for keyboard-triggered drill-downs
+  - Pattern: server functions accept optional `subOrgId`, default to full `contextOrgIds` when absent — single `filterOrgIds` variable keeps queries clean
 ---
 
-## 2026-04-03 - US-015
-- Migrated `webbplats.tsx` from `useQuery` (convex/react) to `useSuspenseQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Query is inside `PageTab` child component (not route component) — each tab has its own `useQuery(api.cms.getPage, { slug })`
-- Wrapped each `<PageTab>` in `<Suspense fallback={<PageTabSkeleton />}>` for per-tab loading
-- Created `WebbplatsSkeleton` route-level `pendingComponent` (header, tab bar, form fields)
-- Created `PageTabSkeleton` for per-tab Suspense fallback (header with badge/switch, form fields)
-- Removed `if (page === undefined)` loading check
-- Kept `useMutation` calls (createPage, updatePage) on `convex/react`
-- Kept `useEffect` for syncing `published` state from server data
-- Files changed: `apps/admin/src/routes/_authenticated/webbplats.tsx`
+## 2026-04-15 - US-015
+- Removed `validateWorkbookSheets` function from both `parse-excel-import-with-mapping.ts` and `index.ts`
+- Replaced with `getWorkbookSheetInfo(workbook)` that returns metadata for every sheet: name, rowCount, firstRowPreview
+- Added `SheetInfo` type to `types.ts`, exported from barrel
+- `parseExcelImportWithMapping` and `parseExcelImport` now use inline sheet-existence checks (non-mandatory) — no more "Obligatoriskt ark" warning
+- All existing callers compile without changes (admin import flow doesn't use `validateWorkbookSheets` directly)
+- Files changed:
+  - `packages/utils/src/excel-import/types.ts`
+  - `packages/utils/src/excel-import/index.ts`
+  - `packages/utils/src/excel-import/parse-excel-import-with-mapping.ts`
+  - `packages/utils/src/index.ts`
 - **Learnings for future iterations:**
-  - When query is inside a child component (not route component): wrap the child in `<Suspense>` with a skeleton fallback, AND add route-level `pendingComponent`
-  - `useSuspenseQuery` in a child component + `<Suspense>` boundary = loading handled by Suspense, not inline checks
-  - CMS page pattern: each tab mounts/unmounts its own `PageTab` — Suspense triggers per-tab on first render of each tab
+  - `XLSX.utils.sheet_to_json(sheet, { header: 1 })` returns an array of row arrays — `length - 1` gives data row count (excluding header)
+  - When removing a public export, grep for all consumers before deleting — in this case `validateWorkbookSheets` had zero external consumers
 ---
 
-## 2026-04-03 - US-016
-- Migrated `sok.tsx` from `useQuery` (convex/react) to `useQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Migrated `global-search.tsx` from `useQuery` (convex/react) to `useQuery` (@tanstack/react-query) + `convexQuery` (@convex-dev/react-query)
-- Both use `convexQuery(api.foo, condition ? args : "skip")` spread pattern — "skip" sets `enabled: false` automatically
-- Replaced `results === undefined` loading check with `isFetching` from query result
-- Replaced `results !== undefined` empty-state guard with `!isFetching`
-- Added type assertions `as { data: T | undefined; isFetching: boolean }` to preserve local types
-- Files changed: `apps/admin/src/routes/_authenticated/sok.tsx`, `apps/admin/src/shared/components/global-search.tsx`
+## 2026-04-15 - US-016
+- Deleted `parse-emergency-phone-sheet.ts` and `parse-demolished-sheet.ts` entirely
+- Removed `parseEmergencyPhone` function from `parsers.ts`
+- Removed `EMERGENCY_PHONE_COLUMNS` and `RIVNA_ELEVATOR_COLUMNS` from `column-mappings.ts`
+- Removed emergency phone column (AH) from `ELEVATOR_COLUMNS`
+- Removed `compound_emergency_phone` parser cases from `parse-elevator-sheet.ts` (both fixed and mapping-based parsers)
+- Removed nödtelefon header alias and target field from `header-aliases.ts`
+- Removed `EmergencyPhoneEntry`, `EmergencyPhoneParseResult` types and emergency phone fields from `ParsedElevator`
+- Simplified `FullImportResult`: removed `demolished`, `combined` fields and `emergencyPhones`/`demolished` sheet metadata
+- Removed `joinEmergencyPhones` function from both `index.ts` and `parse-excel-import-with-mapping.ts`
+- Updated `parseExcelImport` and `parseExcelImportWithMapping` to only handle elevator sheets
+- Removed emergency phone fields from admin `import.ts` Zod schema and `toDetailData` mapping
+- Removed `has_emergency_phone` from elevator insert/update in import
+- Removed Nödtelefoner and Rivna hissar SheetCards from `preview-section.tsx`
+- Updated `use-import-machine.ts`: `result.combined` → `result.elevators`, `parseResult.combined` → `parseResult.elevators`
+- Updated barrel exports in `packages/utils/src/index.ts`
+- Files changed:
+  - `packages/utils/src/excel-import/types.ts`
+  - `packages/utils/src/excel-import/column-mappings.ts`
+  - `packages/utils/src/excel-import/header-aliases.ts`
+  - `packages/utils/src/excel-import/parsers.ts`
+  - `packages/utils/src/excel-import/parse-elevator-sheet.ts`
+  - `packages/utils/src/excel-import/index.ts`
+  - `packages/utils/src/excel-import/parse-excel-import-with-mapping.ts`
+  - `packages/utils/src/excel-import/parse-emergency-phone-sheet.ts` (deleted)
+  - `packages/utils/src/excel-import/parse-demolished-sheet.ts` (deleted)
+  - `packages/utils/src/index.ts`
+  - `apps/admin/src/server/import.ts`
+  - `apps/admin/src/features/import/components/preview-section.tsx`
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
 - **Learnings for future iterations:**
-  - Conditional queries: use `useQuery` (not `useSuspenseQuery`) with `convexQuery(api.foo, condition ? args : "skip")` — spread directly, no manual `enabled` flag needed
-  - `convexQuery` with "skip" union type causes `data` to resolve as `any` — need type assertion on the destructured result (same pattern as dependent queries in US-009)
-  - Loading states: `isFetching` is true only during active network requests; when query is disabled (`enabled: false`), `isFetching` is false
+  - When removing a feature that spans types → parsers → join logic → UI, work bottom-up (types/parsers first, then consumers)
+  - `FullImportResult.combined` was used in the import machine hook — grep for all field references before changing a shared type shape
+  - 693 lines deleted — feature removal is high-leverage cleanup
 ---
 
-## 2026-04-03 - US-017
-- Migrated all four org feature components from `useQuery` (convex/react) to TanStack Query + `convexQuery`
-- `org-register-view.tsx`: Two always-active queries (`suggestedValues.list`, `elevators.listing.list`) → `useSuspenseQuery`; conditional export query → `useQuery` with "skip"; removed `if (result === undefined)` check; exported `RegisterViewSkeleton`
-- `org-modernization-view.tsx`: All three queries (`timeline`, `budget`, `priorityList`) → `useSuspenseQuery`; removed `if (... === undefined)` check; removed `ModernizationSkeleton` import (no longer used inline)
-- `org-maintenance-view.tsx`: Three always-active queries → `useSuspenseQuery`; conditional `inspectionList` → `useQuery` with "skip"; removed `if (... === undefined)` check; removed `MaintenanceSkeleton` import
-- `org-users-view.tsx`: Main `userAdmin.list` query → `useSuspenseQuery`; dialog's `organizations.list` → `useQuery` (non-suspense, renders in dialog); removed `if (users === undefined)` check; removed `?? []` fallback on table data; exported `OrgUsersSkeleton`; moved `Organisation` type to module level
-- Parent `admin.organisationer.$id.tsx`: Added `<Suspense>` wrapper around each tab view with appropriate skeleton fallbacks; imported skeletons from feature components and shared modules
-- Files changed: `apps/admin/src/features/organization/components/org-register-view.tsx`, `org-modernization-view.tsx`, `org-maintenance-view.tsx`, `org-users-view.tsx`, `apps/admin/src/routes/_authenticated/admin.organisationer.$id.tsx`
+## 2026-04-15 - US-017
+- Added `sheet-selection` state to import machine between `parsing` and `mapping`
+- After file upload, `getWorkbookSheetInfo()` extracts metadata for all sheets in workbook
+- Created `SheetSelectionSection` component with checkboxes, row counts, first-row preview, and empty-sheet warnings
+- All sheets selected by default; at least one must be selected to proceed
+- On confirm, first selected sheet is auto-mapped and passed to existing mapping step
+- Removed outdated Nödtelefoner/Rivna hissar references from upload zone description
+- Updated `handleHeaderRowChange` to use selected sheet name instead of hardcoded "Hissar"
+- Files changed:
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `apps/admin/src/features/import/components/sheet-selection-section.tsx` (new)
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
 - **Learnings for future iterations:**
-  - Feature components (non-route) use same `useSuspenseQuery` pattern as route components — parent wraps in `<Suspense fallback={<Skeleton />}>`
-  - Conditional queries in feature components: same "skip" pattern — `useQuery` from @tanstack/react-query with `convexQuery(api.foo, condition ? args : "skip")`
-  - Dialog-internal queries: use `useQuery` (non-suspense) since Suspense would hide the dialog — optional chaining on `data` handles loading
-  - When exporting skeletons for Suspense fallbacks, keep them in the same file as the component they represent for colocation
-  - `useSuspenseQuery` guarantees data: remove `?? []` fallbacks, remove `as T | undefined` assertions, pass data directly
+  - `getWorkbookSheetInfo` already existed from US-015 — reused directly in the import machine
+  - Sheet selection state (`selectedSheets`) needs to persist across steps for use in later stories (US-019 per-sheet mapping, US-020 merge)
+  - Import machine currently only maps the first selected sheet; US-019 will add per-sheet sequential mapping
 ---
 
-## 2026-04-03 - US-018
-- Migrated three non-route hooks/components from `useQuery` (convex/react) to TanStack Query + `convexQuery`
-- `hissnummer-field.tsx`: Conditional query → `useQuery` from @tanstack/react-query with `convexQuery(api.foo, condition ? args : "skip")` spread pattern; type assertion on destructured result
-- `use-suggestions.ts`: Always-active query → `useSuspenseQuery` with queryKey/staleTime extraction; removed `if (!data) return []` guard — data guaranteed by Suspense
-- `use-import-machine.ts`: Two queries migrated — `currentUser` (always-active) and `analysis` (conditional with "skip") both to `useQuery` from @tanstack/react-query with `convexQuery` spread; `useAction` kept on `convex/react`; state machine logic unchanged
-- Files changed: `apps/admin/src/features/elevator/components/hissnummer-field.tsx`, `apps/admin/src/features/elevator/hooks/use-suggestions.ts`, `apps/admin/src/features/import/hooks/use-import-machine.ts`
+## 2026-04-15 - US-018
+- Created `extractOrgNames` server function in `apps/admin/src/server/import.ts`
+  - Accepts parsed elevator rows, extracts distinct org names (case-sensitive dedup using Set)
+  - Returns `{ orgNames: string[], rowCount: number }`
+  - Uses `.passthrough()` on Zod schema to accept full parsed rows without listing every field
+- Created `extractOrgNamesOptions` query factory for TanStack Query integration
+- Updated `use-import-machine.ts`:
+  - Added `extractOrgNamesOptions` query that auto-fires when `parseResult` is available
+  - Exposed `extractedOrgData` (`{ orgNames, rowCount }`) in the machine's return value
+  - Org names extraction is now decoupled from the analysis step for use by downstream org-mapping UI (US-021)
+- Files changed:
+  - `apps/admin/src/server/import.ts`
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
 - **Learnings for future iterations:**
-  - Non-route hooks follow the same patterns as route components: conditional → `useQuery` + "skip", always-active → `useSuspenseQuery`
-  - `use-import-machine.ts` uses `useQuery` (not `useSuspenseQuery`) for both queries since the import machine hook is not guaranteed to have a Suspense boundary and `currentUser` is only used for email (non-critical)
-  - State machine hooks: only touch the query/action imports, leave all `useState`/`useCallback`/`useRef` logic untouched
+  - Zod `.passthrough()` is useful when a schema only needs specific fields but the input object has many more
+  - `extractOrgNamesOptions` query is keyed on row count to avoid re-extraction when parsed data hasn't changed
+  - Parsed rows remain in client state (`parseResult`) — no server-side storage needed since client already has them
 ---
 
-## 2026-04-03 - US-019
-- Final cleanup pass — removed deprecated code made obsolete by the migration
-- Removed `ConvexClerkProvider` from `packages/auth/src/provider.tsx` (unused wrapper component — both apps use `ConvexProviderWithClerk` directly)
-- Removed `ConvexClerkProvider` export from `packages/auth/src/index.ts`
-- Verified: `ConvexHttpClient`/`convex/browser` already removed (US-003)
-- Verified: module-level `ConvexReactClient` already removed from `__root.tsx` (US-002)
-- Verified: no `useQuery` from `convex/react` remains — only `useMutation`/`useAction` imports (legitimate)
-- Verified: remaining `as ... | undefined` type assertions are TanStack Query "skip" union workarounds (needed), not old Convex workarounds
-- Files changed: `packages/auth/src/provider.tsx`, `packages/auth/src/index.ts`
+## 2026-04-15 - US-019
+- Added per-sheet column mapping with sequential flow and inherited defaults
+- Import machine now tracks `currentSheetIndex` and `sheetMappings` (Map<sheetName, { mappings, headerRowIndex }>)
+- `loadSheetForMapping()` helper: auto-maps a sheet, then overlays inherited mappings from previous sheet by matching header names (case-insensitive)
+- First sheet uses pure `autoMapSheet` (existing `HEADER_ALIASES` logic); subsequent sheets inherit previous sheet's resolved mapping as defaults
+- `handleMappingConfirm` saves per-sheet mapping and advances to next sheet or triggers final parse with all sheet configs
+- Column mapping section: added sheet progress indicator ("Ark 2 av 4: [sheet name]") with visual step dots
+- Missing mandatory fields now shown with red destructive badges instead of amber warning
+- "Bekräfta mappning" button disabled when mandatory fields missing; shows "Nästa ark" when more sheets remain
+- Updated `parseExcelImportWithMapping` to accept `SheetMappingConfig[]` — parses all sheets and concatenates elevators
+- Added `SheetMappingConfig` type, exported from utils barrel
+- Files changed:
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `apps/admin/src/features/import/components/column-mapping-section.tsx`
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+  - `packages/utils/src/excel-import/parse-excel-import-with-mapping.ts`
+  - `packages/utils/src/excel-import/types.ts`
+  - `packages/utils/src/excel-import/index.ts`
+  - `packages/utils/src/index.ts`
 - **Learnings for future iterations:**
-  - Type assertions on conditional `useQuery` with `convexQuery(..., "skip")` are inherent to the TanStack Query integration — they are NOT Convex workarounds to clean up
-  - Final cleanup stories benefit from grepping first to verify what's already been addressed by prior stories
+  - Inherited mapping overlay: match by normalized header name (lowercase, trimmed) — auto-map takes priority, inherited fills gaps
+  - `parseExcelImportWithMapping` now uses discriminated union pattern (checks for `sheetName` property) for backward compatibility
+  - Component `key` should include both sheet name and header row index to force remount on sheet change
+  - `Map<string, T>` in React state requires `new Map(existing)` spread pattern for immutable updates
+---
+
+## 2026-04-15 - US-020
+- Added `"org-mapping"` state to `ImportStatus` between column mapping and preview
+- After all sheets are column-mapped, `parseExcelImportWithMapping` merges rows into single `parseResult` with `_source_sheet` metadata preserved on each row
+- New `handleOrgMappingConfirm` handler triggers analysis (elevator number + org name extraction) and transitions to preview
+- `extractOrgNamesOptions` query provides deduplicated org names to the org-mapping step
+- Placeholder org-mapping UI in import page shows merged row count, source sheet count, and org name list — US-021 will replace with full mapping UI
+- Files changed:
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+- **Learnings for future iterations:**
+  - Splitting state transitions (mapping → org-mapping → preview) is cleaner than bundling parse + analysis in one handler
+  - `extractOrgNamesOptions` query auto-fires when `parseResult` is set, so org names are ready by the time org-mapping renders
+---
+
+## 2026-04-15 - US-021
+- Built `OrgMappingSection` component replacing the placeholder org-mapping step
+- Table UI: one row per distinct Excel org name, each with a searchable Popover+Command dropdown
+- Exact case-sensitive matches auto-selected from `listOrganizationsOptions` data
+- Unmatched rows show "Skapa organisation" option (using `__create__` sentinel)
+- "Fortsätt" button disabled until all rows have a resolved org ID or "create" selection
+- Info banner when no existing orgs exist at all
+- Added `resolvedOrgMapping` state to import machine: stores `matchedOrgs` (name+id pairs) and `newOrgNames`
+- `handleOrgMappingConfirm` now accepts `OrgMappingEntry[]` from the UI, builds resolved mapping
+- `handleConfirm` uses `resolvedOrgMapping` for org data instead of `analysis.orgMatch*`
+- Updated `PreviewSection` to show org counts from `resolvedOrgMapping` when available
+- Files changed:
+  - `apps/admin/src/features/import/components/org-mapping-section.tsx` (new)
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+  - `apps/admin/src/features/import/components/preview-section.tsx`
+  - `scripts/ralph/prd.json`
+- **Learnings for future iterations:**
+  - Popover+Command (cmdk) pattern reused from org management pages — consistent searchable-select UX
+  - `__create__` sentinel value distinguishes "create new" from "unresolved" (null) in org mapping
+  - Resolved org mapping stored client-side avoids modifying server-side `analyzeImport` — clean separation of user choices vs server analysis
+  - `listOrganizationsOptions` already exists in `organization.ts` — no new server function needed
+---
+
+## 2026-04-15 - US-022
+- Added inline `CreateOrgDialog` to `OrgMappingSection` — opens from the "Skapa organisation" dropdown option
+- Dialog fields: name (prefilled from Excel row), optional parent organization (searchable dropdown of root orgs)
+- On save: calls `createOrganization` server function, invalidates org list query, auto-selects new org on the mapping row
+- All import state (parsed Excel, sheet selections, column mappings, other org mappings) persists across dialog open/close
+- Dialog confirms discard when closed with modified fields (`window.confirm`)
+- Focus restored to triggering combobox button on dialog close via `triggerRefMap` (Map of refs per excel name)
+- Removed `CREATE_SENTINEL` from import machine — orgs are now created inline, not deferred to import time
+- Added `ParentOrgSelect` component locally (simplified from org management page pattern)
+- Files changed:
+  - `apps/admin/src/features/import/components/org-mapping-section.tsx`
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+- **Learnings for future iterations:**
+  - `useForm` from `@tanstack/react-form` needs `form.reset()` + `form.setFieldValue()` in `useEffect` to sync `defaultValues` when dialog reopens with a different name
+  - `triggerRefMap` (Map<string, HTMLButtonElement>) pattern enables focus restoration across multiple rows without per-row state
+  - Removing `CREATE_SENTINEL` simplifies the import machine — all org mappings are resolved to real IDs before proceeding
+---
+
+## 2026-04-15 - US-023
+- Refactored `confirmImport` to use resolved org mapping — org IDs are passed per-row via `_organizationId`, no organizations created during import
+- Wrapped entire import in `db.transaction()` for all-or-nothing semantics (rollback on any failure)
+- Added `contactPersonName`, `contactPersonPhone`, `contactPersonEmail` to elevator insert/update in import
+- Added contact person fields to `ParsedElevator` type, header aliases (`kontaktperson`, `kontakt`, etc.), and `TARGET_FIELDS`
+- Added contact person fields to `confirmImportSchema` Zod validation
+- Simplified `ImportResult` type — removed `errors`, `orgsCreated`, `orgsCreatedIds`, `emailSent` (no longer relevant)
+- Updated `ResultSection` to show only created/updated counts (no org-creation or error details)
+- Updated `PreviewSection` to remove "new orgs will be created" banner (orgs are created inline in US-022)
+- Removed `IMPORT_BATCH_SIZE` — single transactional call replaces batched approach
+- Removed `getMeOptions`/`currentUser` dependency from import machine (admin email no longer passed)
+- Files changed:
+  - `packages/utils/src/excel-import/types.ts`
+  - `packages/utils/src/excel-import/header-aliases.ts`
+  - `apps/admin/src/server/import.ts`
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `apps/admin/src/features/import/components/result-section.tsx`
+  - `apps/admin/src/features/import/components/preview-section.tsx`
+- **Learnings for future iterations:**
+  - Neon HTTP driver + Drizzle supports `db.transaction()` — use `tx` instead of `db` inside the callback for transactional operations
+  - When resolved org mapping is built client-side (US-022 inline creation), the import server function can receive `_organizationId` per row and skip all org creation/lookup
+  - Removing batching simplifies error handling — a single transactional call means either everything succeeds or nothing does
+---
+
+## 2026-04-15 - US-024
+- Created `ImportStepper` component showing 5 steps with numbered circles, check marks for completed steps, and highlighted current step
+- Added screen-reader-only text announcing current step ("Steg 2 av 5: Välj ark")
+- Added back navigation handlers to import machine: `handleBackToUpload`, `handleBackToSheetSelection`, `handleBackToMapping`, `handleBackToOrgMapping`
+- Back navigation preserves state: workbook ref, sheet infos, selected sheets, sheet mappings, parse results, org mappings all retained appropriately per step
+- Renamed `onCancel` → `onBack` and "Avbryt" → "Tillbaka" on all step components (sheet selection, column mapping, org mapping, preview)
+- Each step has exactly one primary CTA and one secondary (Back) except upload which has no back
+- Stepper uses semantic `<nav>` + `<ol>` with `aria-current="step"` on the active step circle
+- Files changed:
+  - `apps/admin/src/features/import/components/import-stepper.tsx` (new)
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+  - `apps/admin/src/features/import/components/sheet-selection-section.tsx`
+  - `apps/admin/src/features/import/components/column-mapping-section.tsx`
+  - `apps/admin/src/features/import/components/org-mapping-section.tsx`
+  - `apps/admin/src/features/import/components/preview-section.tsx`
+- **Learnings for future iterations:**
+  - Back navigation needs different levels of state reset per target step — going back to sheet selection clears mappings but keeps workbook/sheet infos
+  - `handleReset` can just alias `handleBackToUpload` since full reset = back to step 1
+  - Step labels hidden on narrow screens via `hidden sm:inline` keeps stepper compact on mobile
+---
+
+## 2026-04-15 - US-025
+- Enhanced UploadZone component with visible drag-over hover state (primary border + bg tint)
+- Added keyboard-accessible "Välj fil" Button inside the drop zone (stopPropagation to avoid double trigger)
+- Added `role="alert"` and `aria-live="assertive"` to error display for screen reader announcements
+- Styled error as a bordered alert box (bg-destructive/5 + border) instead of plain text
+- Added file size validation (10MB limit) with descriptive error including file size and recovery step
+- Improved all error messages to include cause AND recovery step:
+  - Non-Excel format: states accepted formats + "exportera från Excel och försök igen"
+  - File too large: states limit and actual size + "minska filstorleken eller dela upp"
+  - Zero sheets: "Kontrollera att Excel-filen har minst ett ark med data"
+  - Corrupt/unreadable: "Försök exportera filen på nytt" + original error message
+- Reset file input value after selection to allow re-uploading the same file
+- Files changed:
+  - `packages/ui/src/components/ui/upload-zone.tsx`
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `scripts/ralph/prd.json`
+- **Learnings for future iterations:**
+  - `e.target.value = ""` on file input onChange allows re-selecting the same file (otherwise browser skips the change event)
+  - `aria-live="assertive"` on error containers ensures screen readers announce errors immediately
+  - `e.stopPropagation()` on nested button inside clickable div prevents the parent's onClick from double-firing
+---
+
+## 2026-04-15 - US-026
+- Added validation: if all selected sheets have zero data rows, "Nästa" button is disabled
+- Added warning banner explaining the issue when all selected sheets are empty
+- Verified existing implementations cover other acceptance criteria:
+  - Empty sheets already show inline warning with AlertTriangle icon (from US-017)
+  - Missing mandatory fields already shown with red destructive badges (from US-019)
+  - "Bekräfta mappning" button already disabled when mandatory fields missing (from US-019)
+- Files changed:
+  - `apps/admin/src/features/import/components/sheet-selection-section.tsx`
+  - `scripts/ralph/prd.json`
+- **Learnings for future iterations:**
+  - Check existing implementations before coding — most of US-026 was already done across US-017 and US-019
+---
+
+## 2026-04-15 - US-027
+- Added `useBlocker` from TanStack Router to import page for route change protection
+- `shouldBlockFn` shows `window.confirm` dialog when navigating away with in-progress import state
+- `enableBeforeUnload` handles tab close/refresh with browser's native "Leave site?" dialog
+- Blocker disabled when status is `idle` (no file uploaded) or `complete` (import finished)
+- Dialog text clearly states that import progress will be lost
+- Files changed:
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+  - `scripts/ralph/prd.json`
+- **Learnings for future iterations:**
+  - TanStack Router's `useBlocker` with `enableBeforeUnload` handles both route changes and tab close/refresh in one hook
+  - `shouldBlockFn` returning `false` (from confirm OK) allows navigation; `true` blocks it
+  - `disabled` prop prevents the blocker from firing at all when not needed — cleaner than conditional shouldBlockFn
+---
+
+## 2026-04-15 - US-028
+- Added `"error"` status to import machine for failed imports (separate from `parseError`)
+- `confirmFn` now returns `perOrgCounts` with per-organization created/updated counts
+- Import machine enriches per-org counts with org names from resolved mapping
+- `ResultSection` enhanced: shows per-org breakdown sorted alphabetically with green/amber badges
+- Created `ImportErrorSection` component for import failures:
+  - Shows error message in styled alert with `role="alert"`
+  - States that transaction was rolled back
+  - "Tillbaka till mappning" and "Börja om" action buttons
+- Updated importing progress indicator: pulsing progress bar with total count (single transactional call can't report incremental progress)
+- Updated `ImportStepper` to include `"error"` in step 5 statuses
+- Files changed:
+  - `apps/admin/src/server/import.ts`
+  - `apps/admin/src/features/import/hooks/use-import-machine.ts`
+  - `apps/admin/src/features/import/components/result-section.tsx`
+  - `apps/admin/src/features/import/components/import-stepper.tsx`
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+  - `scripts/ralph/prd.json`
+- **Learnings for future iterations:**
+  - Single transactional server call can't report incremental progress — use pulsing animation for indeterminate state
+  - Per-org counts computed inside the transaction by aggregating over create/update arrays
+  - Org ID → name mapping done client-side from `resolvedOrgMapping` since server doesn't have display names
+---
+
+## 2026-04-15 - US-029
+- Added focus management on import step advance: `stepHeadingRef` passed to each step component's CardTitle with `tabIndex={-1}`
+- `useEffect` moves focus to the step heading when status changes (except idle/parsing)
+- Added `headingRef` prop to SheetSelectionSection, ColumnMappingSection, OrgMappingSection, PreviewSection
+- Added `aria-live="polite"` to missing-mandatory-fields warning in column mapping and all-empty-sheets warning in sheet selection
+- Added `aria-hidden="true"` to decorative icons (AlertTriangle, CheckCircle2) throughout import flow
+- Added `aria-label` to icon-only buttons (Pencil edit buttons in anvandare.tsx and org-users-view.tsx)
+- Added `role="button"`, `tabIndex={0}`, `aria-label="Rensa val"` to clear-X span in org parent select
+- Made upload zone div keyboard-accessible: `role="button"`, `tabIndex={0}`, `aria-label`, `onKeyDown` for Enter/Space
+- Hard failure states use `role="alert"` (ImportErrorSection, UploadZone error)
+- Color is not sole indicator: column mapping badges have icons (CheckCircle2 for Auto/Manuell, — prefix for Hoppas över)
+- Radix Dialog (shadcn) already handles focus trapping and restoration for all modal dialogs
+- Files changed:
+  - `apps/admin/src/routes/_authenticated/admin.import.tsx`
+  - `apps/admin/src/features/import/components/sheet-selection-section.tsx`
+  - `apps/admin/src/features/import/components/column-mapping-section.tsx`
+  - `apps/admin/src/features/import/components/org-mapping-section.tsx`
+  - `apps/admin/src/features/import/components/preview-section.tsx`
+  - `apps/admin/src/routes/_authenticated/admin.anvandare.tsx`
+  - `apps/admin/src/routes/_authenticated/admin.organisationer.index.tsx`
+  - `apps/admin/src/features/organization/components/org-users-view.tsx`
+  - `packages/ui/src/components/ui/upload-zone.tsx`
+  - `scripts/ralph/prd.json`
+- **Learnings for future iterations:**
+  - `tabIndex={-1}` on headings makes them programmatically focusable without adding them to tab order
+  - `aria-hidden="true"` on decorative icons prevents screen readers from announcing icon names
+  - Radix-based shadcn Dialog already handles focus trap — no custom implementation needed
+  - `requestAnimationFrame` ensures focus moves after DOM update completes
 ---

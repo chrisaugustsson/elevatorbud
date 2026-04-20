@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { elevatorOptions, elevatorDetailsOptions, elevatorBudgetOptions } from "../../server/elevator";
+import { elevatorOptions, elevatorDetailsOptions, elevatorBudgetOptions } from "../../../server/elevator";
+import { elevatorEventsOptions } from "../../../server/elevator-events";
 import {
   Card,
   CardContent,
@@ -11,13 +12,17 @@ import { Button } from "@elevatorbud/ui/components/ui/button";
 import { Badge } from "@elevatorbud/ui/components/ui/badge";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 import { Separator } from "@elevatorbud/ui/components/ui/separator";
-import { ArrowLeft, Phone, MessageSquare } from "lucide-react";
+import { ArrowLeft, Phone, MessageSquare, History } from "lucide-react";
+import { EventTimeline } from "../../../features/elevator-events/event-timeline";
 
-export const Route = createFileRoute("/_authenticated/hiss/$id")({
+export const Route = createFileRoute("/_authenticated/$parentOrgId/hiss/$id")({
   loader: ({ context, params }) => {
-    context.queryClient.prefetchQuery(elevatorOptions(params.id));
-    context.queryClient.prefetchQuery(elevatorDetailsOptions(params.id));
-    context.queryClient.prefetchQuery(elevatorBudgetOptions(params.id));
+    context.queryClient.prefetchQuery(elevatorOptions(params.id, params.parentOrgId));
+    context.queryClient.prefetchQuery(elevatorDetailsOptions(params.id, params.parentOrgId));
+    context.queryClient.prefetchQuery(elevatorBudgetOptions(params.id, params.parentOrgId));
+    context.queryClient.prefetchQuery(
+      elevatorEventsOptions(params.id, params.parentOrgId),
+    );
   },
   component: HissDetail,
   pendingComponent: DetailSkeleton,
@@ -74,10 +79,13 @@ function DetailSection({
 }
 
 function HissDetail() {
-  const { id } = Route.useParams();
-  const { data: hiss } = useSuspenseQuery(elevatorOptions(id));
-  const { data: details } = useSuspenseQuery(elevatorDetailsOptions(id));
-  const { data: budget } = useSuspenseQuery(elevatorBudgetOptions(id));
+  const { id, parentOrgId } = Route.useParams();
+  const { data: hiss } = useSuspenseQuery(elevatorOptions(id, parentOrgId));
+  const { data: details } = useSuspenseQuery(elevatorDetailsOptions(id, parentOrgId));
+  const { data: budget } = useSuspenseQuery(elevatorBudgetOptions(id, parentOrgId));
+  const { data: events } = useSuspenseQuery(
+    elevatorEventsOptions(id, parentOrgId),
+  );
 
   if (!hiss) {
     return (
@@ -97,10 +105,9 @@ function HissDetail() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      {/* Header — read-only, no edit button */}
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <Link to="/register">
+          <Link to="/$parentOrgId/register" params={{ parentOrgId }}>
             <Button variant="ghost" size="icon" className="size-8">
               <ArrowLeft className="size-4" />
             </Button>
@@ -117,7 +124,29 @@ function HissDetail() {
 
       <Separator />
 
-      {/* Identifiering */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <History className="size-4" />
+            Historik
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EventTimeline
+            events={events.map((e) => ({
+              id: e.id,
+              type: e.type,
+              occurredAt: e.occurredAt,
+              title: e.title,
+              description: e.description,
+              cost: e.cost,
+              currency: e.currency,
+              performedBy: e.performedBy,
+            }))}
+          />
+        </CardContent>
+      </Card>
+
       <DetailSection title="Identifiering">
         <DetailField label="Hissnummer" value={hiss.elevatorNumber} />
         <DetailField label="Adress" value={hiss.address} />
@@ -125,19 +154,17 @@ function HissDetail() {
         <DetailField label="Distrikt" value={hiss.district} />
       </DetailSection>
 
-      {/* Teknisk specifikation */}
       <DetailSection title="Teknisk specifikation">
         <DetailField label="Hisstyp" value={hiss.elevatorType} />
         <DetailField label="Fabrikat" value={hiss.manufacturer} />
         <DetailField label="Byggår" value={hiss.buildYear} />
-        <DetailField label="Hastighet" value={details?.speed} />
-        <DetailField label="Lyfthöjd" value={details?.liftHeight} />
-        <DetailField label="Marklast" value={details?.loadCapacity} />
+        <DetailField label="Hastighet (m/s)" value={details?.speed} />
+        <DetailField label="Lyfthöjd (m)" value={details?.liftHeight} />
+        <DetailField label="Märklast (kg)" value={details?.loadCapacity} />
         <DetailField label="Antal plan" value={details?.floorCount} />
         <DetailField label="Antal dörrar" value={details?.doorCount} />
       </DetailSection>
 
-      {/* Dörrar och korg */}
       <DetailSection title="Dörrar och korg">
         <DetailField label="Typ dörrar" value={details?.doorType} />
         <DetailField label="Genomgång" value={details?.passthrough} />
@@ -148,7 +175,6 @@ function HissDetail() {
         <DetailField label="Dörrmaskin" value={details?.doorMachine} />
       </DetailSection>
 
-      {/* Maskineri */}
       <DetailSection title="Maskineri">
         <DetailField label="Drivsystem" value={details?.driveSystem} />
         <DetailField label="Upphängning" value={details?.suspension} />
@@ -157,7 +183,6 @@ function HissDetail() {
         <DetailField label="Typ styrsystem" value={details?.controlSystemType} />
       </DetailSection>
 
-      {/* Besiktning & underhåll */}
       <DetailSection title="Besiktning och underhåll">
         <DetailField label="Besiktningsorgan" value={hiss.inspectionAuthority} />
         <DetailField label="Besiktningsmånad" value={hiss.inspectionMonth} />
@@ -165,10 +190,12 @@ function HissDetail() {
         <DetailField label="Schaktbelysning" value={details?.shaftLighting} />
       </DetailSection>
 
-      {/* Modernisering */}
       <DetailSection title="Modernisering">
         <DetailField label="Moderniserad" value={hiss.modernizationYear} />
-        <DetailField label="Garanti" value={budget?.warranty} />
+        <DetailField
+          label="Garanti gäller t.o.m."
+          value={hiss.warrantyExpiresAt}
+        />
         <DetailField
           label="Rekommenderat moderniseringsår"
           value={budget?.recommendedModernizationYear}
@@ -187,7 +214,6 @@ function HissDetail() {
         />
       </DetailSection>
 
-      {/* Nödtelefon */}
       <DetailSection
         title="Nödtelefon"
         icon={<Phone className="size-4" />}
@@ -209,7 +235,6 @@ function HissDetail() {
         />
       </DetailSection>
 
-      {/* Kommentarer */}
       {details?.comments && (
         <Card>
           <CardHeader className="pb-3">
@@ -224,7 +249,6 @@ function HissDetail() {
         </Card>
       )}
 
-      {/* Metadata */}
       <div className="text-xs text-muted-foreground">
         <p>
           Skapad:{" "}

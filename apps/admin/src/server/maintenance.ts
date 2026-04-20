@@ -3,8 +3,8 @@ import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { elevators, organizations } from "@elevatorbud/db/schema";
-import type { Database } from "@elevatorbud/db";
-import { adminMiddleware } from "./auth";
+import type { DatabaseHttp } from "@elevatorbud/db";
+import { adminMiddlewareRead } from "./auth";
 
 // ---------------------------------------------------------------------------
 // Inlined query logic (from packages/api/src/routers/maintenance.ts)
@@ -17,7 +17,7 @@ const inspectionListInput = z.object({
 });
 
 async function inspectionCalendar(
-  db: Database,
+  db: DatabaseHttp,
   organizationId: string | undefined,
 ) {
   const orgFilter = organizationId
@@ -41,7 +41,7 @@ async function inspectionCalendar(
 }
 
 async function companies(
-  db: Database,
+  db: DatabaseHttp,
   organizationId: string | undefined,
 ) {
   const orgFilter = organizationId
@@ -86,7 +86,7 @@ async function companies(
 }
 
 async function emergencyPhoneStatus(
-  db: Database,
+  db: DatabaseHttp,
   organizationId: string | undefined,
 ) {
   const orgFilter = organizationId
@@ -123,7 +123,7 @@ async function emergencyPhoneStatus(
 }
 
 async function inspectionList(
-  db: Database,
+  db: DatabaseHttp,
   organizationId: string | undefined,
   month: string,
 ) {
@@ -149,7 +149,7 @@ async function inspectionList(
     .orderBy(elevators.elevatorNumber);
 }
 
-async function todaysElevators(db: Database, userId: string) {
+async function todaysElevators(db: DatabaseHttp, userId: string) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -180,7 +180,7 @@ async function todaysElevators(db: Database, userId: string) {
 // ---------------------------------------------------------------------------
 
 export const getInspectionCalendar = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ organizationId: z.string().uuid().optional() }).optional())
   .handler(async ({ data, context }) => {
     return inspectionCalendar(context.db, data?.organizationId);
@@ -193,7 +193,7 @@ export const inspectionCalendarOptions = (organizationId?: string) =>
   });
 
 export const getMaintenanceCompanies = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ organizationId: z.string().uuid().optional() }).optional())
   .handler(async ({ data, context }) => {
     return companies(context.db, data?.organizationId);
@@ -206,7 +206,7 @@ export const maintenanceCompaniesOptions = (organizationId?: string) =>
   });
 
 export const getEmergencyPhoneStatus = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ organizationId: z.string().uuid().optional() }).optional())
   .handler(async ({ data, context }) => {
     return emergencyPhoneStatus(context.db, data?.organizationId);
@@ -219,7 +219,7 @@ export const emergencyPhoneStatusOptions = (organizationId?: string) =>
   });
 
 export const getInspectionList = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(inspectionListInput)
   .handler(async ({ data, context }) => {
     return inspectionList(context.db, data.organizationId, data.month);
@@ -232,7 +232,7 @@ export const inspectionListOptions = (month: string, organizationId?: string) =>
   });
 
 export const getTodaysElevators = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .handler(async ({ context }) => {
     return todaysElevators(context.db, context.user.id);
   });

@@ -12,18 +12,24 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/migrate.ts",
+    "db:migrate:dev": "tsx --env-file=../../.env.development src/migrate.ts",
+    "db:migrate:prod": "tsx --env-file=../../.env.production src/migrate.ts",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:reset": "tsx src/reset-data.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.0",
     "drizzle-orm": "^0.44.2",
+    "esbuild": "^0.28.0",
     "pg": "^8.20.0"
   },
   "devDependencies": {
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.1",
     "tsx": "^4.19.4",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.4"
   }
 }

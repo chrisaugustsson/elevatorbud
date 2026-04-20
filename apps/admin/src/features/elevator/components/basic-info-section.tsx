@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import type { HissForm, HissFormValues } from "../types";
 import { isChanged } from "../utils/form-converters";
 import { EditSection } from "./edit-section";
@@ -6,14 +7,21 @@ import { ComboboxField } from "./combobox-field";
 import { HissnummerField } from "./hissnummer-field";
 import { Label } from "@elevatorbud/ui/components/ui/label";
 import { Input } from "@elevatorbud/ui/components/ui/input";
+import { Button } from "@elevatorbud/ui/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@elevatorbud/ui/components/ui/select";
-import { Building2 } from "lucide-react";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@elevatorbud/ui/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@elevatorbud/ui/components/ui/command";
+import { Building2, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@elevatorbud/ui/lib/utils";
 
 interface BasicInfoSectionProps {
@@ -44,25 +52,16 @@ export function BasicInfoSection({
                 "border-l-4 border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20",
             )}
           >
-            <Label className="text-sm text-muted-foreground">
+            <Label htmlFor="organization_id-trigger" className="text-sm text-muted-foreground">
               <Building2 className="mr-1 inline size-4" />
               Organisation
             </Label>
-            <Select
+            <OrgCombobox
               value={field.state.value}
-              onValueChange={(val) => field.handleChange(val)}
-            >
-              <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="Välj organisation..." />
-              </SelectTrigger>
-              <SelectContent>
-                {orgs?.map((org: { id: string; name: string }) => (
-                  <SelectItem key={org.id} value={org.id}>
-                    {org.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(val) => field.handleChange(val)}
+              orgs={orgs ?? []}
+              triggerId="organization_id-trigger"
+            />
           </div>
         )}
       </form.Field>
@@ -77,7 +76,11 @@ export function BasicInfoSection({
         >
           <form.Field name="elevator_number">
             {(field) => (
-              <HissnummerField field={field} currentHissId={currentHissId} />
+              <HissnummerField
+                field={field}
+                currentHissId={currentHissId}
+                organizationId={formValues.organization_id}
+              />
             )}
           </form.Field>
         </FieldWrapper>
@@ -129,5 +132,78 @@ export function BasicInfoSection({
         />
       </EditSection>
     </>
+  );
+}
+
+// Type-to-filter combobox for organization selection. FR-21: every org-
+// selection dropdown is type-to-filter searchable. Replaces the plain
+// <Select> which became unusable once orgs include sub-orgs (Bostadsbolaget
+// scale).
+function OrgCombobox({
+  value,
+  onChange,
+  orgs,
+  triggerId,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  orgs: Array<{ id: string; name: string }>;
+  triggerId?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const sortedOrgs = useMemo(
+    () => [...orgs].sort((a, b) => a.name.localeCompare(b.name, "sv")),
+    [orgs],
+  );
+  const selected = sortedOrgs.find((o) => o.id === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id={triggerId}
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          aria-label={
+            selected
+              ? `Organisation: ${selected.name}. Klicka för att byta.`
+              : "Välj organisation"
+          }
+          className="h-11 w-full justify-between font-normal"
+        >
+          <span className="truncate">
+            {selected?.name ?? "Välj organisation..."}
+          </span>
+          <ChevronsUpDown className="size-4 opacity-50 shrink-0 ml-2" aria-hidden="true" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Sök organisation..." />
+          <CommandList>
+            <CommandEmpty>Inga organisationer hittades.</CommandEmpty>
+            <CommandGroup>
+              {sortedOrgs.map((org) => (
+                <CommandItem
+                  key={org.id}
+                  value={org.name}
+                  onSelect={() => {
+                    onChange(org.id);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={org.id === value ? "opacity-100" : "opacity-0"}
+                  />
+                  {org.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

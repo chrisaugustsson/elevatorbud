@@ -6,6 +6,10 @@ dist
 .wrangler
 .env
 .env.local
+.env.development
+.env.production
 .dev.vars
+.DS_Store
+.pnpm-store/
 *.tsbuildinfo
 routeTree.gen.ts

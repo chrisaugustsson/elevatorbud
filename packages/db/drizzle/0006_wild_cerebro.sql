@@ -1,0 +1,1 @@
+ALTER TABLE "elevators" ADD CONSTRAINT "elevators_organization_id_elevator_number_unique" UNIQUE("organization_id","elevator_number");

@@ -40,32 +40,4 @@ export const ELEVATOR_COLUMNS: ColumnDef[] = [
   { col: 30, letter: "AE", field: "budget_amount", parser: "budget" },
   { col: 31, letter: "AF", field: "modernization_measures" },
   { col: 32, letter: "AG", field: "shaft_lighting" },
-  { col: 33, letter: "AH", field: "emergency_phone", parser: "compound_emergency_phone" },
 ];
-
-/**
- * Column mapping for the 'Nodtelefoner' sheet.
- * Column G (index 6) is elevator_number — the join key to Hissar.
- * Other columns contain expanded emergency phone data.
- */
-export const EMERGENCY_PHONE_COLUMNS = [
-  { col: 0, letter: "A", field: "_organisation_namn" },
-  { col: 1, letter: "B", field: "_distrikt" }, // used for case-insensitive matching during join
-  { col: 2, letter: "C", field: "_adress" },
-  { col: 3, letter: "D", field: "_elevator_designation" },
-  { col: 4, letter: "E", field: "_elevator_type" },
-  { col: 5, letter: "F", field: "_manufacturer" },
-  { col: 6, letter: "G", field: "elevator_number" }, // JOIN KEY
-  { col: 7, letter: "H", field: "has_emergency_phone", parser: "boolean" as const },
-  { col: 8, letter: "I", field: "emergency_phone_model" },
-  { col: 9, letter: "J", field: "emergency_phone_type" },
-  { col: 10, letter: "K", field: "needs_upgrade", parser: "boolean" as const },
-  { col: 11, letter: "L", field: "emergency_phone_price", parser: "number" as const },
-];
-
-/**
- * Rivna hissar uses the same column structure as Hissar but WITHOUT column AH (nodtelefon).
- */
-export const RIVNA_ELEVATOR_COLUMNS: ColumnDef[] = ELEVATOR_COLUMNS.filter(
-  (col) => col.letter !== "AH",
-);

@@ -10,7 +10,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 if (typeof document !== "undefined") {
   ChartJS.register(
@@ -24,6 +24,25 @@ if (typeof document !== "undefined") {
     Tooltip,
     Legend
   );
+
+  // Respect prefers-reduced-motion: disable Chart.js animations globally
+  // for users who've requested reduced motion. Chart.js defaults to 1000ms
+  // entrance and ~400ms update animations otherwise.
+  const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const applyReducedMotion = (reduced: boolean) => {
+    if (reduced) {
+      ChartJS.defaults.animation = false;
+      ChartJS.defaults.animations.colors = false;
+      ChartJS.defaults.animations.x = false;
+      ChartJS.defaults.animations.y = false;
+      ChartJS.defaults.transitions.active.animation.duration = 0;
+      ChartJS.defaults.transitions.resize.animation.duration = 0;
+      ChartJS.defaults.transitions.show.animation.duration = 0;
+      ChartJS.defaults.transitions.hide.animation.duration = 0;
+    }
+  };
+  applyReducedMotion(mql.matches);
+  mql.addEventListener?.("change", (e) => applyReducedMotion(e.matches));
 }
 
 export function resolveToHex(cssColor: string): string {
@@ -43,6 +62,36 @@ export function resolveToHex(cssColor: string): string {
   return ctx.fillStyle;
 }
 
+/**
+ * Apply alpha to a color returned by `resolveToHex` / `useChartColors`.
+ *
+ * Canvas normalizes most inputs to `#rrggbb`, but on browsers that don't
+ * parse the input (e.g. legacy engines faced with oklch) it falls back to
+ * `rgb(r, g, b)`. Concatenating a two-character hex alpha onto a
+ * non-`#rrggbb` value produces invalid CSS, which is why we shouldn't
+ * hand-concat alpha anywhere. Use this helper instead.
+ */
+export function withAlpha(color: string, alpha: number): string {
+  const a = Math.max(0, Math.min(1, alpha));
+  // Most common case: canvas returned #rrggbb — append hex alpha.
+  if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+    const hex = Math.round(a * 255)
+      .toString(16)
+      .padStart(2, "0");
+    return `${color}${hex}`;
+  }
+  // rgb(r, g, b) → rgba(r, g, b, alpha)
+  const rgbMatch = color.match(
+    /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/,
+  );
+  if (rgbMatch) {
+    return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${a})`;
+  }
+  // Fallback for any other format (oklch, hsl, etc.): let the browser
+  // handle the blend. `color-mix` is baseline across Chrome/Safari/Firefox.
+  return `color-mix(in oklab, ${color} ${Math.round(a * 100)}%, transparent)`;
+}
+
 const defaultColors = {
   chart1: "#2563eb",
   chart2: "#16a34a",
@@ -51,24 +100,47 @@ const defaultColors = {
   chart5: "#7c3aed",
   grid: "rgba(255,255,255,0.1)",
   label: "rgba(255,255,255,0.5)",
+  foreground: "#0f172a",
 };
 
+function readChartColors() {
+  if (typeof document === "undefined") return defaultColors;
+  const root = document.documentElement;
+  const get = (name: string) =>
+    getComputedStyle(root).getPropertyValue(name).trim();
+  return {
+    chart1: resolveToHex(get("--chart-1") || "#2563eb"),
+    chart2: resolveToHex(get("--chart-2") || "#16a34a"),
+    chart3: resolveToHex(get("--chart-3") || "#d97706"),
+    chart4: resolveToHex(get("--chart-4") || "#dc2626"),
+    chart5: resolveToHex(get("--chart-5") || "#7c3aed"),
+    grid: get("--chart-grid") || "rgba(255,255,255,0.1)",
+    label: get("--chart-label") || "rgba(255,255,255,0.5)",
+    foreground: resolveToHex(get("--foreground") || "#0f172a"),
+  };
+}
+
+/**
+ * Theme-aware chart colors. Re-reads CSS custom properties whenever the
+ * theme toggles (detected by a `class` change on <html>) so colors stay in
+ * sync with the active theme. Guards against SSR via `typeof document`.
+ */
 export function useChartColors() {
-  return useMemo(() => {
-    if (typeof document === "undefined") return defaultColors;
-    const root = document.documentElement;
-    const get = (name: string) =>
-      getComputedStyle(root).getPropertyValue(name).trim();
-    return {
-      chart1: resolveToHex(get("--chart-1") || "#2563eb"),
-      chart2: resolveToHex(get("--chart-2") || "#16a34a"),
-      chart3: resolveToHex(get("--chart-3") || "#d97706"),
-      chart4: resolveToHex(get("--chart-4") || "#dc2626"),
-      chart5: resolveToHex(get("--chart-5") || "#7c3aed"),
-      grid: get("--chart-grid") || "rgba(255,255,255,0.1)",
-      label: get("--chart-label") || "rgba(255,255,255,0.5)",
-    };
+  const [colors, setColors] = useState(() => readChartColors());
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    // Re-read on mount to pick up hydrated theme class.
+    setColors(readChartColors());
+    const observer = new MutationObserver(() => setColors(readChartColors()));
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme", "style"],
+    });
+    return () => observer.disconnect();
   }, []);
+
+  return useMemo(() => colors, [colors]);
 }
 
 export type ChartColors = ReturnType<typeof useChartColors>;

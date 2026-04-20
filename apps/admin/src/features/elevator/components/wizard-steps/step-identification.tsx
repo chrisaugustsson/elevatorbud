@@ -10,13 +10,22 @@ interface StepIdentificationProps {
   formValues: HissFormValues;
 }
 
-export function StepIdentification({ form }: StepIdentificationProps) {
+export function StepIdentification({
+  form,
+  formValues,
+}: StepIdentificationProps) {
   return (
     <div className="space-y-5">
-      {/* Hissnummer with real-time uniqueness check */}
+      {/* Hissnummer with real-time uniqueness check (scoped to selected org) */}
       <FieldWrapper changed={false}>
         <form.Field name="elevator_number">
-          {(field) => <HissnummerField field={field} currentHissId="" />}
+          {(field) => (
+            <HissnummerField
+              field={field}
+              currentHissId=""
+              organizationId={formValues.organization_id}
+            />
+          )}
         </form.Field>
       </FieldWrapper>
 

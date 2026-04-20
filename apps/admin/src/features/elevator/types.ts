@@ -31,7 +31,10 @@ export type HissFormValues = {
   maintenance_company: string;
   shaft_lighting: string;
   modernization_year: string;
-  warranty: boolean;
+  // Warranty expiration date for the most recent modernization. ISO
+  // YYYY-MM-DD or empty string. Replaces the legacy boolean `warranty`
+  // field that misinterpreted the Excel column.
+  warranty_expires_at: string;
   recommended_modernization_year: string;
   budget_amount: string;
   modernization_measures: string;
@@ -74,7 +77,7 @@ export const emptyValues: HissFormValues = {
   maintenance_company: "",
   shaft_lighting: "",
   modernization_year: "",
-  warranty: false,
+  warranty_expires_at: "",
   recommended_modernization_year: "",
   budget_amount: "",
   modernization_measures: "",

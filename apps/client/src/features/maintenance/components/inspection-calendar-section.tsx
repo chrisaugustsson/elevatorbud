@@ -23,6 +23,7 @@ import {
 import { Bar } from "react-chartjs-2";
 import { CalendarDays, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
+import { useParams } from "@tanstack/react-router";
 
 const MANADER = [
   "Januari",
@@ -77,6 +78,7 @@ export function InspectionCalendarSection({
   onSelectManad,
   besiktningslista,
 }: InspectionCalendarSectionProps) {
+  const { parentOrgId } = useParams({ strict: false }) as { parentOrgId: string };
   return (
     <div className="space-y-4">
       <h2 className="flex items-center gap-2 text-lg font-semibold">
@@ -270,6 +272,7 @@ function InspectionMonthList({
   selectedManad: string;
   besiktningslista: InspectionListItem[] | undefined;
 }) {
+  const { parentOrgId } = useParams({ strict: false }) as { parentOrgId: string };
   return (
     <Card>
       <CardHeader>
@@ -323,7 +326,7 @@ function InspectionMonthList({
                     </TableCell>
                     <TableCell>
                       <a
-                        href={`/hiss/${h.id}`}
+                        href={`/${parentOrgId}/hiss/${h.id}`}
                         className="inline-flex items-center text-muted-foreground hover:text-foreground"
                       >
                         <ChevronRight className="h-4 w-4" />
