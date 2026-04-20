@@ -51,7 +51,7 @@ async function overview(db: DatabaseHttp) {
       ) lb ON true
       WHERE e.status = 'active'
         AND lb.recommended_modernization_year IS NOT NULL
-        AND lb.recommended_modernization_year ~ '^\d+$'
+        AND lb.recommended_modernization_year ~ '^[0-9]+$'
         AND lb.recommended_modernization_year::int <= ${modernizationCutoff}
     `),
     db.execute(sql`

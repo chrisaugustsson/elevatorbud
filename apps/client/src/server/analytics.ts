@@ -33,9 +33,9 @@ export const getStats = createServerFn()
       context.db.execute(sql`
         SELECT
           count(*) filter (where lb.recommended_modernization_year is not null
-            and lb.recommended_modernization_year ~ '^\d+$' and lb.recommended_modernization_year::int <= ${currentYear + 3})::int as modernization_within_3_years,
+            and lb.recommended_modernization_year ~ '^[0-9]+$' and lb.recommended_modernization_year::int <= ${currentYear + 3})::int as modernization_within_3_years,
           coalesce(sum(lb.budget_amount) filter (where lb.recommended_modernization_year is not null
-            and lb.recommended_modernization_year ~ '^\d+$' and lb.recommended_modernization_year::int = ${currentYear}), 0)::real as budget_current_year
+            and lb.recommended_modernization_year ~ '^[0-9]+$' and lb.recommended_modernization_year::int = ${currentYear}), 0)::real as budget_current_year
         FROM elevators e
         JOIN LATERAL (
           SELECT recommended_modernization_year, budget_amount
