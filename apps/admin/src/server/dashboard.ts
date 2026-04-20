@@ -14,7 +14,17 @@ async function overview(db: DatabaseHttp) {
   const currentYear = new Date().getFullYear();
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
-  const nextMonth = now.getMonth() + 2 > 12 ? 1 : now.getMonth() + 2;
+  const nextMonth = (now.getMonth() + 1) % 12 + 1;
+  // inspection_month is stored as free-text: imported sheets yield either
+  // "01"…"12" or "1"…"12" depending on the source cell format. Match both
+  // so the KPI isn't silently zero.
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const inspectionMonthValues = [
+    String(currentMonth),
+    pad(currentMonth),
+    String(nextMonth),
+    pad(nextMonth),
+  ];
   const modernizationCutoff = currentYear + 3;
 
   const activeCondition = eq(elevators.status, "active");
@@ -30,7 +40,7 @@ async function overview(db: DatabaseHttp) {
     db.execute(sql`
       SELECT count(*)::int as count FROM elevators e
       WHERE e.status = 'active'
-        AND e.inspection_month IN (${String(currentMonth)}, ${String(nextMonth)})
+        AND e.inspection_month IN ${inspectionMonthValues}
     `),
     db.execute(sql`
       SELECT count(*)::int as count FROM elevators e

@@ -64,7 +64,7 @@ async function budget(db: DatabaseHttp, organizationId: string | undefined) {
       e.district,
       e.elevator_type,
       count(*)::int as count,
-      coalesce(sum(lb.budget_amount), 0)::real as total_budget
+      coalesce(sum(lb.budget_amount), 0)::double precision as total_budget
     FROM elevators e
     JOIN LATERAL (
       SELECT recommended_modernization_year, budget_amount

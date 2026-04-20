@@ -99,7 +99,7 @@ async function emergencyPhoneStatus(
       count(*) filter (where e.has_emergency_phone = true)::int as with_phone,
       count(*) filter (where e.has_emergency_phone = false or e.has_emergency_phone is null)::int as without_phone,
       count(*) filter (where e.needs_upgrade = true)::int as needs_upgrade,
-      coalesce(sum(d.emergency_phone_price) filter (where e.needs_upgrade = true), 0)::real as upgrade_cost
+      coalesce(sum(d.emergency_phone_price) filter (where e.needs_upgrade = true), 0)::double precision as upgrade_cost
     FROM elevators e
     LEFT JOIN elevator_details d ON d.elevator_id = e.id
     WHERE e.status = 'active' ${orgFilter}

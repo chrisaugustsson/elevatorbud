@@ -60,15 +60,14 @@ function buildWhereConditions(filters: FilterInput, contextOrgIds: string[]) {
 
   if (filters.search) {
     const s = `%${filters.search}%`;
-    conditions.push(
-      or(
-        ilike(elevators.elevatorNumber, s),
-        ilike(elevators.address, s),
-        ilike(elevators.district, s),
-        ilike(elevators.manufacturer, s),
-        ilike(elevators.elevatorType, s),
-      )!,
+    const searchPredicate = or(
+      ilike(elevators.elevatorNumber, s),
+      ilike(elevators.address, s),
+      ilike(elevators.district, s),
+      ilike(elevators.manufacturer, s),
+      ilike(elevators.elevatorType, s),
     );
+    if (searchPredicate) conditions.push(searchPredicate);
   }
 
   if (filters.district?.length) {
@@ -100,12 +99,11 @@ function buildWhereConditions(filters: FilterInput, contextOrgIds: string[]) {
     conditions.push(sql`${elevators.modernizationYear} IS NOT NULL`);
     conditions.push(ne(elevators.modernizationYear, NOT_MODERNIZED));
   } else if (filters.modernized === false) {
-    conditions.push(
-      or(
-        sql`${elevators.modernizationYear} IS NULL`,
-        eq(elevators.modernizationYear, NOT_MODERNIZED),
-      )!,
+    const notModernizedPredicate = or(
+      sql`${elevators.modernizationYear} IS NULL`,
+      eq(elevators.modernizationYear, NOT_MODERNIZED),
     );
+    if (notModernizedPredicate) conditions.push(notModernizedPredicate);
   }
 
   return and(...conditions);
