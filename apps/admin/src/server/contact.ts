@@ -3,8 +3,10 @@ import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { contactSubmissions } from "@elevatorbud/db/schema";
-import type { Database } from "@elevatorbud/db";
-import { adminMiddleware } from "./auth";
+import type { Database, DatabaseHttp } from "@elevatorbud/db";
+import { adminMiddleware, adminMiddlewareRead } from "./auth";
+
+type ReadDb = Database | DatabaseHttp;
 
 // ---------------------------------------------------------------------------
 // Zod schemas (inlined from packages/api/src/routers/contact.ts)
@@ -25,7 +27,7 @@ const updateContactStatusSchema = z.object({
 // Inlined query logic — no org scoping (contact submissions are global).
 // ---------------------------------------------------------------------------
 
-async function unreadCount(db: Database) {
+async function unreadCount(db: ReadDb) {
   const result = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(contactSubmissions)
@@ -34,7 +36,7 @@ async function unreadCount(db: Database) {
 }
 
 async function listContacts(
-  db: Database,
+  db: ReadDb,
   filters?: z.infer<typeof listContactsSchema>,
 ) {
   return db.query.contactSubmissions.findMany({
@@ -62,7 +64,7 @@ async function updateStatus(
 // ---------------------------------------------------------------------------
 
 export const getUnreadCount = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .handler(async ({ context }) => {
     return unreadCount(context.db);
   });
@@ -74,7 +76,7 @@ export const unreadCountOptions = () =>
   });
 
 export const listContactsFn = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(listContactsSchema)
   .handler(async ({ data, context }) => {
     return listContacts(context.db, data);
