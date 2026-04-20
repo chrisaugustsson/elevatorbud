@@ -34,6 +34,7 @@ import {
   type ModernizationFieldKey,
   type ModernizationFieldSpec,
 } from "./modernization-fields";
+import { DRAFT_TTL_MS } from "./draft-constants";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -83,10 +84,6 @@ type DraftShape = {
 // ---------------------------------------------------------------------------
 
 const DRAFT_VERSION = 1;
-// Drafts older than this are ignored on load (and cleared). The elevator's
-// current values may have changed in the meantime, so restoring a stale
-// draft would silently overwrite unrelated work.
-const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const draftKey = (elevatorId: string) =>
   `modernization-draft:v${DRAFT_VERSION}:${elevatorId}`;
