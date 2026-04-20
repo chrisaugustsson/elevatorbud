@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { Database, DatabaseHttp } from "@elevatorbud/db";
 import {
   elevators,
@@ -187,62 +187,53 @@ async function syncElevatorCache(
   db: DbOrTx,
   elevatorId: string,
 ) {
-  const [latestInventory] = await db
-    .select({ occurredAt: elevatorEvents.occurredAt })
+  // One aggregated query instead of three serial ones — syncElevatorCache is
+  // on the hot path for every event write and every matching update.
+  const rows = await db
+    .select({
+      type: elevatorEvents.type,
+      occurredAt: sql<Date>`max(${elevatorEvents.occurredAt})`,
+    })
     .from(elevatorEvents)
     .where(
       and(
         eq(elevatorEvents.elevatorId, elevatorId),
-        eq(elevatorEvents.type, "inventory"),
+        inArray(elevatorEvents.type, [
+          "inventory",
+          "modernization",
+          "replacement",
+        ]),
       ),
     )
-    .orderBy(desc(elevatorEvents.occurredAt))
-    .limit(1);
+    .groupBy(elevatorEvents.type);
 
-  // Either a modernization or a replacement counts as "the year this unit
-  // was last renewed" for the denormalized cache. Event `type` differentiates
-  // if reporting ever needs to split them.
-  const [latestMod] = await db
-    .select({ occurredAt: elevatorEvents.occurredAt })
-    .from(elevatorEvents)
-    .where(
-      and(
-        eq(elevatorEvents.elevatorId, elevatorId),
-        eq(elevatorEvents.type, "modernization"),
-      ),
-    )
-    .orderBy(desc(elevatorEvents.occurredAt))
-    .limit(1);
-
-  const [latestReplacement] = await db
-    .select({ occurredAt: elevatorEvents.occurredAt })
-    .from(elevatorEvents)
-    .where(
-      and(
-        eq(elevatorEvents.elevatorId, elevatorId),
-        eq(elevatorEvents.type, "replacement"),
-      ),
-    )
-    .orderBy(desc(elevatorEvents.occurredAt))
-    .limit(1);
-
-  const newestModLike =
-    latestMod && latestReplacement
-      ? latestMod.occurredAt > latestReplacement.occurredAt
-        ? latestMod
-        : latestReplacement
-      : latestMod ?? latestReplacement;
+  let latestInventory: Date | null = null;
+  let newestModLike: Date | null = null;
+  for (const r of rows) {
+    // Neon's HTTP driver returns `timestamptz` as an ISO string, while the
+    // WS/pool driver returns a Date. Normalize.
+    const occurredAt =
+      r.occurredAt instanceof Date ? r.occurredAt : new Date(r.occurredAt);
+    if (r.type === "inventory") {
+      latestInventory = occurredAt;
+    } else if (r.type === "modernization" || r.type === "replacement") {
+      // Either a modernization or a replacement counts as "the year this unit
+      // was last renewed" for the denormalized cache. Event `type` on the
+      // events table differentiates if reporting ever needs to split them.
+      if (!newestModLike || occurredAt > newestModLike) {
+        newestModLike = occurredAt;
+      }
+    }
+  }
 
   const patch: Record<string, unknown> = {};
   if (latestInventory) {
     // elevators.inventoryDate is stored as text (YYYY-MM-DD) — match.
-    patch.inventoryDate = latestInventory.occurredAt.toISOString().slice(0, 10);
+    patch.inventoryDate = latestInventory.toISOString().slice(0, 10);
   }
   if (newestModLike) {
     // elevators.modernizationYear is stored as text — use the year.
-    patch.modernizationYear = String(
-      newestModLike.occurredAt.getUTCFullYear(),
-    );
+    patch.modernizationYear = String(newestModLike.getUTCFullYear());
   }
   if (Object.keys(patch).length > 0) {
     await db.update(elevators).set(patch).where(eq(elevators.id, elevatorId));
@@ -262,28 +253,32 @@ async function createEventFn(
   });
   if (!existing) throw new Error("Hissen hittades inte");
 
-  const [row] = await db
-    .insert(elevatorEvents)
-    .values({
-      elevatorId: input.elevatorId,
-      type: input.type,
-      occurredAt: input.occurredAt,
-      title: input.title,
-      description: input.description ?? undefined,
-      cost: input.cost != null ? String(input.cost) : undefined,
-      currency: input.currency ?? undefined,
-      performedBy: input.performedBy ?? undefined,
-      metadata: input.metadata ?? undefined,
-      createdBy: userId,
-    })
-    .returning({ id: elevatorEvents.id });
+  const result = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(elevatorEvents)
+      .values({
+        elevatorId: input.elevatorId,
+        type: input.type,
+        occurredAt: input.occurredAt,
+        title: input.title,
+        description: input.description ?? undefined,
+        cost: input.cost != null ? String(input.cost) : undefined,
+        currency: input.currency ?? undefined,
+        performedBy: input.performedBy ?? undefined,
+        metadata: input.metadata ?? undefined,
+        createdBy: userId,
+      })
+      .returning({ id: elevatorEvents.id });
 
-  if (input.type === "inventory" || input.type === "modernization") {
-    await syncElevatorCache(db, input.elevatorId);
-  }
+    if (input.type === "inventory" || input.type === "modernization") {
+      await syncElevatorCache(tx, input.elevatorId);
+    }
 
-  if (!row) throw new Error("Kunde inte skapa händelse");
-  return { id: row.id };
+    if (!row) throw new Error("Kunde inte skapa händelse");
+    return row;
+  });
+
+  return { id: result.id };
 }
 
 async function updateEventFn(
@@ -318,21 +313,23 @@ async function updateEventFn(
     patch.metadata = input.metadata;
   }
 
-  await db
-    .update(elevatorEvents)
-    .set(patch)
-    .where(eq(elevatorEvents.id, input.id));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(elevatorEvents)
+      .set(patch)
+      .where(eq(elevatorEvents.id, input.id));
 
-  if (
-    input.type === "inventory" ||
-    input.type === "modernization" ||
-    input.type === "replacement" ||
-    existing.type === "inventory" ||
-    existing.type === "modernization" ||
-    existing.type === "replacement"
-  ) {
-    await syncElevatorCache(db, input.elevatorId);
-  }
+    if (
+      input.type === "inventory" ||
+      input.type === "modernization" ||
+      input.type === "replacement" ||
+      existing.type === "inventory" ||
+      existing.type === "modernization" ||
+      existing.type === "replacement"
+    ) {
+      await syncElevatorCache(tx, input.elevatorId);
+    }
+  });
 
   return { id: input.id };
 }
@@ -355,8 +352,11 @@ function coerceDetailValue(
   }
   if (key === "passthrough") {
     if (typeof raw === "boolean") return raw;
-    if (raw === "true" || raw === "Ja" || raw === "ja") return true;
-    if (raw === "false" || raw === "Nej" || raw === "nej") return false;
+    if (typeof raw === "string") {
+      const s = raw.trim().toLowerCase();
+      if (s === "true" || s === "ja") return true;
+      if (s === "false" || s === "nej") return false;
+    }
     return null;
   }
   return String(raw);
@@ -494,6 +494,26 @@ async function createReplacementEventFn(
       } else {
         detailPatch[key] = value;
       }
+    }
+  }
+
+  // Preflight duplicate check — the new identity may reuse a number that
+  // already exists on another elevator in the same org, which would trip the
+  // (organizationId, elevatorNumber) unique index and surface the raw Postgres
+  // error to the user. Only check if the number is actually changing.
+  if (input.newIdentity.elevatorNumber !== existing.elevatorNumber) {
+    const duplicate = await db.query.elevators.findFirst({
+      where: and(
+        eq(elevators.elevatorNumber, input.newIdentity.elevatorNumber),
+        eq(elevators.organizationId, existing.organizationId),
+        ne(elevators.id, input.elevatorId),
+      ),
+      columns: { id: true },
+    });
+    if (duplicate) {
+      throw new Error(
+        `Hissnummer ${input.newIdentity.elevatorNumber} finns redan i registret`,
+      );
     }
   }
 
