@@ -18,6 +18,12 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Hisskompetens Admin" },
+      // Security hardening that works via meta. Headers that cannot live in
+      // a meta tag (CSP frame-ancestors, HSTS, X-Frame-Options,
+      // X-Content-Type-Options) are configured at the Cloudflare zone level
+      // via Transform Rules.
+      { name: "referrer", content: "strict-origin-when-cross-origin" },
+      { name: "robots", content: "noindex, nofollow" },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),
@@ -53,6 +59,10 @@ function RootLayout() {
 }
 
 function RootError({ error }: { error: Error }) {
+  // Log the raw error for operators (server logs + browser devtools) but
+  // never surface `error.message` to end users — it can leak Drizzle SQL,
+  // PG constraint names, or internal paths.
+  console.error("[RootError]", error);
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-md rounded-lg border border-red-200 bg-red-50 p-6 text-center">
@@ -60,7 +70,7 @@ function RootError({ error }: { error: Error }) {
           Något gick fel
         </h1>
         <p className="mb-4 text-sm text-red-600">
-          {error.message || "Ett oväntat fel inträffade."}
+          Ett oväntat fel inträffade. Försök igen om en stund.
         </p>
         <button
           onClick={() => window.location.reload()}

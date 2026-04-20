@@ -13,3 +13,7 @@ dist
 .pnpm-store/
 *.tsbuildinfo
 routeTree.gen.ts
+
+# Customer data exports / scratch spreadsheets — NEVER commit
+Statuslista*
+hissar-sample.csv

@@ -4,12 +4,15 @@ import { z } from "zod";
 import { eq, and, inArray } from "drizzle-orm";
 import { createClerkClient } from "@clerk/backend";
 import { users, userOrganizations, organizations } from "@elevatorbud/db/schema";
-import type { Database } from "@elevatorbud/db";
+import type { Database, DatabaseHttp } from "@elevatorbud/db";
 import {
   adminMiddleware,
+  adminMiddlewareRead,
   invalidateUserCacheByDbId,
   invalidateUserCacheByClerkId,
 } from "./auth";
+
+type ReadDb = Database | DatabaseHttp;
 
 function getClerkClient() {
   return createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
@@ -105,7 +108,7 @@ type UserWithOrgs = typeof users.$inferSelect & {
 // ---------------------------------------------------------------------------
 
 async function listUsersFn(
-  db: Database,
+  db: ReadDb,
   filters?: z.infer<typeof listUsersSchema>,
 ) {
   if (filters?.organizationId) {
@@ -370,7 +373,7 @@ async function deleteUserFn(db: Database, id: string) {
 // ---------------------------------------------------------------------------
 
 export const getMe = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .handler(async ({ context }) => {
     return context.user;
   });
@@ -382,7 +385,7 @@ export const getMeOptions = () =>
   });
 
 export const listUsers = createServerFn({ method: "POST" })
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(listUsersSchema)
   .handler(async ({ data, context }) => {
     return listUsersFn(context.db, data);
@@ -394,10 +397,36 @@ export const listUsersOptions = (filters?: z.infer<typeof listUsersSchema>) =>
     queryFn: () => listUsers({ data: filters }),
   });
 
+// Self-action lockout guard — admins must not be able to revoke their own
+// access or delete their own row via the admin UI. A legitimate "leave the
+// team" flow would go through a different, reviewed path.
+function assertNotSelf(
+  targetUserId: string,
+  actingUserId: string,
+  action: string,
+) {
+  if (targetUserId === actingUserId) {
+    throw new Error(
+      `Du kan inte ${action} ditt eget konto. Be en annan administratör att göra det.`,
+    );
+  }
+}
+
 export const updateUser = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
   .inputValidator(updateUserSchema)
   .handler(async ({ data, context }) => {
+    // Block the two self-actions that could lock the admin out. Changing own
+    // name/email is harmless and goes through a different path anyway — this
+    // endpoint only touches role/active/organizationIds.
+    if (data.id === context.user.id) {
+      if (data.role !== undefined && data.role !== context.user.role) {
+        assertNotSelf(data.id, context.user.id, "ändra roll på");
+      }
+      if (data.active === false) {
+        assertNotSelf(data.id, context.user.id, "inaktivera");
+      }
+    }
     return updateUserFn(context.db, data);
   });
 
@@ -405,6 +434,7 @@ export const deactivateUser = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data, context }) => {
+    assertNotSelf(data.id, context.user.id, "inaktivera");
     return deactivateUserFn(context.db, data.id);
   });
 
@@ -426,6 +456,7 @@ export const deleteUser = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data, context }) => {
+    assertNotSelf(data.id, context.user.id, "radera");
     return deleteUserFn(context.db, data.id);
   });
 

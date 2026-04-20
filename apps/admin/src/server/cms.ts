@@ -10,6 +10,23 @@ import { adminMiddleware } from "./auth";
 // Zod schemas (inlined from packages/api/src/routers/cms.ts)
 // ---------------------------------------------------------------------------
 
+// Allowlist URL schemes so a malicious/compromised admin can't store
+// `javascript:` or `data:` values that would become stored-XSS the moment
+// the landing page renders them into an `href` or `src`.
+const safeHref = z
+  .string()
+  .refine(
+    (v) => v === "" || /^(\/|https?:\/\/|mailto:|tel:)/i.test(v.trim()),
+    "Länken måste börja med /, https://, http://, mailto: eller tel:",
+  );
+
+const safeImageUrl = z
+  .string()
+  .refine(
+    (v) => v === "" || /^(\/|https?:\/\/)/i.test(v.trim()),
+    "Bild-URL måste börja med / eller https://",
+  );
+
 const sectionSchema = z.object({
   id: z.string(),
   type: z.string(),
@@ -25,8 +42,8 @@ const sectionSchema = z.object({
       }),
     )
     .optional(),
-  cta: z.object({ text: z.string(), href: z.string() }).optional(),
-  imageUrl: z.string().optional(),
+  cta: z.object({ text: z.string(), href: safeHref }).optional(),
+  imageUrl: safeImageUrl.optional(),
   order: z.number(),
 });
 
