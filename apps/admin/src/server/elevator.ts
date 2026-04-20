@@ -24,6 +24,14 @@ type ReadDb = Database | DatabaseHttp;
 
 const NOT_MODERNIZED = "Ej ombyggd";
 
+// `suggested_values` is a GLOBAL table with no organizationId scoping —
+// everything auto-added here surfaces as an autocomplete suggestion in every
+// other customer's admin UI. Only include categories whose values are
+// industry-wide reference data (manufacturers, door types, etc.). Free-text
+// fields that would carry tenant-specific business content (notably
+// `measures` — the description of planned modernization work) MUST NOT be
+// auto-collected. Admins curate `measures` reference values manually via
+// the reference-data UI instead.
 const CATEGORY_FIELDS = [
   "elevator_type",
   "manufacturer",
@@ -35,7 +43,6 @@ const CATEGORY_FIELDS = [
   "dispatch_mode",
   "drive_system",
   "machine_placement",
-  "measures",
 ] as const;
 
 async function autoAddSuggestedValues(
