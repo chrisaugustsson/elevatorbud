@@ -20,11 +20,12 @@ import {
   CalendarCheck,
 } from "lucide-react";
 import { Button } from "@elevatorbud/ui/components/ui/button";
+import { formatInspectionMonth } from "@elevatorbud/utils/format";
 
 type DashboardData = {
   totalElevators: number;
   totalOrganizations: number;
-  upcomingInspections: number;
+  upcomingInspections: { count: number; month: number };
   modernizationSoon: number;
   topOrganizations: {
     id: string;
@@ -68,8 +69,8 @@ function Dashboard() {
           icon={<Building2 className="h-4 w-4 text-muted-foreground" />}
         />
         <StatCard
-          label="Kommande besiktningar"
-          value={data.upcomingInspections}
+          label={`Besiktningar i ${formatInspectionMonth(data.upcomingInspections.month)}`}
+          value={data.upcomingInspections.count}
           icon={<CalendarCheck className="h-4 w-4 text-muted-foreground" />}
         />
         <StatCard
