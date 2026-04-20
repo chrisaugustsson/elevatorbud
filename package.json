@@ -21,7 +21,6 @@
     "@clerk/backend": "^3.2.4",
     "@types/node": "^25.5.0",
     "concurrently": "^9.2.1",
-    "resend": "^6.10.0",
     "svix": "^1.89.0",
     "turbo": "^2.9.3",
     "typescript": "^6.0.2"
