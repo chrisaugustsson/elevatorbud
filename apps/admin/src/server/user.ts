@@ -8,6 +8,7 @@ import type { Database, DatabaseHttp } from "@elevatorbud/db";
 import {
   adminMiddleware,
   adminMiddlewareRead,
+  authMiddlewareRead,
   invalidateUserCacheByDbId,
   invalidateUserCacheByClerkId,
 } from "./auth";
@@ -372,8 +373,14 @@ async function deleteUserFn(db: Database, id: string) {
 // Server functions
 // ---------------------------------------------------------------------------
 
+// Uses authMiddlewareRead (not adminMiddlewareRead) so that non-admin users
+// who land on the admin app can still fetch their own identity. The
+// `_authenticated` layout then renders an "Åtkomst nekad" screen with a
+// sign-out button — if this throws a role error instead, the request dies
+// in the server-fn and the user sees a generic error boundary with no
+// recovery path.
 export const getMe = createServerFn()
-  .middleware([adminMiddlewareRead])
+  .middleware([authMiddlewareRead])
   .handler(async ({ context }) => {
     return context.user;
   });
