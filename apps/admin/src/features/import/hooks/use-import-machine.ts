@@ -35,9 +35,13 @@ export type ImportProgress = {
 
 export type ImportResult = {
   created: number;
+  updated: number;
   total: number;
   failures: ImportFailure[];
-  perOrgCounts?: Record<string, { orgName: string; created: number }>;
+  perOrgCounts?: Record<
+    string,
+    { orgName: string; created: number; updated: number }
+  >;
 };
 
 export type { ImportFailure };
@@ -410,10 +414,11 @@ export function useImportMachine() {
     setImportProgress({ current: 0, total });
 
     let totalCreated = 0;
+    let totalUpdated = 0;
     const allFailures: ImportFailure[] = [];
     const aggregatedPerOrg: Record<
       string,
-      { orgName: string; created: number }
+      { orgName: string; created: number; updated: number }
     > = {};
 
     // Sequential chunks: parallel requests would blow through the DB
@@ -424,15 +429,18 @@ export function useImportMachine() {
       try {
         const result = await confirmImport({ data: { elevators: chunk } });
         totalCreated += result.created;
+        totalUpdated += result.updated;
         if (result.failures.length > 0) allFailures.push(...result.failures);
         for (const [orgId, counts] of Object.entries(result.perOrgCounts)) {
           if (!aggregatedPerOrg[orgId]) {
             aggregatedPerOrg[orgId] = {
               orgName: counts.orgName || orgNameById.get(orgId) || orgId,
               created: 0,
+              updated: 0,
             };
           }
           aggregatedPerOrg[orgId]!.created += counts.created;
+          aggregatedPerOrg[orgId]!.updated += counts.updated;
         }
       } catch (e) {
         // The chunk itself threw — network issue, auth, schema bug. Record
@@ -454,6 +462,7 @@ export function useImportMachine() {
         setImportProgress({ current: i + chunk.length, total });
         setImportResult({
           created: totalCreated,
+          updated: totalUpdated,
           total,
           failures: allFailures,
           perOrgCounts: aggregatedPerOrg,
@@ -467,6 +476,7 @@ export function useImportMachine() {
 
     setImportResult({
       created: totalCreated,
+      updated: totalUpdated,
       total,
       failures: allFailures,
       perOrgCounts: aggregatedPerOrg,
