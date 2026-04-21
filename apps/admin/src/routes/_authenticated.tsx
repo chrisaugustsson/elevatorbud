@@ -31,9 +31,11 @@ const authGuard = createServerFn().handler(async () => {
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: () => authGuard(),
-  loader: ({ context }) => {
-    context.queryClient.prefetchQuery(getMeOptions());
-    context.queryClient.prefetchQuery(unreadCountOptions());
+  loader: async ({ context }) => {
+    await Promise.all([
+      context.queryClient.prefetchQuery(getMeOptions()),
+      context.queryClient.prefetchQuery(unreadCountOptions()),
+    ]);
   },
   component: AuthenticatedLayout,
 });
