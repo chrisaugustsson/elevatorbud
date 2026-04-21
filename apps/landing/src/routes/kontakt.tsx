@@ -66,7 +66,7 @@ function Kontakt() {
     queryFn: () => getPage({ data: { slug: "kontakt" } }),
   });
   const submitContactMutation = useMutation({
-    mutationFn: (input: { name: string; email: string; phone?: string; message: string; turnstileToken?: string }) =>
+    mutationFn: (input: { name: string; email: string; phone?: string; message: string; turnstileToken: string }) =>
       submitContact({ data: input }),
   });
   const [submitted, setSubmitted] = useState(false);
@@ -200,6 +200,7 @@ function Kontakt() {
                     email: formData.get("epost") as string,
                     phone: (formData.get("telefon") as string) || undefined,
                     message: formData.get("meddelande") as string,
+                    turnstileToken,
                   });
                   setSubmitted(true);
                 } catch {

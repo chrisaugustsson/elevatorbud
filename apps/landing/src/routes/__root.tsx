@@ -26,6 +26,10 @@ export const Route = createRootRoute({
         content:
           "Hisskompetens erbjuder professionell hisshantering, besiktning och modernisering av hissar i Sverige.",
       },
+      // Security hardening that works via meta. Headers that cannot live in
+      // a meta tag (CSP, HSTS, X-Frame-Options, X-Content-Type-Options) are
+      // configured at the Cloudflare zone level via Transform Rules.
+      { name: "referrer", content: "strict-origin-when-cross-origin" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -74,6 +78,10 @@ const navLinks = [
 ];
 
 function RootError({ error }: { error: Error }) {
+  // Log the raw error for operators (server logs + browser devtools) but
+  // never surface `error.message` to end users — it can leak Drizzle SQL,
+  // PG constraint names, or internal paths.
+  console.error("[RootError]", error);
   return (
     <RootDocument>
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -82,7 +90,7 @@ function RootError({ error }: { error: Error }) {
             Något gick fel
           </h1>
           <p className="mb-4 text-sm text-red-600">
-            {error.message || "Ett oväntat fel inträffade."}
+            Ett oväntat fel inträffade. Försök igen om en stund.
           </p>
           <button
             onClick={() => window.location.reload()}

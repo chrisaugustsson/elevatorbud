@@ -3,8 +3,10 @@ import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
 import { eq, inArray, and, not } from "drizzle-orm";
 import { organizations, userOrganizations, users } from "@elevatorbud/db/schema";
-import type { Database } from "@elevatorbud/db";
-import { adminMiddleware } from "./auth";
+import type { Database, DatabaseHttp } from "@elevatorbud/db";
+import { adminMiddleware, adminMiddlewareRead } from "./auth";
+
+type ReadDb = Database | DatabaseHttp;
 
 // ---------------------------------------------------------------------------
 // Zod schemas (inlined from packages/api/src/routers/organization.ts)
@@ -28,13 +30,13 @@ const updateOrganizationSchema = z.object({
 // Admin sees ALL organizations — no org scoping.
 // ---------------------------------------------------------------------------
 
-async function listOrgs(db: Database) {
+async function listOrgs(db: ReadDb) {
   return db.query.organizations.findMany({
     orderBy: (orgs, { asc }) => [asc(orgs.name)],
   });
 }
 
-async function getOrg(db: Database, id: string) {
+async function getOrg(db: ReadDb, id: string) {
   return db.query.organizations.findFirst({
     where: eq(organizations.id, id),
   });
@@ -134,7 +136,7 @@ async function updateOrg(
 // ---------------------------------------------------------------------------
 
 export const listOrganizations = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .handler(async ({ context }) => {
     return listOrgs(context.db);
   });
@@ -146,7 +148,7 @@ export const listOrganizationsOptions = () =>
   });
 
 export const getOrganization = createServerFn()
-  .middleware([adminMiddleware])
+  .middleware([adminMiddlewareRead])
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data, context }) => {
     return getOrg(context.db, data.id);

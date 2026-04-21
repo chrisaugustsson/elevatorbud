@@ -44,6 +44,7 @@ const currentMonthIndex = new Date().getMonth();
 const currentMonthName = MANADER[currentMonthIndex];
 
 export type KalenderEntry = {
+  monthNumber: number;
   name: string;
   fullName: string;
   count: number;
@@ -65,8 +66,8 @@ interface InspectionCalendarSectionProps {
   kalenderData: KalenderEntry[];
   totalBesiktningar: number;
   currentMonthCount: number;
-  selectedManad: string | null;
-  onSelectManad: (month: string | null) => void;
+  selectedMonth: number | null;
+  onSelectMonth: (month: number | null) => void;
   besiktningslista: InspectionListItem[] | undefined;
 }
 
@@ -74,11 +75,14 @@ export function InspectionCalendarSection({
   kalenderData,
   totalBesiktningar,
   currentMonthCount,
-  selectedManad,
-  onSelectManad,
+  selectedMonth,
+  onSelectMonth,
   besiktningslista,
 }: InspectionCalendarSectionProps) {
-  const { parentOrgId } = useParams({ strict: false }) as { parentOrgId: string };
+  const selectedMonthName =
+    selectedMonth != null
+      ? kalenderData.find((k) => k.monthNumber === selectedMonth)?.fullName ?? null
+      : null;
   return (
     <div className="space-y-4">
       <h2 className="flex items-center gap-2 text-lg font-semibold">
@@ -97,13 +101,14 @@ export function InspectionCalendarSection({
       <InspectionBarChart
         kalenderData={kalenderData}
         totalBesiktningar={totalBesiktningar}
-        selectedManad={selectedManad}
-        onSelectManad={onSelectManad}
+        selectedMonth={selectedMonth}
+        onSelectMonth={onSelectMonth}
+        selectedMonthName={selectedMonthName}
       />
 
-      {selectedManad && (
+      {selectedMonthName && (
         <InspectionMonthList
-          selectedManad={selectedManad}
+          selectedMonthName={selectedMonthName}
           besiktningslista={besiktningslista}
         />
       )}
@@ -152,13 +157,15 @@ function InspectionSummaryCards({
 function InspectionBarChart({
   kalenderData,
   totalBesiktningar,
-  selectedManad,
-  onSelectManad,
+  selectedMonth,
+  onSelectMonth,
+  selectedMonthName,
 }: {
   kalenderData: KalenderEntry[];
   totalBesiktningar: number;
-  selectedManad: string | null;
-  onSelectManad: (month: string | null) => void;
+  selectedMonth: number | null;
+  onSelectMonth: (month: number | null) => void;
+  selectedMonthName: string | null;
 }) {
   const colors = useChartColors();
 
@@ -175,14 +182,14 @@ function InspectionBarChart({
               : entry.isCurrent
                 ? colors.chart1
                 : colors.chart2;
-            return selectedManad && !entry.isSelected ? base + "66" : base;
+            return selectedMonth != null && !entry.isSelected ? base + "66" : base;
           }),
           borderRadius: 4,
           barPercentage: 0.7,
         },
       ],
     }),
-    [kalenderData, colors, selectedManad],
+    [kalenderData, colors, selectedMonth],
   );
 
   const options = useMemo(
@@ -212,14 +219,16 @@ function InspectionBarChart({
         elements: { index: number }[],
       ) => {
         if (elements[0]) {
-          const fullName = kalenderData[elements[0].index]?.fullName;
-          if (fullName) {
-            onSelectManad(selectedManad === fullName ? null : fullName);
+          const entry = kalenderData[elements[0].index];
+          if (entry) {
+            onSelectMonth(
+              selectedMonth === entry.monthNumber ? null : entry.monthNumber,
+            );
           }
         }
       },
     }),
-    [colors, kalenderData, selectedManad, onSelectManad],
+    [colors, kalenderData, selectedMonth, onSelectMonth],
   );
 
   return (
@@ -227,14 +236,14 @@ function InspectionBarChart({
       <CardHeader>
         <CardTitle className="text-base">
           Besiktningar per månad
-          {selectedManad && (
+          {selectedMonthName && (
             <Badge variant="outline" className="ml-2 font-normal">
-              {selectedManad}
+              {selectedMonthName}
               <button
                 className="ml-1 hover:text-destructive"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onSelectManad(null);
+                  onSelectMonth(null);
                 }}
               >
                 ×
@@ -266,10 +275,10 @@ function InspectionBarChart({
 }
 
 function InspectionMonthList({
-  selectedManad,
+  selectedMonthName,
   besiktningslista,
 }: {
-  selectedManad: string;
+  selectedMonthName: string;
   besiktningslista: InspectionListItem[] | undefined;
 }) {
   const { parentOrgId } = useParams({ strict: false }) as { parentOrgId: string };
@@ -277,7 +286,7 @@ function InspectionMonthList({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">
-          Hissar med besiktning i {selectedManad}
+          Hissar med besiktning i {selectedMonthName}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -289,7 +298,7 @@ function InspectionMonthList({
           </div>
         ) : besiktningslista.length === 0 ? (
           <p className="py-4 text-center text-muted-foreground">
-            Inga hissar med besiktning i {selectedManad}.
+            Inga hissar med besiktning i {selectedMonthName}.
           </p>
         ) : (
           <div className="overflow-x-auto">

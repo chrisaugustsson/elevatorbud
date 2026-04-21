@@ -1,25 +1,42 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { elevatorOptions, elevatorDetailsOptions, elevatorBudgetOptions } from "../../../server/elevator";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@elevatorbud/ui/components/ui/button";
+import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@elevatorbud/ui/components/ui/tabs";
+import {
+  elevatorOptions,
+  elevatorDetailsOptions,
+  elevatorBudgetOptions,
+} from "../../../server/elevator";
 import { elevatorEventsOptions } from "../../../server/elevator-events";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@elevatorbud/ui/components/ui/card";
-import { Button } from "@elevatorbud/ui/components/ui/button";
-import { Badge } from "@elevatorbud/ui/components/ui/badge";
-import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
-import { Separator } from "@elevatorbud/ui/components/ui/separator";
-import { ArrowLeft, Phone, MessageSquare, History } from "lucide-react";
-import { EventTimeline } from "../../../features/elevator-events/event-timeline";
+  IdentityHero,
+  type IdentityData,
+} from "../../../features/elevator/identity-panel";
+import {
+  EventList,
+  PlanList,
+  type EditorialEvent,
+  type EditorialPlan,
+} from "../../../features/elevator/editorial-rows";
 
 export const Route = createFileRoute("/_authenticated/$parentOrgId/hiss/$id")({
   loader: ({ context, params }) => {
-    context.queryClient.prefetchQuery(elevatorOptions(params.id, params.parentOrgId));
-    context.queryClient.prefetchQuery(elevatorDetailsOptions(params.id, params.parentOrgId));
-    context.queryClient.prefetchQuery(elevatorBudgetOptions(params.id, params.parentOrgId));
+    context.queryClient.prefetchQuery(
+      elevatorOptions(params.id, params.parentOrgId),
+    );
+    context.queryClient.prefetchQuery(
+      elevatorDetailsOptions(params.id, params.parentOrgId),
+    );
+    context.queryClient.prefetchQuery(
+      elevatorBudgetOptions(params.id, params.parentOrgId),
+    );
     context.queryClient.prefetchQuery(
       elevatorEventsOptions(params.id, params.parentOrgId),
     );
@@ -28,61 +45,15 @@ export const Route = createFileRoute("/_authenticated/$parentOrgId/hiss/$id")({
   pendingComponent: DetailSkeleton,
 });
 
-function DetailField({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number | boolean | null | undefined;
-}) {
-  let display: string;
-  if (value === undefined || value === null || value === "") {
-    display = "—";
-  } else if (typeof value === "boolean") {
-    display = value ? "Ja" : "Nej";
-  } else {
-    display = String(value);
-  }
-
-  return (
-    <div className="space-y-1">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="text-sm font-medium">{display}</dd>
-    </div>
-  );
-}
-
-function DetailSection({
-  title,
-  icon,
-  children,
-}: {
-  title: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          {icon}
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
-          {children}
-        </dl>
-      </CardContent>
-    </Card>
-  );
-}
-
 function HissDetail() {
   const { id, parentOrgId } = Route.useParams();
   const { data: hiss } = useSuspenseQuery(elevatorOptions(id, parentOrgId));
-  const { data: details } = useSuspenseQuery(elevatorDetailsOptions(id, parentOrgId));
-  const { data: budget } = useSuspenseQuery(elevatorBudgetOptions(id, parentOrgId));
+  const { data: details } = useSuspenseQuery(
+    elevatorDetailsOptions(id, parentOrgId),
+  );
+  const { data: budget } = useSuspenseQuery(
+    elevatorBudgetOptions(id, parentOrgId),
+  );
   const { data: events } = useSuspenseQuery(
     elevatorEventsOptions(id, parentOrgId),
   );
@@ -95,187 +66,340 @@ function HissDetail() {
     );
   }
 
-  const statusLabel: Record<string, string> = {
-    active: "Aktiv",
-    demolished: "Rivd",
-    archived: "Arkiverad",
+  const identityData: IdentityData = {
+    elevatorNumber: hiss.elevatorNumber,
+    address: hiss.address,
+    district: hiss.district,
+    organizationName: hiss.organization?.name ?? null,
+    contactPersonName: hiss.contactPersonName,
+    maintenanceCompany: hiss.maintenanceCompany,
+    inspectionAuthority: hiss.inspectionAuthority,
+    inspectionMonth: hiss.inspectionMonth,
+    warrantyExpiresAt: hiss.warrantyExpiresAt,
+    createdAt: hiss.createdAt,
+    lastUpdatedAt: hiss.lastUpdatedAt,
   };
 
-  const statusVariant = hiss.status === "active" ? "default" : "secondary";
+  // Client has a single-latest-budget query (not an array like admin). Wrap
+  // it into a one-element list so we can reuse the shared PlanList shape.
+  const editorialPlans: EditorialPlan[] = budget
+    ? [
+        {
+          id: budget.id,
+          recommendedYear: budget.recommendedModernizationYear
+            ? Number(budget.recommendedModernizationYear)
+            : null,
+          measure: firstMeasure(budget.measures),
+          measures: budget.measures,
+          budgetAmount:
+            budget.budgetAmount != null ? Number(budget.budgetAmount) : null,
+        },
+      ]
+    : [];
+
+  // Events newest first — same ordering as the admin Historik section.
+  const editorialEvents: EditorialEvent[] = events
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
+    )
+    .map((e) => ({
+      id: e.id,
+      type: e.type,
+      occurredAt: e.occurredAt,
+      title: e.title,
+      description: e.description,
+      cost: e.cost,
+      currency: e.currency,
+      performedBy: e.performedBy,
+      metadata: e.metadata,
+    }));
+
+  // Synthetic "Installation" row from buildYear — UI-only, oldest in list.
+  if (hiss.buildYear != null) {
+    editorialEvents.push({
+      id: `synthetic-installation-${hiss.id}`,
+      type: "installation",
+      occurredAt: new Date(Date.UTC(hiss.buildYear, 0, 1)),
+      title: "",
+    });
+  }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <Link to="/$parentOrgId/register" params={{ parentOrgId }}>
-            <Button variant="ghost" size="icon" className="size-8">
-              <ArrowLeft className="size-4" />
-            </Button>
-          </Link>
-          <h1 className="text-2xl font-bold">{hiss.elevatorNumber}</h1>
-          <Badge variant={statusVariant}>
-            {statusLabel[hiss.status] ?? hiss.status}
-          </Badge>
-        </div>
-        {hiss.address && (
-          <p className="ml-10 text-sm text-muted-foreground">{hiss.address}</p>
-        )}
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      {/* ── Header / breadcrumb ──────────────────────────────────── */}
+      <header className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <Link to="/$parentOrgId/register" params={{ parentOrgId }}>
+          <Button variant="ghost" size="icon" className="size-7">
+            <ArrowLeft className="size-4" />
+          </Button>
+        </Link>
+        <Link
+          to="/$parentOrgId/register"
+          params={{ parentOrgId }}
+          className="hover:underline"
+        >
+          Register
+        </Link>
+        <span>›</span>
+        <span className="font-medium text-foreground">
+          {hiss.elevatorNumber}
+        </span>
+      </header>
 
-      <Separator />
+      {/* ── Identity hero ────────────────────────────────────────── */}
+      <IdentityHero data={identityData} />
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <History className="size-4" />
-            Historik
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <EventTimeline
-            events={events.map((e) => ({
-              id: e.id,
-              type: e.type,
-              occurredAt: e.occurredAt,
-              title: e.title,
-              description: e.description,
-              cost: e.cost,
-              currency: e.currency,
-              performedBy: e.performedBy,
-            }))}
-          />
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="oversikt">
+        <TabsList variant="line" className="w-full justify-start">
+          <TabsTrigger value="oversikt">Översikt</TabsTrigger>
+          <TabsTrigger value="teknik">Teknik</TabsTrigger>
+        </TabsList>
 
-      <DetailSection title="Identifiering">
-        <DetailField label="Hissnummer" value={hiss.elevatorNumber} />
-        <DetailField label="Adress" value={hiss.address} />
-        <DetailField label="Klassificering" value={hiss.elevatorClassification} />
-        <DetailField label="Distrikt" value={hiss.district} />
-      </DetailSection>
+        {/* ── Översikt: Planerat + Historik ────────────────────── */}
+        <TabsContent value="oversikt" className="mt-8 space-y-16">
+          <section>
+            <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+              Planerat
+              {editorialPlans.length > 0 && (
+                <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-muted px-1.5 text-xs font-medium tabular-nums text-muted-foreground">
+                  {editorialPlans.length}
+                </span>
+              )}
+            </h2>
+            <div className="mt-6">
+              {editorialPlans.length > 0 ? (
+                <PlanList plans={editorialPlans} />
+              ) : (
+                <p className="pl-14 py-2 text-sm text-muted-foreground">
+                  Inga planerade moderniseringar.
+                </p>
+              )}
+            </div>
+          </section>
 
-      <DetailSection title="Teknisk specifikation">
-        <DetailField label="Hisstyp" value={hiss.elevatorType} />
-        <DetailField label="Fabrikat" value={hiss.manufacturer} />
-        <DetailField label="Byggår" value={hiss.buildYear} />
-        <DetailField label="Hastighet (m/s)" value={details?.speed} />
-        <DetailField label="Lyfthöjd (m)" value={details?.liftHeight} />
-        <DetailField label="Märklast (kg)" value={details?.loadCapacity} />
-        <DetailField label="Antal plan" value={details?.floorCount} />
-        <DetailField label="Antal dörrar" value={details?.doorCount} />
-      </DetailSection>
+          <section>
+            <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+              Historik
+              {editorialEvents.length > 0 && (
+                <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-muted px-1.5 text-xs font-medium tabular-nums text-muted-foreground">
+                  {editorialEvents.length}
+                </span>
+              )}
+            </h2>
+            <div className="mt-6">
+              {editorialEvents.length > 0 ? (
+                <EventList events={editorialEvents} />
+              ) : (
+                <p className="pl-14 py-2 text-sm text-muted-foreground">
+                  Inga registrerade händelser ännu.
+                </p>
+              )}
+            </div>
+          </section>
+        </TabsContent>
 
-      <DetailSection title="Dörrar och korg">
-        <DetailField label="Typ dörrar" value={details?.doorType} />
-        <DetailField label="Genomgång" value={details?.passthrough} />
-        <DetailField label="Manövrering" value={details?.dispatchMode} />
-        <DetailField label="Korgstorlek" value={details?.cabSize} />
-        <DetailField label="Dörröppning" value={details?.doorOpening} />
-        <DetailField label="Dörrbärare" value={details?.doorCarrier} />
-        <DetailField label="Dörrmaskin" value={details?.doorMachine} />
-      </DetailSection>
+        {/* ── Teknik: spec blocks ─────────────────────────────── */}
+        <TabsContent value="teknik" className="mt-8">
+          <div className="grid grid-cols-1 gap-x-10 gap-y-10 md:grid-cols-2">
+            <div>
+              <h4 className="text-base font-semibold">Dörrar &amp; korg</h4>
+              <DefinitionList>
+                <Definition label="Typ dörrar" value={details?.doorType} />
+                <Definition
+                  label="Genomgång"
+                  value={formatBool(details?.passthrough)}
+                />
+                <Definition
+                  label="Manövrering"
+                  value={details?.dispatchMode}
+                />
+                <Definition
+                  label="Korgstorlek"
+                  value={details?.cabSize}
+                  mono
+                />
+                <Definition
+                  label="Dörröppning"
+                  value={details?.doorOpening}
+                  mono
+                />
+                <Definition label="Dörrmaskin" value={details?.doorMachine} />
+              </DefinitionList>
+            </div>
 
-      <DetailSection title="Maskineri">
-        <DetailField label="Drivsystem" value={details?.driveSystem} />
-        <DetailField label="Upphängning" value={details?.suspension} />
-        <DetailField label="Maskinplacering" value={details?.machinePlacement} />
-        <DetailField label="Typ maskin" value={details?.machineType} />
-        <DetailField label="Typ styrsystem" value={details?.controlSystemType} />
-      </DetailSection>
+            <div>
+              <h4 className="text-base font-semibold">Maskineri</h4>
+              <DefinitionList>
+                <Definition label="Drivsystem" value={details?.driveSystem} />
+                <Definition
+                  label="Upphängning"
+                  value={details?.suspension}
+                  mono
+                />
+                <Definition
+                  label="Maskinplacering"
+                  value={details?.machinePlacement}
+                />
+                <Definition label="Typ maskin" value={details?.machineType} />
+                <Definition
+                  label="Typ styrsystem"
+                  value={details?.controlSystemType}
+                />
+                <Definition
+                  label="Schaktbelysning"
+                  value={details?.shaftLighting}
+                />
+              </DefinitionList>
+            </div>
 
-      <DetailSection title="Besiktning och underhåll">
-        <DetailField label="Besiktningsorgan" value={hiss.inspectionAuthority} />
-        <DetailField label="Besiktningsmånad" value={hiss.inspectionMonth} />
-        <DetailField label="Skötselföretag" value={hiss.maintenanceCompany} />
-        <DetailField label="Schaktbelysning" value={details?.shaftLighting} />
-      </DetailSection>
+            <div>
+              <h4 className="text-base font-semibold">Teknisk specifikation</h4>
+              <DefinitionList>
+                <Definition label="Hisstyp" value={hiss.elevatorType} />
+                <Definition label="Fabrikat" value={hiss.manufacturer} />
+                <Definition label="Byggår" value={hiss.buildYear} mono />
+                <Definition
+                  label="Hastighet (m/s)"
+                  value={details?.speed}
+                  mono
+                />
+                <Definition
+                  label="Lyfthöjd (m)"
+                  value={details?.liftHeight}
+                  mono
+                />
+                <Definition
+                  label="Märklast (kg)"
+                  value={details?.loadCapacity}
+                  mono
+                />
+                <Definition
+                  label="Antal plan"
+                  value={details?.floorCount}
+                  mono
+                />
+                <Definition
+                  label="Antal dörrar"
+                  value={details?.doorCount}
+                  mono
+                />
+                <Definition
+                  label="Moderniserad"
+                  value={hiss.modernizationYear ?? "Ej ombyggd"}
+                />
+              </DefinitionList>
+            </div>
 
-      <DetailSection title="Modernisering">
-        <DetailField label="Moderniserad" value={hiss.modernizationYear} />
-        <DetailField
-          label="Garanti gäller t.o.m."
-          value={hiss.warrantyExpiresAt}
-        />
-        <DetailField
-          label="Rekommenderat moderniseringsår"
-          value={budget?.recommendedModernizationYear}
-        />
-        <DetailField
-          label="Budget"
-          value={
-            budget?.budgetAmount != null
-              ? `${Number(budget.budgetAmount).toLocaleString("sv-SE")} kr`
-              : undefined
-          }
-        />
-        <DetailField
-          label="Åtgärder vid modernisering"
-          value={budget?.measures}
-        />
-      </DetailSection>
+            <div>
+              <h4 className="text-base font-semibold">Nödtelefon</h4>
+              <DefinitionList>
+                <Definition
+                  label="Har nödtelefon"
+                  value={formatBool(hiss.hasEmergencyPhone)}
+                />
+                <Definition
+                  label="Behöver uppgradering"
+                  value={formatBool(hiss.needsUpgrade)}
+                />
+                <Definition
+                  label="Modell"
+                  value={details?.emergencyPhoneModel}
+                />
+                <Definition label="Typ" value={details?.emergencyPhoneType} />
+                <Definition
+                  label="Pris"
+                  value={
+                    details?.emergencyPhonePrice != null
+                      ? formatAmount(Number(details.emergencyPhonePrice))
+                      : null
+                  }
+                  mono
+                />
+              </DefinitionList>
+            </div>
 
-      <DetailSection
-        title="Nödtelefon"
-        icon={<Phone className="size-4" />}
-      >
-        <DetailField label="Har nödtelefon" value={hiss.hasEmergencyPhone} />
-        <DetailField label="Modell" value={details?.emergencyPhoneModel} />
-        <DetailField label="Typ" value={details?.emergencyPhoneType} />
-        <DetailField
-          label="Behöver uppgradering"
-          value={hiss.needsUpgrade}
-        />
-        <DetailField
-          label="Pris"
-          value={
-            details?.emergencyPhonePrice != null
-              ? `${Number(details.emergencyPhonePrice).toLocaleString("sv-SE")} kr`
-              : undefined
-          }
-        />
-      </DetailSection>
-
-      {details?.comments && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <MessageSquare className="size-4" />
-              Kommentarer
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="whitespace-pre-wrap text-sm">{details.comments}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="text-xs text-muted-foreground">
-        <p>
-          Skapad:{" "}
-          {new Date(hiss.createdAt).toLocaleDateString("sv-SE")}
-        </p>
-        {hiss.lastUpdatedAt && (
-          <p>
-            Senast uppdaterad:{" "}
-            {new Date(hiss.lastUpdatedAt).toLocaleDateString("sv-SE")}
-          </p>
-        )}
-      </div>
+            {details?.comments && (
+              <div className="md:col-span-2">
+                <h4 className="text-base font-semibold">Kommentarer</h4>
+                <p className="mt-2 max-w-prose whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                  {details.comments}
+                </p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
 
+// ────────────────────────────────────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────────────────────────────────────
+
+function DefinitionList({ children }: { children: React.ReactNode }) {
+  return (
+    <dl className="mt-3 divide-y divide-border/40 text-sm">{children}</dl>
+  );
+}
+
+function Definition({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-1.5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={mono ? "text-sm tabular-nums" : "text-sm"}>
+        {value != null && value !== "" ? value : "—"}
+      </dd>
+    </div>
+  );
+}
+
+function formatBool(v: boolean | null | undefined): string | null {
+  if (v == null) return null;
+  return v ? "Ja" : "Nej";
+}
+
+function formatAmount(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  return `${Math.round(n).toLocaleString("sv-SE")} kr`;
+}
+
+function firstMeasure(measures: string | null): string | null {
+  if (!measures) return null;
+  const first = measures.split(",")[0]?.trim();
+  return first && first.length > 0 ? first : null;
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Skeleton
+// ────────────────────────────────────────────────────────────────────────
+
 function DetailSkeleton() {
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex items-center gap-2">
-        <Skeleton className="size-8" />
-        <Skeleton className="h-8 w-48" />
+    <div className="mx-auto max-w-5xl space-y-10">
+      <div className="flex items-center justify-between gap-4">
+        <Skeleton className="h-6 w-64" />
       </div>
-      <Skeleton className="h-px w-full" />
-      <Skeleton className="h-48 w-full rounded-lg" />
-      <Skeleton className="h-48 w-full rounded-lg" />
-      <Skeleton className="h-48 w-full rounded-lg" />
+      <div className="space-y-3">
+        <Skeleton className="h-10 w-56" />
+        <Skeleton className="h-5 w-80" />
+        <Skeleton className="h-5 w-64" />
+      </div>
+      <div className="space-y-8">
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-40 w-full" />
+      </div>
     </div>
   );
 }

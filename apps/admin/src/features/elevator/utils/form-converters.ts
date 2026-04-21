@@ -43,7 +43,9 @@ export function serverToFormValues(
     machine_type: (hiss.machineType as string) ?? "",
     control_system_type: (hiss.controlSystemType as string) ?? "",
     inspection_authority: (hiss.inspectionAuthority as string) ?? "",
-    inspection_month: (hiss.inspectionMonth as string) ?? "",
+    // Form uses number-as-string ("1"…"12" or ""); DB stores integer.
+    inspection_month:
+      hiss.inspectionMonth != null ? String(hiss.inspectionMonth) : "",
     maintenance_company: (hiss.maintenanceCompany as string) ?? "",
     shaft_lighting: (hiss.shaftLighting as string) ?? "",
     modernization_year: (hiss.modernizationYear as string) ?? "",
@@ -94,7 +96,7 @@ export function formValuesToUpdateArgs(value: HissFormValues) {
     machineType: toOptionalString(value.machine_type),
     controlSystemType: toOptionalString(value.control_system_type),
     inspectionAuthority: toOptionalString(value.inspection_authority),
-    inspectionMonth: toOptionalString(value.inspection_month),
+    inspectionMonth: toOptionalNumber(value.inspection_month),
     maintenanceCompany: toOptionalString(value.maintenance_company),
     shaftLighting: toOptionalString(value.shaft_lighting),
     modernizationYear: toOptionalString(value.modernization_year),

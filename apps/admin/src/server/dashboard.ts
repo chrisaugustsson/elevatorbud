@@ -13,8 +13,7 @@ import { adminMiddlewareRead } from "./auth";
 async function overview(db: DatabaseHttp) {
   const currentYear = new Date().getFullYear();
   const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const nextMonth = now.getMonth() + 2 > 12 ? 1 : now.getMonth() + 2;
+  const nextMonth = ((now.getMonth() + 1) % 12) + 1;
   const modernizationCutoff = currentYear + 3;
 
   const activeCondition = eq(elevators.status, "active");
@@ -30,7 +29,7 @@ async function overview(db: DatabaseHttp) {
     db.execute(sql`
       SELECT count(*)::int as count FROM elevators e
       WHERE e.status = 'active'
-        AND e.inspection_month IN (${String(currentMonth)}, ${String(nextMonth)})
+        AND e.inspection_month = ${nextMonth}
     `),
     db.execute(sql`
       SELECT count(*)::int as count FROM elevators e
@@ -41,7 +40,7 @@ async function overview(db: DatabaseHttp) {
       ) lb ON true
       WHERE e.status = 'active'
         AND lb.recommended_modernization_year IS NOT NULL
-        AND lb.recommended_modernization_year ~ '^\d+$'
+        AND lb.recommended_modernization_year ~ '^[0-9]+$'
         AND lb.recommended_modernization_year::int <= ${modernizationCutoff}
     `),
     db.execute(sql`
@@ -77,7 +76,12 @@ async function overview(db: DatabaseHttp) {
   return {
     totalElevators: totalElevators[0]?.count ?? 0,
     totalOrganizations: totalOrgs[0]?.count ?? 0,
-    upcomingInspections: inspCount?.count ?? 0,
+    upcomingInspections: {
+      count: inspCount?.count ?? 0,
+      // Month number of the inspections being counted — UI uses this to
+      // build a dynamic card label like "Besiktningar i Maj".
+      month: nextMonth,
+    },
     modernizationSoon: modCount?.count ?? 0,
     topOrganizations: orgs.map((o) => ({
       id: o.id,

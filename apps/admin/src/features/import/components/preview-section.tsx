@@ -164,11 +164,12 @@ export function PreviewSection({
                 {parseResult.warnings.map((w, i) => (
                   <div
                     key={i}
-                    className="flex gap-2 rounded px-2 py-1 text-xs odd:bg-muted/50"
+                    className="flex flex-wrap gap-x-2 rounded px-2 py-1 text-xs odd:bg-muted/50"
                   >
                     <span className="shrink-0 font-mono text-muted-foreground">
                       Rad {w.row}
                       {w.column ? ` (${w.column})` : ""}
+                      {w.elevator_number ? ` · ${w.elevator_number}` : ""}
                     </span>
                     <span>{w.message}</span>
                   </div>

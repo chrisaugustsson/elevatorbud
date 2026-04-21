@@ -45,7 +45,7 @@ const confirmImportSchema = z.object({
       manufacturer: z.string().nullish(),
       build_year: z.number().nullish(),
       inspection_authority: z.string().nullish(),
-      inspection_month: z.string().nullish(),
+      inspection_month: z.number().int().min(1).max(12).nullish(),
       maintenance_company: z.string().nullish(),
       // Year-like fields accept only 4-digit year or null/undefined.
       // modernization_year additionally accepts the "Ej ombyggd" sentinel

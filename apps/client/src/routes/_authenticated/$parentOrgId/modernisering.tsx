@@ -314,11 +314,15 @@ function ModerniseringPage() {
             (prioritetslista?.items ?? []) as {
               id: string;
               elevatorNumber: string;
-              address?: string;
-              district?: string;
-              recommendedModernizationYear?: string;
-              budgetAmount?: number;
-              modernizationMeasures?: string;
+              address: string | null;
+              district: string | null;
+              elevatorType: string | null;
+              manufacturer: string | null;
+              buildYear: number | null;
+              organizationName: string | null;
+              recommendedModernizationYear: string | null;
+              budgetAmount: number | null;
+              measures: string | null;
             }[]
           }
           selectedPeriod={selectedPeriod}

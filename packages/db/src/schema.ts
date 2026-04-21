@@ -147,7 +147,12 @@ export const elevators = pgTable(
 
     // Inspection and maintenance
     inspectionAuthority: text("inspection_authority"),
-    inspectionMonth: text("inspection_month"),
+    // Month of the annual statutory inspection (1=Januari … 12=December).
+    // Imported values are normalized via parseInspectionMonth — the Excel
+    // column can hold Swedish names ("Maj"), short forms ("maj"), or
+    // numeric strings. The CHECK constraint below enforces the range at
+    // the DB level so a bad direct SQL write can't corrupt the column.
+    inspectionMonth: integer("inspection_month"),
     maintenanceCompany: text("maintenance_company"),
 
     // Modernization (historical — when it WAS modernized)
@@ -201,6 +206,10 @@ export const elevators = pgTable(
     ),
     check("elevators_status_check", sql`${t.status} IN ('active', 'demolished', 'archived')`),
     check("elevators_build_year_check", sql`${t.buildYear} IS NULL OR (${t.buildYear} >= 1800 AND ${t.buildYear} <= 2100)`),
+    check(
+      "elevators_inspection_month_check",
+      sql`${t.inspectionMonth} IS NULL OR (${t.inspectionMonth} >= 1 AND ${t.inspectionMonth} <= 12)`,
+    ),
   ],
 );
 

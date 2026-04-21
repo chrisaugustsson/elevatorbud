@@ -1,6 +1,6 @@
 // REACT & EXTERNAL LIBRARIES
 import * as React from 'react';
-import { createContext, ReactNode, useContext, CSSProperties, Fragment, HTMLAttributes, useId } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useState, CSSProperties, Fragment, HTMLAttributes, useId } from 'react';
 import {
   ColumnFiltersState,
   RowData,
@@ -95,7 +95,7 @@ declare module '@tanstack/react-table' {
     headerClassName?: string;
     cellClassName?: string;
     skeleton?: ReactNode;
-    expandedContent?: (row: TData) => ReactNode;
+    expandedContent?: (row: TData, expanded: boolean) => ReactNode;
   }
 }
 
@@ -546,16 +546,47 @@ function DataGridTableBodyRow<TData>({
   );
 }
 
-function DataGridTableBodyRowExpandded<TData>({ row }: { row: Row<TData> }) {
+/**
+ * Renders the expanded row but keeps it mounted for ~260ms after the row
+ * collapses so CSS transitions / exit animations can finish playing before
+ * the TR is removed. Without this, collapsing unmounts the TR immediately
+ * and any exit animation is skipped. Consumers drive the animation via
+ * `data-state="open" | "closed"` which is forwarded here and passed to
+ * the `expandedContent` render function.
+ */
+const EXPAND_EXIT_MS = 260;
+
+function DataGridTableBodyRowExpandded<TData>({
+  row,
+  expanded,
+}: {
+  row: Row<TData>;
+  expanded: boolean;
+}) {
   const { props, table } = useDataGrid();
+  const [shouldRender, setShouldRender] = useState(expanded);
+
+  useEffect(() => {
+    if (expanded) {
+      setShouldRender(true);
+      return;
+    }
+    const timer = setTimeout(() => setShouldRender(false), EXPAND_EXIT_MS);
+    return () => clearTimeout(timer);
+  }, [expanded]);
+
+  if (!shouldRender) return null;
 
   return (
-    <tr className={cn(props.tableLayout?.rowBorder && '[&:not(:last-child)>td]:border-b')}>
+    <tr
+      data-state={expanded ? 'open' : 'closed'}
+      className={cn(props.tableLayout?.rowBorder && '[&:not(:last-child)>td]:border-b')}
+    >
       <td colSpan={row.getVisibleCells().length}>
         {table
           .getAllColumns()
           .find((column) => column.columnDef.meta?.expandedContent)
-          ?.columnDef.meta?.expandedContent?.(row.original)}
+          ?.columnDef.meta?.expandedContent?.(row.original, expanded)}
       </td>
     </tr>
   );
@@ -734,7 +765,7 @@ function DataGridTable<TData>() {
                     );
                   })}
                 </DataGridTableBodyRow>
-                {row.getIsExpanded() && <DataGridTableBodyRowExpandded row={row} />}
+                <DataGridTableBodyRowExpandded row={row} expanded={row.getIsExpanded()} />
               </Fragment>
             );
           })
@@ -1444,7 +1475,7 @@ function DataGridTableDnd<TData>({ handleDragEnd }: { handleDragEnd: (event: Dra
                         );
                       })}
                     </DataGridTableBodyRow>
-                    {row.getIsExpanded() && <DataGridTableBodyRowExpandded row={row} />}
+                    <DataGridTableBodyRowExpandded row={row} expanded={row.getIsExpanded()} />
                   </Fragment>
                 );
               })

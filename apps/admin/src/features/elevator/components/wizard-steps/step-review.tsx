@@ -1,5 +1,6 @@
 import type { HissForm } from "../../types";
 import { AlertCircle, ClipboardList, Pencil } from "lucide-react";
+import { formatInspectionMonth } from "@elevatorbud/utils/format";
 
 type ReviewSection = {
   title: string;
@@ -77,7 +78,12 @@ export function StepReview({ form, goToStep, orgs }: StepReviewProps) {
       step: 5,
       fields: [
         { label: "Besiktningsorgan", value: values.inspection_authority },
-        { label: "Besiktningsmånad", value: values.inspection_month },
+        {
+          label: "Besiktningsmånad",
+          value: values.inspection_month
+            ? formatInspectionMonth(Number(values.inspection_month))
+            : "",
+        },
         { label: "Skötselföretag", value: values.maintenance_company },
         { label: "Schaktbelysning", value: values.shaft_lighting },
       ],

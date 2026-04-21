@@ -3,6 +3,7 @@ import {
   CardContent,
 } from "@elevatorbud/ui/components/ui/card";
 import { Phone, PhoneOff, ArrowUpCircle } from "lucide-react";
+import { formatKr } from "@elevatorbud/utils/format";
 
 export type NodData = {
   total: number;
@@ -66,7 +67,7 @@ export function EmergencyPhoneSection({
               Total uppgraderingskostnad
             </div>
             <div className="mt-1 text-2xl font-bold">
-              {nodData.upgradeCost.toLocaleString("sv-SE")} kr
+              {formatKr(nodData.upgradeCost)}
             </div>
           </CardContent>
         </Card>
