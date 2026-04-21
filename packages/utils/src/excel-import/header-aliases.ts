@@ -192,7 +192,7 @@ export const TARGET_FIELDS: { field: string; label: string; parser?: HeaderAlias
   { field: "machine_type", label: "Maskintyp" },
   { field: "control_system_type", label: "Styrsystem" },
   { field: "inspection_authority", label: "Besiktningsorgan" },
-  { field: "inspection_month", label: "Besiktningsmånad" },
+  { field: "inspection_month", label: "Besiktningsmånad", parser: "inspection_month" },
   { field: "maintenance_company", label: "Skötselföretag" },
   { field: "shaft_lighting", label: "Schaktbelysning" },
   { field: "modernization_year", label: "Moderniseringsår", parser: "modernization_year", mandatory: true },
