@@ -22,8 +22,9 @@ export function ResultSection({
 
   const failureCount = result.failures.length;
   const hasFailures = failureCount > 0;
-  const allFailed = result.created === 0 && hasFailures;
-  const partial = result.created > 0 && hasFailures;
+  const successCount = result.created + result.updated;
+  const allFailed = successCount === 0 && hasFailures;
+  const partial = successCount > 0 && hasFailures;
 
   // Entries carry the org id as key — we sort by display name but fall
   // back to the id suffix when names collide so admins can distinguish
@@ -31,6 +32,7 @@ export function ResultSection({
   const perOrgEntries = result.perOrgCounts
     ? Object.entries(result.perOrgCounts)
         .map(([orgId, counts]) => ({ orgId, ...counts }))
+        .filter((e) => e.created > 0 || e.updated > 0)
         .sort((a, b) => a.orgName.localeCompare(b.orgName, "sv"))
     : [];
   const nameCounts = perOrgEntries.reduce<Record<string, number>>(
@@ -65,11 +67,16 @@ export function ResultSection({
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <StatCard
               label="Skapade"
               value={result.created}
               variant="success"
+            />
+            <StatCard
+              label="Uppdaterade"
+              value={result.updated}
+              variant={result.updated > 0 ? "success" : "default"}
             />
             <StatCard
               label="Misslyckade"
@@ -104,6 +111,14 @@ export function ResultSection({
                             className="text-emerald-700 dark:text-emerald-400 text-xs"
                           >
                             {entry.created} skapade
+                          </Badge>
+                        )}
+                        {entry.updated > 0 && (
+                          <Badge
+                            variant="secondary"
+                            className="text-sky-700 dark:text-sky-400 text-xs"
+                          >
+                            {entry.updated} uppdaterade
                           </Badge>
                         )}
                       </div>

@@ -117,20 +117,22 @@ describeIfDb("confirmImport (real DB)", () => {
     expect(details).toHaveLength(1);
   });
 
-  it("creates both rows when two input rows share the same (org, elevator_number)", async () => {
-    // Duplicates within one org are allowed by design — every import row
-    // becomes its own new elevator, even if the number matches an existing
-    // or in-batch row.
+  it("updates the elevator when two input rows share the same (org, elevator_number)", async () => {
+    // (org, elevator_number) is unique — re-imports and in-batch duplicates
+    // are treated as UPDATE with merge semantics so admins can bulk-edit
+    // the Excel file and re-upload without creating duplicates.
     const result = await confirmFn(db, userId, {
       elevators: [
         {
           elevator_number: "H1",
+          manufacturer: "Kone",
           _organizationId: orgId,
           _source_row: 5,
           _source_sheet: "Hissar",
         },
         {
           elevator_number: "H1",
+          manufacturer: "Otis",
           _organizationId: orgId,
           _source_row: 42,
           _source_sheet: "Hissar",
@@ -138,10 +140,94 @@ describeIfDb("confirmImport (real DB)", () => {
       ],
     });
 
-    expect(result.created).toBe(2);
+    expect(result.created).toBe(1);
+    expect(result.updated).toBe(1);
     expect(result.failures).toHaveLength(0);
     const rows = await db.select().from(schema.elevators);
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.manufacturer).toBe("Otis");
+  });
+
+  it("updates existing fields on re-import and leaves blank cells untouched", async () => {
+    // Merge semantics: an Excel re-upload with only some columns filled must
+    // NOT clear the DB fields that were blank in the new file. Admins use
+    // this to bulk-tweak a subset of columns without touching the rest.
+    await confirmFn(db, userId, {
+      elevators: [
+        {
+          elevator_number: "H1",
+          manufacturer: "Kone",
+          build_year: 1985,
+          district: "Norr",
+          _organizationId: orgId,
+          _source_row: 5,
+          _source_sheet: "Hissar",
+        },
+      ],
+    });
+
+    const second = await confirmFn(db, userId, {
+      elevators: [
+        {
+          elevator_number: "H1",
+          // Only manufacturer changed; build_year/district are blank in the
+          // re-imported row and must be preserved.
+          manufacturer: "Otis",
+          _organizationId: orgId,
+          _source_row: 5,
+          _source_sheet: "Hissar",
+        },
+      ],
+    });
+
+    expect(second.created).toBe(0);
+    expect(second.updated).toBe(1);
+    expect(second.failures).toHaveLength(0);
+
+    const rows = await db.select().from(schema.elevators);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.manufacturer).toBe("Otis");
+    expect(rows[0]!.buildYear).toBe(1985);
+    expect(rows[0]!.district).toBe("Norr");
+    expect(rows[0]!.lastUpdatedBy).toBe(userId);
+    expect(rows[0]!.lastUpdatedAt).toBeInstanceOf(Date);
+  });
+
+  it("dedupes seeded events by (type, occurredAt) on re-import", async () => {
+    // Modernization uses July 1 of the year and inventory uses the exact
+    // date, so identical re-imports must not create duplicate timeline
+    // entries. The app's own event edits should also survive re-import.
+    await confirmFn(db, userId, {
+      elevators: [
+        {
+          elevator_number: "H1",
+          modernization_year: "2010",
+          inventory_date: "2024-03-15",
+          _organizationId: orgId,
+          _source_row: 5,
+          _source_sheet: "Hissar",
+        },
+      ],
+    });
+
+    const eventsAfterFirst = await db.select().from(schema.elevatorEvents);
+    expect(eventsAfterFirst).toHaveLength(2);
+
+    await confirmFn(db, userId, {
+      elevators: [
+        {
+          elevator_number: "H1",
+          modernization_year: "2010",
+          inventory_date: "2024-03-15",
+          _organizationId: orgId,
+          _source_row: 5,
+          _source_sheet: "Hissar",
+        },
+      ],
+    });
+
+    const eventsAfterSecond = await db.select().from(schema.elevatorEvents);
+    expect(eventsAfterSecond).toHaveLength(2);
   });
 
   it("records a failure for rows whose org id is missing", async () => {

@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
-import { inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   elevators,
   elevatorDetails,
@@ -192,6 +192,53 @@ function toDetailData(data: z.infer<typeof confirmImportSchema>["elevators"][num
   };
 }
 
+// Re-imports use merge semantics: a blank Excel cell (null/undefined from the
+// parser) must NOT clear existing DB data — admins may bulk-edit only a few
+// columns and re-upload the whole file. The helpers below drop null/undefined
+// so the UPDATE only touches columns the admin actually provided.
+type MergeSource = Record<string, unknown>;
+
+function mergeNonNull(source: MergeSource): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(source)) {
+    if (val !== null && val !== undefined) out[key] = val;
+  }
+  return out;
+}
+
+function toElevatorMergeUpdate(r: ConfirmRow) {
+  return mergeNonNull({
+    address: r.address,
+    elevatorClassification: r.elevator_classification,
+    district: r.district,
+    elevatorType: r.elevator_type,
+    manufacturer: r.manufacturer,
+    buildYear: r.build_year,
+    inspectionAuthority: r.inspection_authority,
+    inspectionMonth: r.inspection_month,
+    maintenanceCompany: r.maintenance_company,
+    modernizationYear: r.modernization_year,
+    warrantyExpiresAt: r.warranty_expires_at,
+    inventoryDate: r.inventory_date,
+    needsUpgrade: r.needs_upgrade,
+    contactPersonName: r.contact_person_name,
+    contactPersonPhone: r.contact_person_phone,
+    contactPersonEmail: r.contact_person_email,
+  });
+}
+
+function toDetailMergeUpdate(r: ConfirmRow) {
+  return mergeNonNull(toDetailData(r));
+}
+
+function toBudgetMergeUpdate(r: ConfirmRow) {
+  return mergeNonNull({
+    recommendedModernizationYear: r.recommended_modernization_year,
+    budgetAmount: r.budget_amount != null ? String(r.budget_amount) : undefined,
+    measures: r.modernization_measures,
+  });
+}
+
 async function analyzeFn(
   db: Database,
   input: z.infer<typeof analyzeImportSchema>,
@@ -303,8 +350,12 @@ function rowRef(r: ConfirmRow): Pick<ImportFailure, "elevator_number" | "sheet" 
 
 export type ConfirmImportResult = {
   created: number;
+  updated: number;
   failures: ImportFailure[];
-  perOrgCounts: Record<string, { orgName: string; created: number }>;
+  perOrgCounts: Record<
+    string,
+    { orgName: string; created: number; updated: number }
+  >;
 };
 
 /**
@@ -323,11 +374,15 @@ export async function confirmFn(
 ): Promise<ConfirmImportResult> {
   const rows = input.elevators;
   const failures: ImportFailure[] = [];
-  const perOrgCounts: Record<string, { orgName: string; created: number }> = {};
+  const perOrgCounts: Record<
+    string,
+    { orgName: string; created: number; updated: number }
+  > = {};
   let created = 0;
+  let updated = 0;
 
   if (rows.length === 0) {
-    return { created: 0, failures: [], perOrgCounts: {} };
+    return { created: 0, updated: 0, failures: [], perOrgCounts: {} };
   }
 
   // Look up every referenced org once per chunk. Rows whose org vanished
@@ -354,46 +409,111 @@ export async function confirmFn(
         continue;
       }
 
+      // Tracked outside the savepoint callback so the outer scope can
+      // bucket the row as created/updated only if the savepoint commits.
+      // Re-imports: existing (organizationId, elevatorNumber) → UPDATE with
+      // merge semantics (blank Excel cells leave DB values untouched).
+      let rowOutcome: "created" | "updated" | null = null;
+
       try {
         await tx.transaction(async (sp) => {
-          // Skip rows whose (organizationId, elevatorNumber) already exists.
-          // The constraint catches both intra-file duplicates (same number
-          // appearing twice in the source) and re-imports of a previously
-          // imported file. Skipped rows surface in the failures list so the
-          // admin can see what was deduped.
-          const [elevator] = await sp
-            .insert(elevators)
-            .values(toElevatorInsert(row, userId))
-            .onConflictDoNothing({
-              target: [elevators.organizationId, elevators.elevatorNumber],
-            })
-            .returning({ id: elevators.id });
+          const [existing] = await sp
+            .select({ id: elevators.id })
+            .from(elevators)
+            .where(
+              and(
+                eq(elevators.organizationId, row._organizationId),
+                eq(elevators.elevatorNumber, row.elevator_number),
+              ),
+            )
+            .limit(1);
 
-          if (!elevator) {
-            throw new Error(
-              `Hissnummer ${row.elevator_number} finns redan i organisationen — överhoppad.`,
-            );
-          }
+          let elevatorId: string;
+          const isUpdate = !!existing;
 
-          await sp.insert(elevatorDetails).values({
-            elevatorId: elevator.id,
-            ...toDetailData(row),
-          });
+          if (existing) {
+            elevatorId = existing.id;
 
-          if (row.recommended_modernization_year || row.budget_amount != null) {
-            await sp.insert(elevatorBudgets).values({
-              elevatorId: elevator.id,
-              recommendedModernizationYear: row.recommended_modernization_year,
-              budgetAmount:
-                row.budget_amount != null ? String(row.budget_amount) : undefined,
-              measures: row.modernization_measures,
-              createdBy: userId,
+            const elevatorUpdate = toElevatorMergeUpdate(row);
+            // Always stamp the updater, even if no other columns changed —
+            // the fact that the admin re-submitted this row is itself signal.
+            await sp
+              .update(elevators)
+              .set({
+                ...elevatorUpdate,
+                lastUpdatedBy: userId,
+                lastUpdatedAt: new Date(),
+              })
+              .where(eq(elevators.id, elevatorId));
+
+            const detailUpdate = toDetailMergeUpdate(row);
+            const [existingDetail] = await sp
+              .select({ id: elevatorDetails.id })
+              .from(elevatorDetails)
+              .where(eq(elevatorDetails.elevatorId, elevatorId))
+              .limit(1);
+            if (existingDetail) {
+              if (Object.keys(detailUpdate).length > 0) {
+                await sp
+                  .update(elevatorDetails)
+                  .set(detailUpdate)
+                  .where(eq(elevatorDetails.elevatorId, elevatorId));
+              }
+            } else {
+              await sp.insert(elevatorDetails).values({
+                elevatorId,
+                ...toDetailData(row),
+              });
+            }
+          } else {
+            const [inserted] = await sp
+              .insert(elevators)
+              .values(toElevatorInsert(row, userId))
+              .returning({ id: elevators.id });
+            if (!inserted) {
+              throw new Error(
+                `Kunde inte skapa hiss ${row.elevator_number}.`,
+              );
+            }
+            elevatorId = inserted.id;
+
+            await sp.insert(elevatorDetails).values({
+              elevatorId,
+              ...toDetailData(row),
             });
           }
 
-          // Seed historical events from the Excel row so the timeline starts
-          // populated. Writes inside the same savepoint as the elevator
-          // insert, so a failure here rolls the whole row back.
+          // Budget: merge onto the most recent row (the import only ever
+          // creates one; if the admin added extras in the app, we update
+          // the newest so the latest planning values win). When no budget
+          // row exists yet AND Excel has budget data, create one.
+          const budgetUpdate = toBudgetMergeUpdate(row);
+          if (Object.keys(budgetUpdate).length > 0) {
+            const [latestBudget] = await sp
+              .select({ id: elevatorBudgets.id })
+              .from(elevatorBudgets)
+              .where(eq(elevatorBudgets.elevatorId, elevatorId))
+              .orderBy(desc(elevatorBudgets.createdAt))
+              .limit(1);
+            if (latestBudget) {
+              await sp
+                .update(elevatorBudgets)
+                .set(budgetUpdate)
+                .where(eq(elevatorBudgets.id, latestBudget.id));
+            } else {
+              await sp.insert(elevatorBudgets).values({
+                elevatorId,
+                createdBy: userId,
+                ...budgetUpdate,
+              });
+            }
+          }
+
+          // Seed historical events from the Excel row. On re-import, dedupe
+          // by (elevatorId, type, occurredAt) so repeated imports don't
+          // produce duplicate timeline entries. Modernization occurredAt is
+          // deterministic (July 1 of the year), inventory is the exact
+          // date — both make reliable dedupe keys.
           //
           // The "Åtgärder vid modernisering" column describes the FUTURE
           // recommended modernization (it lives on the budget/plan), not what
@@ -403,40 +523,81 @@ export async function confirmFn(
             row.modernization_year,
           );
           if (modernizationDate) {
-            await sp.insert(elevatorEvents).values({
-              elevatorId: elevator.id,
-              type: "modernization",
-              occurredAt: modernizationDate,
-              title: `Modernisering ${modernizationDate.getUTCFullYear()}`,
-              metadata: {
-                source: "import",
-                rawModernizationYear: row.modernization_year ?? null,
-              },
-              createdBy: userId,
-            });
+            let shouldInsert = true;
+            if (isUpdate) {
+              const [dup] = await sp
+                .select({ id: elevatorEvents.id })
+                .from(elevatorEvents)
+                .where(
+                  and(
+                    eq(elevatorEvents.elevatorId, elevatorId),
+                    eq(elevatorEvents.type, "modernization"),
+                    eq(elevatorEvents.occurredAt, modernizationDate),
+                  ),
+                )
+                .limit(1);
+              shouldInsert = !dup;
+            }
+            if (shouldInsert) {
+              await sp.insert(elevatorEvents).values({
+                elevatorId,
+                type: "modernization",
+                occurredAt: modernizationDate,
+                title: `Modernisering ${modernizationDate.getUTCFullYear()}`,
+                metadata: {
+                  source: "import",
+                  rawModernizationYear: row.modernization_year ?? null,
+                },
+                createdBy: userId,
+              });
+            }
           }
 
           const inventoryDate = parseInventoryDateForEvent(row.inventory_date);
           if (inventoryDate) {
-            await sp.insert(elevatorEvents).values({
-              elevatorId: elevator.id,
-              type: "inventory",
-              occurredAt: inventoryDate,
-              title: "Inventering",
-              metadata: {
-                source: "import",
-                rawInventoryDate: row.inventory_date ?? null,
-              },
-              createdBy: userId,
-            });
+            let shouldInsert = true;
+            if (isUpdate) {
+              const [dup] = await sp
+                .select({ id: elevatorEvents.id })
+                .from(elevatorEvents)
+                .where(
+                  and(
+                    eq(elevatorEvents.elevatorId, elevatorId),
+                    eq(elevatorEvents.type, "inventory"),
+                    eq(elevatorEvents.occurredAt, inventoryDate),
+                  ),
+                )
+                .limit(1);
+              shouldInsert = !dup;
+            }
+            if (shouldInsert) {
+              await sp.insert(elevatorEvents).values({
+                elevatorId,
+                type: "inventory",
+                occurredAt: inventoryDate,
+                title: "Inventering",
+                metadata: {
+                  source: "import",
+                  rawInventoryDate: row.inventory_date ?? null,
+                },
+                createdBy: userId,
+              });
+            }
           }
+
+          rowOutcome = isUpdate ? "updated" : "created";
         });
 
-        created++;
-        successfulRows.push(row);
         if (!perOrgCounts[org.id])
-          perOrgCounts[org.id] = { orgName: org.name, created: 0 };
-        perOrgCounts[org.id]!.created++;
+          perOrgCounts[org.id] = { orgName: org.name, created: 0, updated: 0 };
+        if (rowOutcome === "updated") {
+          updated++;
+          perOrgCounts[org.id]!.updated++;
+        } else {
+          created++;
+          perOrgCounts[org.id]!.created++;
+        }
+        successfulRows.push(row);
       } catch (e) {
         failures.push({ ...rowRef(row), reason: rootCauseMessage(e) });
       }
@@ -471,7 +632,7 @@ export async function confirmFn(
     }
   });
 
-  return { created, failures, perOrgCounts };
+  return { created, updated, failures, perOrgCounts };
 }
 
 // ---------------------------------------------------------------------------
