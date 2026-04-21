@@ -4,8 +4,7 @@
     "jsx": "react-jsx",
     "outDir": "dist",
     "paths": {
-      "~/*": ["./src/*"],
-      "@convex/*": ["../../convex/*"]
+      "~/*": ["./src/*"]
     }
   },
   "include": ["src", "vite.config.ts"]
