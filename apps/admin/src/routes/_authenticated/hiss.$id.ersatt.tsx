@@ -126,8 +126,7 @@ function HissErsatt() {
       machineType: details?.machineType ?? null,
       controlSystemType: details?.controlSystemType ?? null,
       shaftLighting: details?.shaftLighting ?? null,
-      emergencyPhoneModel: details?.emergencyPhoneModel ?? null,
-      emergencyPhoneType: details?.emergencyPhoneType ?? null,
+      emergencyPhone: details?.emergencyPhone ?? null,
       emergencyPhonePrice: details?.emergencyPhonePrice ?? null,
     },
   };

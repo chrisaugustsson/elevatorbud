@@ -28,8 +28,7 @@ export type DetailFieldKey = keyof Pick<
   | "liftHeight"
   | "floorCount"
   | "shaftLighting"
-  | "emergencyPhoneModel"
-  | "emergencyPhoneType"
+  | "emergencyPhone"
   | "emergencyPhonePrice"
 >;
 
@@ -126,8 +125,7 @@ const DETAIL_FIELDS: readonly DetailFieldSpec[] = [
 
   // Säkerhet & övrigt
   { key: "shaftLighting", label: "Schaktbelysning", group: "safety", input: "text", modernizable: true, clearOnReplace: true },
-  { key: "emergencyPhoneModel", label: "Nödtelefon — modell", group: "safety", input: "text", modernizable: true, clearOnReplace: true },
-  { key: "emergencyPhoneType", label: "Nödtelefon — typ", group: "safety", input: "text", modernizable: true, clearOnReplace: true },
+  { key: "emergencyPhone", label: "Nödtelefon", group: "safety", input: "text", modernizable: true, clearOnReplace: true },
 
   // Non-modernizable but cleared on replace: the price of the emergency
   // phone install is budget data, not a modernization spec, so it can't

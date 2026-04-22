@@ -14,7 +14,9 @@ import {
   parseWarrantyDate,
   parseBoolean,
   parseBudgetAmount,
+  parseEmergencyPhone,
 } from "./parsers";
+import { slugifyHeader } from "./slugify";
 
 // --- Mapping-Based Parser ---
 
@@ -166,6 +168,16 @@ function parseRowWithMapping(
         if (parsed.budget_amount !== undefined) result.budget_amount = parsed.budget_amount;
         break;
       }
+      case "emergency_phone": {
+        const parsed = parseEmergencyPhone(raw);
+        if (parsed.has_emergency_phone !== undefined) {
+          result.has_emergency_phone = parsed.has_emergency_phone;
+        }
+        if (parsed.emergency_phone !== undefined) {
+          result.emergency_phone = parsed.emergency_phone;
+        }
+        break;
+      }
       case "number": {
         const num = parseFloat(raw);
         if (!isNaN(num)) {
@@ -174,6 +186,35 @@ function parseRowWithMapping(
         break;
       }
       default: {
+        // Custom field: stash the raw string under a def key. Two forms:
+        //   "_custom_field"           → slug the source header (new def)
+        //   "_custom_field:{key}"     → pin to an existing def's key
+        //                               (admin picked it from the catalog)
+        // The label travels alongside so the server can upsert / update
+        // aliases for new defs. For pinned fields the server ignores the
+        // label (def already exists).
+        if (
+          mapping.field === "_custom_field" ||
+          mapping.field.startsWith("_custom_field:")
+        ) {
+          if (raw) {
+            const pinned = mapping.field.startsWith("_custom_field:")
+              ? mapping.field.slice("_custom_field:".length)
+              : null;
+            const key = pinned ?? slugifyHeader(mapping.sourceHeader);
+            if (key) {
+              if (!result.custom_fields) result.custom_fields = {};
+              if (!result.custom_field_labels) result.custom_field_labels = {};
+              result.custom_fields[key] = raw;
+              // Only send label for new defs — pinned ones skip the
+              // alias-append roundtrip.
+              if (!pinned) {
+                result.custom_field_labels[key] = mapping.sourceHeader;
+              }
+            }
+          }
+          break;
+        }
         if (raw) {
           (result as Record<string, unknown>)[mapping.field] = raw;
         }

@@ -20,6 +20,7 @@ export type {
 } from "./types";
 
 export { parseExcelImportWithMapping } from "./parse-excel-import-with-mapping";
+export { slugifyHeader } from "./slugify";
 
 /**
  * Reads an Excel file buffer and returns a XLSX workbook.

@@ -15,6 +15,7 @@ export {
   detectHeaderRow,
   getSheetData,
   parseExcelImportWithMapping,
+  slugifyHeader,
 } from "./excel-import";
 export type {
   ParsedElevator,

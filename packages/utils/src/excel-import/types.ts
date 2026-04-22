@@ -6,6 +6,9 @@ export type ParsedElevator = {
   address?: string;
   elevator_designation?: string;
   district?: string;
+  // Fastighetsbeteckning — formal property/cadastral ID. May equal the
+  // management-object name in some sheets but conceptually distinct.
+  property_designation?: string;
   // ISO date string (YYYY-MM-DD). The Excel column "Inventerings datum"
   // often carries year-month only (e.g. "2021-10") — normalized to the
   // first of the month on parse.
@@ -43,6 +46,13 @@ export type ParsedElevator = {
   maintenance_company?: string;
   shaft_lighting?: string;
 
+  // Nödtelefon — Ja/Nej flag + free-text description. See
+  // parseEmergencyPhone for the "Ja, ..." / "Nej" grammar we accept.
+  // `emergency_phone` carries `null` when the admin answered "Nej"
+  // (forces a clear on re-import) vs `undefined` for no-info.
+  has_emergency_phone?: boolean;
+  emergency_phone?: string | null;
+
   // Modernisering
   modernization_year?: string;
   // Warranty expiration date for the most recent modernization. ISO
@@ -60,6 +70,18 @@ export type ParsedElevator = {
   contact_person_name?: string;
   contact_person_phone?: string;
   contact_person_email?: string;
+
+  // Flexible per-customer columns harvested from unmapped (or
+  // explicitly-mapped-to-`_custom_field`) headers. Keyed by a slug
+  // derived from the source header; the server resolves the slug
+  // against `custom_field_defs` (key + aliases) and auto-creates a
+  // def when nothing matches. Values are strings for now — typed
+  // parsing can come later via def.type.
+  custom_fields?: Record<string, string>;
+  // Header labels for each key above, so the server can upsert/update
+  // `custom_field_defs.label` + aliases when a header is first seen.
+  // Sent alongside `custom_fields` once per row; the server dedupes.
+  custom_field_labels?: Record<string, string>;
 
   // Import metadata (not stored in DB, used during import processing)
   _organisation_namn?: string;
@@ -91,7 +113,7 @@ export type ColumnDef = {
   letter: string; // Excel column letter (for error messages)
   field: string; // Target field name or special parser key
   mandatory?: boolean;
-  parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_daylight_opening" | "build_year" | "modernization_year" | "recommended_modernization_year" | "inspection_month" | "inventory_date" | "warranty_date" | "boolean" | "number" | "budget";
+  parser?: "compound_load_capacity" | "compound_floors_doors" | "compound_cab_size" | "compound_daylight_opening" | "build_year" | "modernization_year" | "recommended_modernization_year" | "inspection_month" | "inventory_date" | "warranty_date" | "boolean" | "number" | "budget" | "emergency_phone";
 };
 
 export type SheetMappingConfig = {

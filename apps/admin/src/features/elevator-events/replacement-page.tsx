@@ -35,8 +35,7 @@ type NewDetails = {
   machineType: string;
   controlSystemType: string;
   shaftLighting: string;
-  emergencyPhoneModel: string;
-  emergencyPhoneType: string;
+  emergencyPhone: string;
   emergencyPhonePrice: string;
 };
 
@@ -58,8 +57,7 @@ const EMPTY_DETAILS: NewDetails = {
   machineType: "",
   controlSystemType: "",
   shaftLighting: "",
-  emergencyPhoneModel: "",
-  emergencyPhoneType: "",
+  emergencyPhone: "",
   emergencyPhonePrice: "",
 };
 
@@ -91,8 +89,7 @@ export type ReplacementPageSubmit = {
     machineType?: string | null;
     controlSystemType?: string | null;
     shaftLighting?: string | null;
-    emergencyPhoneModel?: string | null;
-    emergencyPhoneType?: string | null;
+    emergencyPhone?: string | null;
     emergencyPhonePrice?: number | null;
   };
 };
@@ -231,11 +228,10 @@ const DETAIL_GROUPS: Array<{
   },
   {
     label: "Säkerhet & nödtelefon",
-    description: "Schaktbelysning och nödtelefonens modell.",
+    description: "Schaktbelysning och nödtelefonens beskrivning.",
     fields: [
       { key: "shaftLighting", label: "Schaktbelysning", input: "text" },
-      { key: "emergencyPhoneModel", label: "Nödtelefon — modell", input: "text" },
-      { key: "emergencyPhoneType", label: "Nödtelefon — typ", input: "text" },
+      { key: "emergencyPhone", label: "Nödtelefon", input: "text" },
       { key: "emergencyPhonePrice", label: "Nödtelefon — pris", input: "number" },
     ],
   },
@@ -756,8 +752,7 @@ function serializeDetails(d: NewDetails): ReplacementPageSubmit["newDetails"] {
     machineType: nullIfEmpty(d.machineType),
     controlSystemType: nullIfEmpty(d.controlSystemType),
     shaftLighting: nullIfEmpty(d.shaftLighting),
-    emergencyPhoneModel: nullIfEmpty(d.emergencyPhoneModel),
-    emergencyPhoneType: nullIfEmpty(d.emergencyPhoneType),
+    emergencyPhone: nullIfEmpty(d.emergencyPhone),
     emergencyPhonePrice: parseNumber(d.emergencyPhonePrice),
   };
 }

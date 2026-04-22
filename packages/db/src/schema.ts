@@ -138,6 +138,7 @@ export const elevators = pgTable(
     address: text("address"),
     elevatorClassification: text("elevator_classification"),
     district: text("district"),
+    propertyDesignation: text("property_designation"),
     inventoryDate: text("inventory_date"),
 
     // Core technical (used in charts/filtering)
@@ -173,6 +174,18 @@ export const elevators = pgTable(
     contactPersonPhone: text("contact_person_phone"),
     contactPersonEmail: text("contact_person_email"),
 
+    // Flexible per-customer columns. Keys correspond to
+    // custom_field_defs.key; the import auto-matches Excel headers to
+    // defs (or creates new ones) and stores values here. Non-null with
+    // default '{}' so reads never need a null-check.
+    //
+    // `any` at the DB layer is intentional for the same reason as
+    // `elevator_events.metadata` — TanStack Start's server-fn return-type
+    // serializer rejects `Record<string, unknown>` at the RPC boundary.
+    // Callers narrow to `Record<string, unknown>` at use-site.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    customFields: jsonb("custom_fields").$type<any>().notNull().default({}),
+
     // Metadata
     organizationId: uuid("organization_id")
       .notNull()
@@ -197,6 +210,7 @@ export const elevators = pgTable(
     index("elevators_district_idx").on(t.district),
     index("elevators_manufacturer_idx").on(t.manufacturer),
     index("elevators_elevator_type_idx").on(t.elevatorType),
+    index("elevators_custom_fields_gin_idx").using("gin", t.customFields),
     // (organization_id, elevator_number) is unique — re-imports and edits
     // both rely on this to detect duplicates. The plain index on
     // elevator_number above is kept for cross-org search.
@@ -270,9 +284,15 @@ export const elevatorDetails = pgTable(
     // Inspection detail
     shaftLighting: text("shaft_lighting"),
 
-    // Emergency phone details
-    emergencyPhoneModel: text("emergency_phone_model"),
-    emergencyPhoneType: text("emergency_phone_type"),
+    // Emergency phone description. Free-text copy of the Excel
+    // "Nödtelefon" cell after its "Ja, " prefix — e.g. "Safeline, PSTN
+    // utan pictogram, Modell, SL2000". Null when the cell was "Nej" or
+    // empty. `elevators.hasEmergencyPhone` carries the Ja/Nej flag for
+    // charts; this column carries the detail. The earlier split into
+    // `emergencyPhoneModel` + `emergencyPhoneType` was over-engineered —
+    // brand/type/model order varies too much across customers for
+    // structured parsing to be reliable.
+    emergencyPhone: text("emergency_phone"),
     emergencyPhonePrice: numeric("emergency_phone_price", { precision: 10, scale: 2 }),
 
     // Comments
@@ -441,6 +461,44 @@ export const elevatorEventsRelations = relations(elevatorEvents, ({ one }) => ({
     relationName: "eventUpdatedByUser",
   }),
 }));
+
+// ─── Custom Field Definitions ────────────────────────────────────────────────
+//
+// Global catalog of user-defined columns found on imported Excel sheets.
+// The import auto-matches a header (e.g. "Verksamhet") against `key` or
+// `aliases`; unmatched headers become new defs after the admin confirms
+// label/type in the import UI. Values live in `elevators.customFields`
+// keyed by `key`. Global (not per-org) because the same label means the
+// same thing across customers, and each customer only ever sees their
+// own elevators — no cross-tenant leakage is possible from sharing defs.
+
+export const CUSTOM_FIELD_TYPES = ["text", "number", "boolean", "date"] as const;
+
+export type CustomFieldType = (typeof CUSTOM_FIELD_TYPES)[number];
+
+export const customFieldDefs = pgTable(
+  "custom_field_defs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    type: text("type", { enum: CUSTOM_FIELD_TYPES }).notNull().default("text"),
+    // Known header variants that should auto-match to this def on future
+    // imports. Admin-confirmed matches append to this list.
+    aliases: text("aliases").array().notNull().default(sql`'{}'::text[]`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("custom_field_defs_key_unique").on(t.key),
+    index("custom_field_defs_key_idx").on(t.key),
+    check(
+      "custom_field_defs_type_check",
+      sql`${t.type} IN ('text','number','boolean','date')`,
+    ),
+  ],
+);
 
 // ─── Suggested Values (reference data) ───────────────────────────────────────
 

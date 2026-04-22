@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 import { createFileRoute, useBlocker } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { customFieldDefsOptions } from "../../server/elevator";
 import {
   Card,
   CardContent,
@@ -25,10 +27,17 @@ import { PreviewSection } from "../../features/import/components/preview-section
 import { ResultSection, ImportErrorSection } from "../../features/import/components/result-section";
 
 export const Route = createFileRoute("/_authenticated/admin/import")({
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery(customFieldDefsOptions());
+  },
   component: ImportPage,
 });
 
 function ImportPage() {
+  // The catalog is used to (a) auto-match unknown Excel headers to known
+  // defs via aliases and (b) let the admin pin a column to a specific
+  // existing def from the grouped Select.
+  const { data: customFieldDefs } = useSuspenseQuery(customFieldDefsOptions());
   const {
     status,
     importProgress,
@@ -145,6 +154,7 @@ function ImportPage() {
             current: currentSheetIndex + 1,
             total: selectedSheets.length,
           }}
+          knownCustomFieldDefs={customFieldDefs}
           onConfirm={handleMappingConfirm}
           onHeaderRowChange={handleHeaderRowChange}
           onBack={handleBackToSheetSelection}

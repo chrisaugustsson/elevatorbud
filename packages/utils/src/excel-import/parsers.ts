@@ -326,6 +326,59 @@ export function parseInspectionMonth(raw: string): {
   };
 }
 
+/**
+ * Parse the Excel "Nödtelefon" column. The cell is a single free-text
+ * string following a loose convention: "Ja, {rest}" or "Nej" (empty
+ * is also valid). "{rest}" varies — brand + type + model in any order,
+ * sometimes with "Modell, " breadcrumbs, sometimes not. We capture:
+ *   - `has_emergency_phone`: true for "Ja"/"Yes", false for "Nej"/"No",
+ *     undefined when the cell is empty or unrecognizable (so merge
+ *     imports don't flip an existing value without evidence).
+ *   - `emergency_phone`: everything after the leading "Ja," trimmed.
+ *     Null when the answer is "Nej" (carries an explicit null so the
+ *     import layer can clear any stale description).
+ *
+ * Returning `null` vs leaving a field undefined matters: `undefined` is
+ * treated as "no info, don't touch" by the merge helpers; `null` is
+ * treated as "clear this column" by the Nej-override logic.
+ */
+export function parseEmergencyPhone(raw: string): {
+  has_emergency_phone?: boolean;
+  emergency_phone?: string | null;
+} {
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+
+  // Split on the first comma so we can interrogate the prefix. Anything
+  // after the comma is preserved verbatim (spacing, casing, punctuation)
+  // — admins paste these strings in from vendor quotes and we don't want
+  // to normalize away their meaning.
+  const firstComma = trimmed.indexOf(",");
+  const head =
+    firstComma === -1 ? trimmed : trimmed.slice(0, firstComma).trim();
+  const tail =
+    firstComma === -1 ? "" : trimmed.slice(firstComma + 1).trim();
+  const headLower = head.toLowerCase();
+
+  if (headLower === "nej" || headLower === "no") {
+    // Explicit negative answer. The description column must be
+    // cleared on re-import — hence the null (not undefined).
+    return { has_emergency_phone: false, emergency_phone: null };
+  }
+
+  if (headLower === "ja" || headLower === "yes") {
+    return {
+      has_emergency_phone: true,
+      emergency_phone: tail.length > 0 ? tail : null,
+    };
+  }
+
+  // Unrecognized prefix — treat the whole cell as a description and
+  // assume presence, but don't force the `has_emergency_phone` bool
+  // (the merge layer will only update fields the parser explicitly set).
+  return { emergency_phone: trimmed };
+}
+
 export function parseBudgetAmount(raw: string): { budget_amount?: number } {
   const trimmed = raw.trim();
   if (!trimmed) return {};
