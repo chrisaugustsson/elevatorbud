@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { analyzeImportOptions, extractOrgNamesOptions, confirmImport } from "~/server/import";
-import type { ImportFailure } from "~/server/import";
+import type { ImportFailure, UpdateDiff } from "~/server/import";
 import type { OrgMappingEntry } from "../components/org-mapping-section";
 import {
   readWorkbook,
@@ -38,13 +38,20 @@ export type ImportResult = {
   updated: number;
   total: number;
   failures: ImportFailure[];
+  /**
+   * Per-row diffs for every elevator updated across all chunks. Empty
+   * when nothing was updated or when every update was a no-op (re-import
+   * with no cell changes — the row still gets its `lastUpdatedAt` stamp
+   * but produces no diff entry).
+   */
+  updates: UpdateDiff[];
   perOrgCounts?: Record<
     string,
     { orgName: string; created: number; updated: number }
   >;
 };
 
-export type { ImportFailure };
+export type { ImportFailure, UpdateDiff };
 
 // Per-chunk size. Small enough that the admin sees progress tick every
 // fraction of a second on a typical file, large enough that network RTT
@@ -400,22 +407,29 @@ export function useImportMachine() {
       _organizationId: orgIdByName.get(e._organisation_namn ?? "") ?? "",
     }));
 
+    // Separate rows with a resolved org from rows that can't be imported
+    // (typically the source Excel had an empty Kund cell — those names
+    // don't surface in the org-mapping step because the name extractor
+    // filters empty strings, so the admin can't map them). Report these
+    // as per-row failures and keep going so the rest of the file imports.
+    const importable = elevatorsWithOrgId.filter((e) => !!e._organizationId);
     const unresolved = elevatorsWithOrgId.filter((e) => !e._organizationId);
-    if (unresolved.length > 0) {
-      setImportResult(null);
-      setParseError(
-        `${unresolved.length} rader saknar organisationskoppling. Gå tillbaka och mappa alla organisationer.`,
-      );
-      setStatus("org-mapping");
-      return;
-    }
+
+    const allFailures: ImportFailure[] = unresolved.map((row) => ({
+      elevator_number: row.elevator_number,
+      sheet: row._source_sheet ?? null,
+      row: row._source_row ?? null,
+      reason: row._organisation_namn
+        ? `Kund "${row._organisation_namn}" saknar organisationskoppling — mappa i steget Organisationsmappning.`
+        : "Kund-cellen är tom. Fyll i ett kundnamn i Excel-filen och försök igen.",
+    }));
 
     const total = elevatorsWithOrgId.length;
-    setImportProgress({ current: 0, total });
+    setImportProgress({ current: unresolved.length, total });
 
     let totalCreated = 0;
     let totalUpdated = 0;
-    const allFailures: ImportFailure[] = [];
+    const allUpdates: UpdateDiff[] = [];
     const aggregatedPerOrg: Record<
       string,
       { orgName: string; created: number; updated: number }
@@ -423,14 +437,18 @@ export function useImportMachine() {
 
     // Sequential chunks: parallel requests would blow through the DB
     // connection limit and interleave savepoints in ways that aren't worth
-    // the few hundred ms of wall time on the import path.
-    for (let i = 0; i < total; i += IMPORT_CHUNK_SIZE) {
-      const chunk = elevatorsWithOrgId.slice(i, i + IMPORT_CHUNK_SIZE);
+    // the few hundred ms of wall time on the import path. Progress count
+    // starts at the number of rows we dropped upfront so the bar reflects
+    // overall completion, not just chunked work.
+    const importableTotal = importable.length;
+    for (let i = 0; i < importableTotal; i += IMPORT_CHUNK_SIZE) {
+      const chunk = importable.slice(i, i + IMPORT_CHUNK_SIZE);
       try {
         const result = await confirmImport({ data: { elevators: chunk } });
         totalCreated += result.created;
         totalUpdated += result.updated;
         if (result.failures.length > 0) allFailures.push(...result.failures);
+        if (result.updates.length > 0) allUpdates.push(...result.updates);
         for (const [orgId, counts] of Object.entries(result.perOrgCounts)) {
           if (!aggregatedPerOrg[orgId]) {
             aggregatedPerOrg[orgId] = {
@@ -459,19 +477,26 @@ export function useImportMachine() {
             reason,
           });
         }
-        setImportProgress({ current: i + chunk.length, total });
+        setImportProgress({
+          current: unresolved.length + i + chunk.length,
+          total,
+        });
         setImportResult({
           created: totalCreated,
           updated: totalUpdated,
           total,
           failures: allFailures,
+          updates: allUpdates,
           perOrgCounts: aggregatedPerOrg,
         });
         setImportError(reason);
         setStatus("error");
         return;
       }
-      setImportProgress({ current: i + chunk.length, total });
+      setImportProgress({
+        current: unresolved.length + i + chunk.length,
+        total,
+      });
     }
 
     setImportResult({
@@ -479,6 +504,7 @@ export function useImportMachine() {
       updated: totalUpdated,
       total,
       failures: allFailures,
+      updates: allUpdates,
       perOrgCounts: aggregatedPerOrg,
     });
     setStatus("complete");

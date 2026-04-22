@@ -9,6 +9,7 @@ import {
   elevatorOptions,
   elevatorDetailsOptions,
   elevatorBudgetsOptions,
+  customFieldDefsOptions,
   archiveElevator,
   createElevatorBudget,
   updateElevatorBudget,
@@ -94,6 +95,7 @@ export const Route = createFileRoute("/_authenticated/hiss/$id/")({
     context.queryClient.prefetchQuery(elevatorDetailsOptions(params.id));
     context.queryClient.prefetchQuery(elevatorBudgetsOptions(params.id));
     context.queryClient.prefetchQuery(elevatorEventsOptions(params.id));
+    context.queryClient.prefetchQuery(customFieldDefsOptions());
   },
   component: HissDetail,
   pendingComponent: DetailSkeleton,
@@ -107,6 +109,7 @@ function HissDetail() {
   const { data: details } = useSuspenseQuery(elevatorDetailsOptions(id));
   const { data: budgets } = useSuspenseQuery(elevatorBudgetsOptions(id));
   const { data: events } = useSuspenseQuery(elevatorEventsOptions(id));
+  const { data: customFieldDefs } = useSuspenseQuery(customFieldDefsOptions());
 
   const archiveMutation = useMutation({
     mutationFn: (input: { id: string; status: "demolished" | "archived" }) =>
@@ -482,8 +485,7 @@ function HissDetail() {
           liftHeight: details.liftHeight,
           floorCount: details.floorCount,
           shaftLighting: details.shaftLighting,
-          emergencyPhoneModel: details.emergencyPhoneModel,
-          emergencyPhoneType: details.emergencyPhoneType,
+          emergencyPhone: details.emergencyPhone,
         }
       : {};
 
@@ -754,17 +756,15 @@ function HissDetail() {
               <DefinitionList>
                 <Definition
                   label="Har nödtelefon"
-                  value={formatBool(hiss.hasEmergencyPhone)}
+                  value={formatEmergencyPhoneSummary(
+                    hiss.hasEmergencyPhone,
+                    details?.emergencyPhone,
+                  )}
                 />
                 <Definition
                   label="Behöver uppgradering"
                   value={formatBool(hiss.needsUpgrade)}
                 />
-                <Definition
-                  label="Modell"
-                  value={details?.emergencyPhoneModel}
-                />
-                <Definition label="Typ" value={details?.emergencyPhoneType} />
                 <Definition
                   label="Pris"
                   value={
@@ -776,6 +776,40 @@ function HissDetail() {
                 />
               </DefinitionList>
             </div>
+
+            {hiss.propertyDesignation && (
+              <div>
+                <h4 className="text-base font-semibold">Fastighet</h4>
+                <DefinitionList>
+                  <Definition
+                    label="Fastighetsbeteckning"
+                    value={hiss.propertyDesignation}
+                  />
+                </DefinitionList>
+              </div>
+            )}
+
+            {(() => {
+              const cf = (hiss.customFields ?? {}) as Record<string, unknown>;
+              const entries = customFieldDefs
+                .map((def) => {
+                  const raw = cf[def.key];
+                  if (raw === undefined || raw === null || raw === "") return null;
+                  return { def, value: formatCustomFieldValue(raw) };
+                })
+                .filter((e): e is { def: typeof customFieldDefs[number]; value: string } => e !== null);
+              if (entries.length === 0) return null;
+              return (
+                <div className="md:col-span-2">
+                  <h4 className="text-base font-semibold">Extrafält</h4>
+                  <DefinitionList>
+                    {entries.map(({ def, value }) => (
+                      <Definition key={def.id} label={def.label} value={value} />
+                    ))}
+                  </DefinitionList>
+                </div>
+              );
+            })()}
 
             {details?.comments && (
               <div className="md:col-span-2">
@@ -913,6 +947,34 @@ function Definition({
 function formatBool(v: boolean | null | undefined): string | null {
   if (v == null) return null;
   return v ? "Ja" : "Nej";
+}
+
+// Combine the boolean flag with the free-text description into a single
+// readable value. "Ja · Safeline, GSM 4G, Modell, MX" when both are set;
+// "Ja" alone when the flag is true but no description; "Nej" when the
+// flag is false; null when we have no info.
+function formatEmergencyPhoneSummary(
+  has: boolean | null | undefined,
+  text: string | null | undefined,
+): string | null {
+  if (has == null) return null;
+  if (!has) return "Nej";
+  return text && text.trim() !== "" ? `Ja · ${text}` : "Ja";
+}
+
+// Render an opaque JSONB value for the Extrafält list. Booleans become
+// Ja/Nej (matches the rest of this page); numbers/strings stringify; any
+// other shape (array/object) falls back to JSON so the admin at least
+// sees something rather than "[object Object]".
+function formatCustomFieldValue(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "boolean") return v ? "Ja" : "Nej";
+  if (typeof v === "string" || typeof v === "number") return String(v);
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return String(v);
+  }
 }
 
 function formatAmount(n: number): string {

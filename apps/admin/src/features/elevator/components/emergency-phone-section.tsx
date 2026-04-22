@@ -18,6 +18,8 @@ export function EmergencyPhoneSection({
   formValues,
   originalValues,
 }: EmergencyPhoneSectionProps) {
+  const hasPhone = formValues.has_emergency_phone;
+
   return (
     <EditSection title="7. Nödtelefon">
       <FieldWrapper
@@ -43,45 +45,32 @@ export function EmergencyPhoneSection({
         </form.Field>
       </FieldWrapper>
 
+      {/* Single free-text description. Disabled when "har nödtelefon" is
+          off — on save the converter forces it to null so the column
+          doesn't carry stale text alongside a `false` flag. */}
       <FieldWrapper
         changed={
           !!originalValues &&
-          isChanged("emergency_phone_model", formValues, originalValues)
+          isChanged("emergency_phone", formValues, originalValues)
         }
       >
-        <form.Field name="emergency_phone_model">
+        <form.Field name="emergency_phone">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="emergency_phone_model">Modell</Label>
+              <Label htmlFor="emergency_phone">Beskrivning</Label>
               <Input
-                id="emergency_phone_model"
+                id="emergency_phone"
                 className="h-11"
-                placeholder="Ange modell..."
+                placeholder="T.ex. Safeline, GSM 4G, Modell, MX + GL6 4G"
                 value={field.state.value}
+                disabled={!hasPhone}
                 onChange={(e) => field.handleChange(e.target.value)}
               />
-            </div>
-          )}
-        </form.Field>
-      </FieldWrapper>
-
-      <FieldWrapper
-        changed={
-          !!originalValues &&
-          isChanged("emergency_phone_type", formValues, originalValues)
-        }
-      >
-        <form.Field name="emergency_phone_type">
-          {(field) => (
-            <div className="space-y-1.5">
-              <Label htmlFor="emergency_phone_type">Typ</Label>
-              <Input
-                id="emergency_phone_type"
-                className="h-11"
-                placeholder="Ange typ..."
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-              />
+              <p className="text-xs text-muted-foreground">
+                {hasPhone
+                  ? "Fritext från Nödtelefon-kolumnen (fabrikat, typ, modell)."
+                  : "Hissen saknar nödtelefon. Slå på växeln ovan för att ange uppgifter."}
+              </p>
             </div>
           )}
         </form.Field>

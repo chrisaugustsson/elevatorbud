@@ -25,6 +25,9 @@ export const HEADER_ALIASES: HeaderAlias[] = [
   { header: "distrikt/ort", field: "district" },
   { header: "distrikt/ ort", field: "district" },
   { header: "ort", field: "district" },
+  { header: "fastighetsbeteckning", field: "property_designation" },
+  { header: "fastighets beteckning", field: "property_designation" },
+  { header: "fastighets-beteckning", field: "property_designation" },
   {
     header: "inventerings datum",
     field: "inventory_date",
@@ -119,6 +122,14 @@ export const HEADER_ALIASES: HeaderAlias[] = [
   { header: "skötselföretag", field: "maintenance_company" },
   { header: "underhållsföretag", field: "maintenance_company" },
   { header: "schaktbelysning", field: "shaft_lighting" },
+  {
+    header: "nödtelefon",
+    field: "emergency_phone",
+    parser: "emergency_phone",
+  },
+  // Bostadsbolaget's "Nödtelefoner" sheet used a slightly different
+  // header — keep it mapped so re-importing older exports still works.
+  { header: "nödtelefoner", field: "emergency_phone", parser: "emergency_phone" },
 
   // --- Modernisering ---
   {
@@ -166,11 +177,16 @@ export const HEADER_ALIASES: HeaderAlias[] = [
 /** All unique target fields that can be mapped to */
 export const TARGET_FIELDS: { field: string; label: string; parser?: HeaderAlias["parser"]; mandatory?: boolean }[] = [
   { field: "_skip", label: "— Hoppa över —" },
+  // Catch-all for columns the admin wants to keep but we don't have a
+  // structured home for. The server slugifies the source header into a
+  // `custom_field_defs.key` and stores the value in `elevators.customFields`.
+  { field: "_custom_field", label: "Extrafält (valfri kolumn)" },
   { field: "_organisation_namn", label: "Organisation (namn)" },
   { field: "elevator_number", label: "Hissnummer", mandatory: true },
   { field: "address", label: "Hissadress" },
   { field: "elevator_designation", label: "Hissbeteckning" },
   { field: "district", label: "Distrikt / Ort" },
+  { field: "property_designation", label: "Fastighetsbeteckning" },
   { field: "inventory_date", label: "Inventeringsdatum", parser: "inventory_date" },
   { field: "elevator_type", label: "Hisstyp" },
   { field: "manufacturer", label: "Fabrikat" },
@@ -195,6 +211,7 @@ export const TARGET_FIELDS: { field: string; label: string; parser?: HeaderAlias
   { field: "inspection_month", label: "Besiktningsmånad", parser: "inspection_month" },
   { field: "maintenance_company", label: "Skötselföretag" },
   { field: "shaft_lighting", label: "Schaktbelysning" },
+  { field: "emergency_phone", label: "Nödtelefon", parser: "emergency_phone" },
   { field: "modernization_year", label: "Moderniseringsår", parser: "modernization_year", mandatory: true },
   { field: "warranty_expires_at", label: "Garanti (datum)", parser: "warranty_date" },
   {

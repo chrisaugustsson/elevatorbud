@@ -9,6 +9,7 @@ import {
   elevatorBudgets,
   organizations,
   suggestedValues,
+  customFieldDefs,
 } from "@elevatorbud/db/schema";
 import { adminMiddleware, adminMiddlewareRead } from "./auth";
 
@@ -133,6 +134,7 @@ const createInput = z.object({
   address: z.string().optional(),
   elevatorClassification: z.string().optional(),
   district: z.string().optional(),
+  propertyDesignation: z.string().optional(),
   elevatorType: z.string().optional(),
   manufacturer: z.string().optional(),
   buildYear: z.number().optional(),
@@ -172,10 +174,15 @@ const createInput = z.object({
   machineType: z.string().optional(),
   controlSystemType: z.string().optional(),
   shaftLighting: z.string().optional(),
-  emergencyPhoneModel: z.string().optional(),
-  emergencyPhoneType: z.string().optional(),
+  // Free-text description of the emergency phone. `null` is meaningful
+  // on update: it explicitly clears the column (used when the admin
+  // toggles "har nödtelefon" off). `undefined` leaves the DB value
+  // alone.
+  emergencyPhone: z.string().nullish(),
   emergencyPhonePrice: z.number().optional(),
   comments: z.string().optional(),
+  // Flexible per-customer fields (keyed by custom_field_defs.key)
+  customFields: z.record(z.string(), z.unknown()).optional(),
   // Budget
   recommendedModernizationYear: yearLike,
   budgetAmount: z.number().optional(),
@@ -189,6 +196,7 @@ const updateInput = z.object({
   address: z.string().optional(),
   elevatorClassification: z.string().optional(),
   district: z.string().optional(),
+  propertyDesignation: z.string().optional(),
   elevatorType: z.string().optional(),
   manufacturer: z.string().optional(),
   buildYear: z.number().optional(),
@@ -225,10 +233,13 @@ const updateInput = z.object({
   machineType: z.string().optional(),
   controlSystemType: z.string().optional(),
   shaftLighting: z.string().optional(),
-  emergencyPhoneModel: z.string().optional(),
-  emergencyPhoneType: z.string().optional(),
+  emergencyPhone: z.string().nullish(),
   emergencyPhonePrice: z.number().optional(),
   comments: z.string().optional(),
+  // Flexible per-customer fields. Merge-semantics: when provided, values
+  // overlay onto the existing JSONB — keys not in the payload are left
+  // untouched, and an explicit `null` clears a key.
+  customFields: z.record(z.string(), z.unknown()).optional(),
   // Budget
   recommendedModernizationYear: yearLike,
   budgetAmount: z.number().optional(),
@@ -258,8 +269,7 @@ const DETAIL_KEYS = new Set([
   "machineType",
   "controlSystemType",
   "shaftLighting",
-  "emergencyPhoneModel",
-  "emergencyPhoneType",
+  "emergencyPhone",
   "emergencyPhonePrice",
   "comments",
 ]);
@@ -607,7 +617,8 @@ async function createFn(
   }
 
   await autoAddSuggestedValues(db, input);
-  const { core, details, budget } = splitFields(input);
+  const { customFields, ...rest } = input;
+  const { core, details, budget } = splitFields(rest);
 
   // Insert core elevator
   const [elevator] = await db
@@ -616,6 +627,7 @@ async function createFn(
       ...core,
       elevatorNumber: input.elevatorNumber,
       organizationId: input.organizationId,
+      customFields: customFields ?? {},
       status: "active",
       createdBy: userId,
     })
@@ -679,13 +691,25 @@ async function updateFn(
   }
 
   await autoAddSuggestedValues(db, fields);
-  const { core, details, budget } = splitFields(fields);
+  const { customFields, ...fieldsRest } = fields;
+  const { core, details, budget } = splitFields(fieldsRest);
 
-  // Update core
-  if (Object.keys(core).length > 0) {
+  // Update core. When customFields is provided, merge it onto the
+  // existing JSONB (`||` concatenates, right side wins) so a partial
+  // payload doesn't wipe unrelated keys.
+  const hasCustomFields =
+    customFields !== undefined && Object.keys(customFields).length > 0;
+  if (Object.keys(core).length > 0 || hasCustomFields) {
     await db
       .update(elevators)
-      .set({ ...core, lastUpdatedBy: userId, lastUpdatedAt: new Date() })
+      .set({
+        ...core,
+        ...(hasCustomFields
+          ? { customFields: sql`${elevators.customFields} || ${JSON.stringify(customFields)}::jsonb` }
+          : {}),
+        lastUpdatedBy: userId,
+        lastUpdatedAt: new Date(),
+      })
       .where(eq(elevators.id, id));
   }
 
@@ -875,6 +899,29 @@ export const exportElevatorDataOptions = (
   queryOptions({
     queryKey: ["elevator", "export", filters],
     queryFn: () => exportElevatorData({ data: filters }),
+  });
+
+// Global catalog of user-defined columns discovered during imports. Returned
+// sorted by label so the detail view can render them in a stable order.
+export const listCustomFieldDefs = createServerFn()
+  .middleware([adminMiddlewareRead])
+  .handler(async ({ context }) => {
+    return context.db
+      .select({
+        id: customFieldDefs.id,
+        key: customFieldDefs.key,
+        label: customFieldDefs.label,
+        type: customFieldDefs.type,
+        aliases: customFieldDefs.aliases,
+      })
+      .from(customFieldDefs)
+      .orderBy(asc(customFieldDefs.label));
+  });
+
+export const customFieldDefsOptions = () =>
+  queryOptions({
+    queryKey: ["customFieldDefs"],
+    queryFn: () => listCustomFieldDefs(),
   });
 
 // ---------------------------------------------------------------------------

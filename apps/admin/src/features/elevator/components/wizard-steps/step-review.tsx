@@ -114,8 +114,7 @@ export function StepReview({ form, goToStep, orgs }: StepReviewProps) {
           value: values.has_emergency_phone,
           type: "boolean",
         },
-        { label: "Modell", value: values.emergency_phone_model },
-        { label: "Typ", value: values.emergency_phone_type },
+        { label: "Beskrivning", value: values.emergency_phone },
         {
           label: "Behöver uppgradering",
           value: values.needs_upgrade,

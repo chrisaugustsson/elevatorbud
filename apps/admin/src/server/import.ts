@@ -9,9 +9,11 @@ import {
   elevatorEvents,
   organizations,
   suggestedValues,
+  customFieldDefs,
 } from "@elevatorbud/db/schema";
 import type { Database } from "@elevatorbud/db";
 import { adminMiddleware } from "./auth";
+import { sql } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
 // Zod schemas (inlined from packages/api/src/routers/import.ts)
@@ -41,6 +43,7 @@ const confirmImportSchema = z.object({
       elevator_classification: z.string().nullish(),
       elevator_designation: z.string().nullish(),
       district: z.string().nullish(),
+      property_designation: z.string().nullish(),
       elevator_type: z.string().nullish(),
       manufacturer: z.string().nullish(),
       build_year: z.number().nullish(),
@@ -99,6 +102,11 @@ const confirmImportSchema = z.object({
       machine_type: z.string().nullish(),
       control_system_type: z.string().nullish(),
       shaft_lighting: z.string().nullish(),
+      // Free-text emergency-phone description. `null` is meaningful:
+      // when the Excel cell is "Nej", the parser emits null here so the
+      // import clears any stale description on re-import.
+      emergency_phone: z.string().nullish(),
+      has_emergency_phone: z.boolean().nullish(),
       comments: z.string().nullish(),
       // Contact person
       contact_person_name: z.string().nullish(),
@@ -115,6 +123,11 @@ const confirmImportSchema = z.object({
         .nullish(),
       budget_amount: z.number().nullish(),
       modernization_measures: z.string().nullish(),
+      // Flexible per-customer columns. Keys correspond to
+      // custom_field_defs.key; labels are the original Excel headers and
+      // let the server upsert/update def labels + aliases on first sight.
+      custom_fields: z.record(z.string(), z.string()).optional(),
+      custom_field_labels: z.record(z.string(), z.string()).optional(),
       // Resolved org ID from mapping step
       _organizationId: z.string(),
       _source_row: z.number().optional(),
@@ -188,6 +201,7 @@ function toDetailData(data: z.infer<typeof confirmImportSchema>["elevators"][num
     machineType: data.machine_type,
     controlSystemType: data.control_system_type,
     shaftLighting: data.shaft_lighting,
+    emergencyPhone: data.emergency_phone,
     comments: data.comments,
   };
 }
@@ -211,6 +225,7 @@ function toElevatorMergeUpdate(r: ConfirmRow) {
     address: r.address,
     elevatorClassification: r.elevator_classification,
     district: r.district,
+    propertyDesignation: r.property_designation,
     elevatorType: r.elevator_type,
     manufacturer: r.manufacturer,
     buildYear: r.build_year,
@@ -220,6 +235,7 @@ function toElevatorMergeUpdate(r: ConfirmRow) {
     modernizationYear: r.modernization_year,
     warrantyExpiresAt: r.warranty_expires_at,
     inventoryDate: r.inventory_date,
+    hasEmergencyPhone: r.has_emergency_phone,
     needsUpgrade: r.needs_upgrade,
     contactPersonName: r.contact_person_name,
     contactPersonPhone: r.contact_person_phone,
@@ -228,7 +244,16 @@ function toElevatorMergeUpdate(r: ConfirmRow) {
 }
 
 function toDetailMergeUpdate(r: ConfirmRow) {
-  return mergeNonNull(toDetailData(r));
+  const base = mergeNonNull(toDetailData(r));
+  // Nej-override: when the source row explicitly answered "Nej" to the
+  // Nödtelefon column, force `emergencyPhone` to null on the merge so
+  // any stale description from a previous import is cleared. Without
+  // this, `mergeNonNull` would drop the null and the DB would keep the
+  // old text next to `hasEmergencyPhone: false`, which is misleading.
+  if (r.has_emergency_phone === false) {
+    base.emergencyPhone = null;
+  }
+  return base;
 }
 
 function toBudgetMergeUpdate(r: ConfirmRow) {
@@ -282,12 +307,20 @@ async function analyzeFn(
 
 type ConfirmRow = z.infer<typeof confirmImportSchema>["elevators"][number];
 
+// Drop null/undefined so the insert's `customFields` default `{}` stays
+// in effect when the row has no custom data. Empty object otherwise.
+function toCustomFieldsForInsert(r: ConfirmRow): Record<string, string> {
+  return r.custom_fields ?? {};
+}
+
 function toElevatorInsert(r: ConfirmRow, userId: string) {
   return {
     elevatorNumber: r.elevator_number,
     address: r.address,
     elevatorClassification: r.elevator_classification,
     district: r.district,
+    propertyDesignation: r.property_designation,
+    customFields: toCustomFieldsForInsert(r),
     elevatorType: r.elevator_type,
     manufacturer: r.manufacturer,
     buildYear: r.build_year,
@@ -297,6 +330,7 @@ function toElevatorInsert(r: ConfirmRow, userId: string) {
     modernizationYear: r.modernization_year,
     warrantyExpiresAt: r.warranty_expires_at,
     inventoryDate: r.inventory_date,
+    hasEmergencyPhone: r.has_emergency_phone,
     needsUpgrade: r.needs_upgrade,
     organizationId: r._organizationId,
     contactPersonName: r.contact_person_name,
@@ -348,15 +382,94 @@ function rowRef(r: ConfirmRow): Pick<ImportFailure, "elevator_number" | "sheet" 
   };
 }
 
+export type UpdateChange = {
+  /**
+   * Field identifier in camelCase matching the drizzle schema column,
+   * e.g. "elevatorType", "budgetAmount", "emergencyPhone". Custom
+   * fields are prefixed: "custom:{slug}" so the UI can separate them
+   * from structured columns.
+   */
+  field: string;
+  // `any` at the RPC boundary — same constraint as
+  // `elevator_events.metadata`: TanStack Start's server-fn return-type
+  // serializer rejects `unknown` on arbitrary shapes. The UI narrows
+  // with `formatChangeValue` at render-site.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  before: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  after: any;
+};
+
+export type UpdateDiff = {
+  elevatorId: string;
+  elevatorNumber: string;
+  organizationId: string;
+  organizationName: string;
+  sheet: string | null;
+  row: number | null;
+  changes: UpdateChange[];
+};
+
 export type ConfirmImportResult = {
   created: number;
   updated: number;
   failures: ImportFailure[];
+  /**
+   * Per-row diffs for elevators updated in this chunk. Only rows with
+   * at least one actual column change are included — a re-import that
+   * touches no columns produces an empty list for that row (the row is
+   * still counted in `updated` because lastUpdatedAt/By get stamped).
+   */
+  updates: UpdateDiff[];
   perOrgCounts: Record<
     string,
     { orgName: string; created: number; updated: number }
   >;
 };
+
+/**
+ * Loose equality for diffing: handles null/undefined, coerces numeric
+ * strings to numbers (the DB returns `numeric(12,2)` as a string but
+ * the import payload sends a number, which would otherwise show as a
+ * change when the underlying value is identical).
+ */
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  if (
+    (typeof a === "number" && typeof b === "string") ||
+    (typeof a === "string" && typeof b === "number")
+  ) {
+    const na = Number(a);
+    const nb = Number(b);
+    if (Number.isFinite(na) && Number.isFinite(nb)) return na === nb;
+  }
+  if (a instanceof Date && b instanceof Date) {
+    return a.getTime() === b.getTime();
+  }
+  return String(a) === String(b);
+}
+
+/**
+ * Return `{ field, before, after }` entries for keys in `incoming` whose
+ * value differs from the existing row. Only keys present in `incoming`
+ * are inspected — merge-semantics mean keys not sent are intentionally
+ * untouched, so they're not a "diff".
+ */
+function diffFields(
+  existing: Record<string, unknown>,
+  incoming: Record<string, unknown>,
+): UpdateChange[] {
+  const out: UpdateChange[] = [];
+  for (const [key, afterVal] of Object.entries(incoming)) {
+    const beforeVal = existing[key];
+    if (!valuesEqual(beforeVal, afterVal)) {
+      out.push({ field: key, before: beforeVal ?? null, after: afterVal });
+    }
+  }
+  return out;
+}
 
 /**
  * Process one chunk of elevators. Each row runs inside its own PG savepoint
@@ -374,6 +487,7 @@ export async function confirmFn(
 ): Promise<ConfirmImportResult> {
   const rows = input.elevators;
   const failures: ImportFailure[] = [];
+  const updates: UpdateDiff[] = [];
   const perOrgCounts: Record<
     string,
     { orgName: string; created: number; updated: number }
@@ -382,7 +496,13 @@ export async function confirmFn(
   let updated = 0;
 
   if (rows.length === 0) {
-    return { created: 0, updated: 0, failures: [], perOrgCounts: {} };
+    return {
+      created: 0,
+      updated: 0,
+      failures: [],
+      updates: [],
+      perOrgCounts: {},
+    };
   }
 
   // Look up every referenced org once per chunk. Rows whose org vanished
@@ -395,9 +515,48 @@ export async function confirmFn(
     .where(inArray(organizations.id, referencedOrgIds));
   const orgById = new Map(existingOrgs.map((o) => [o.id, o]));
 
+  // Collect every (key, label) pair across the chunk so defs can be
+  // upserted in a single batch before the row loop. Last label wins for
+  // any key that appears with multiple labels in the same file — unusual
+  // but not worth failing over.
+  const defPairs = new Map<string, string>();
+  for (const r of rows) {
+    if (!r.custom_field_labels) continue;
+    for (const [key, label] of Object.entries(r.custom_field_labels)) {
+      if (key && label) defPairs.set(key, label);
+    }
+  }
+
   const successfulRows: ConfirmRow[] = [];
 
   await db.transaction(async (tx) => {
+    // Upsert custom field defs for every key seen in this chunk. On conflict,
+    // keep the existing label/type but append the incoming label to `aliases`
+    // if not already present — that's how the alias list grows organically
+    // as new header variants show up in imports.
+    if (defPairs.size > 0) {
+      const defRows = [...defPairs.entries()].map(([key, label]) => ({
+        key,
+        label,
+        type: "text" as const,
+        aliases: [label],
+      }));
+      await tx
+        .insert(customFieldDefs)
+        .values(defRows)
+        .onConflictDoUpdate({
+          target: customFieldDefs.key,
+          set: {
+            aliases: sql`(
+              SELECT array_agg(DISTINCT a)
+              FROM unnest(
+                ${customFieldDefs.aliases} || excluded.aliases
+              ) AS a
+            )`,
+          },
+        });
+    }
+
     for (const row of rows) {
       const org = orgById.get(row._organizationId);
       if (!org) {
@@ -414,11 +573,16 @@ export async function confirmFn(
       // Re-imports: existing (organizationId, elevatorNumber) → UPDATE with
       // merge semantics (blank Excel cells leave DB values untouched).
       let rowOutcome: "created" | "updated" | null = null;
+      let committedElevatorId: string | null = null;
+
+      // Per-row diff — populated only on the update branch, emitted to
+      // `updates` at the bottom if any column actually changed.
+      let rowChanges: UpdateChange[] = [];
 
       try {
         await tx.transaction(async (sp) => {
           const [existing] = await sp
-            .select({ id: elevators.id })
+            .select()
             .from(elevators)
             .where(
               and(
@@ -435,12 +599,50 @@ export async function confirmFn(
             elevatorId = existing.id;
 
             const elevatorUpdate = toElevatorMergeUpdate(row);
+            const incomingCustomFields = row.custom_fields;
+            const hasCustomFields =
+              incomingCustomFields &&
+              Object.keys(incomingCustomFields).length > 0;
+
+            // Diff the core fields first — before SQL runs so we read
+            // the original values, not the freshly-written ones.
+            rowChanges.push(
+              ...diffFields(
+                existing as Record<string, unknown>,
+                elevatorUpdate,
+              ),
+            );
+            if (hasCustomFields) {
+              const existingCf =
+                (existing.customFields as Record<string, unknown> | null) ??
+                {};
+              for (const [key, afterVal] of Object.entries(
+                incomingCustomFields,
+              )) {
+                const beforeVal = existingCf[key];
+                if (!valuesEqual(beforeVal, afterVal)) {
+                  rowChanges.push({
+                    field: `custom:${key}`,
+                    before: beforeVal ?? null,
+                    after: afterVal,
+                  });
+                }
+              }
+            }
+
             // Always stamp the updater, even if no other columns changed —
             // the fact that the admin re-submitted this row is itself signal.
+            // Custom fields merge via JSONB `||` (right side wins per key)
+            // so partial imports don't drop unrelated keys already saved.
             await sp
               .update(elevators)
               .set({
                 ...elevatorUpdate,
+                ...(hasCustomFields
+                  ? {
+                      customFields: sql`${elevators.customFields} || ${JSON.stringify(incomingCustomFields)}::jsonb`,
+                    }
+                  : {}),
                 lastUpdatedBy: userId,
                 lastUpdatedAt: new Date(),
               })
@@ -448,11 +650,17 @@ export async function confirmFn(
 
             const detailUpdate = toDetailMergeUpdate(row);
             const [existingDetail] = await sp
-              .select({ id: elevatorDetails.id })
+              .select()
               .from(elevatorDetails)
               .where(eq(elevatorDetails.elevatorId, elevatorId))
               .limit(1);
             if (existingDetail) {
+              rowChanges.push(
+                ...diffFields(
+                  existingDetail as Record<string, unknown>,
+                  detailUpdate,
+                ),
+              );
               if (Object.keys(detailUpdate).length > 0) {
                 await sp
                   .update(elevatorDetails)
@@ -460,9 +668,17 @@ export async function confirmFn(
                   .where(eq(elevatorDetails.elevatorId, elevatorId));
               }
             } else {
+              // No existing detail row → every detail field in this
+              // import is a "new value". Emit a diff from null → incoming
+              // so the admin still sees what got populated.
+              const newDetail = toDetailData(row);
+              for (const [key, val] of Object.entries(newDetail)) {
+                if (val == null) continue;
+                rowChanges.push({ field: key, before: null, after: val });
+              }
               await sp.insert(elevatorDetails).values({
                 elevatorId,
-                ...toDetailData(row),
+                ...newDetail,
               });
             }
           } else {
@@ -490,17 +706,34 @@ export async function confirmFn(
           const budgetUpdate = toBudgetMergeUpdate(row);
           if (Object.keys(budgetUpdate).length > 0) {
             const [latestBudget] = await sp
-              .select({ id: elevatorBudgets.id })
+              .select()
               .from(elevatorBudgets)
               .where(eq(elevatorBudgets.elevatorId, elevatorId))
               .orderBy(desc(elevatorBudgets.createdAt))
               .limit(1);
             if (latestBudget) {
+              if (isUpdate) {
+                rowChanges.push(
+                  ...diffFields(
+                    latestBudget as Record<string, unknown>,
+                    budgetUpdate,
+                  ),
+                );
+              }
               await sp
                 .update(elevatorBudgets)
                 .set(budgetUpdate)
                 .where(eq(elevatorBudgets.id, latestBudget.id));
             } else {
+              if (isUpdate) {
+                // New budget row on an existing elevator is itself a
+                // change worth surfacing. Emit every provided budget
+                // field as null → incoming.
+                for (const [key, val] of Object.entries(budgetUpdate)) {
+                  if (val == null) continue;
+                  rowChanges.push({ field: key, before: null, after: val });
+                }
+              }
               await sp.insert(elevatorBudgets).values({
                 elevatorId,
                 createdBy: userId,
@@ -586,6 +819,7 @@ export async function confirmFn(
           }
 
           rowOutcome = isUpdate ? "updated" : "created";
+          committedElevatorId = elevatorId;
         });
 
         if (!perOrgCounts[org.id])
@@ -593,6 +827,20 @@ export async function confirmFn(
         if (rowOutcome === "updated") {
           updated++;
           perOrgCounts[org.id]!.updated++;
+          // Only emit a diff entry if the row actually changed values.
+          // A no-op re-import still counts as "updated" because we
+          // stamp lastUpdatedAt/By, but the diff list stays quiet.
+          if (rowChanges.length > 0 && committedElevatorId) {
+            updates.push({
+              elevatorId: committedElevatorId,
+              elevatorNumber: row.elevator_number,
+              organizationId: org.id,
+              organizationName: org.name,
+              sheet: row._source_sheet ?? null,
+              row: row._source_row ?? null,
+              changes: rowChanges,
+            });
+          }
         } else {
           created++;
           perOrgCounts[org.id]!.created++;
@@ -632,7 +880,7 @@ export async function confirmFn(
     }
   });
 
-  return { created, updated, failures, perOrgCounts };
+  return { created, updated, failures, updates, perOrgCounts };
 }
 
 // ---------------------------------------------------------------------------

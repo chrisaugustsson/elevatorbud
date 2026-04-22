@@ -122,8 +122,7 @@ const newDetailsSchema = z
     controlSystemType: z.string().max(200).optional().nullable(),
     // Safety & emergency phone
     shaftLighting: z.string().max(200).optional().nullable(),
-    emergencyPhoneModel: z.string().max(200).optional().nullable(),
-    emergencyPhoneType: z.string().max(200).optional().nullable(),
+    emergencyPhone: z.string().max(400).optional().nullable(),
     emergencyPhonePrice: z.number().nonnegative().optional().nullable(),
   })
   .optional();

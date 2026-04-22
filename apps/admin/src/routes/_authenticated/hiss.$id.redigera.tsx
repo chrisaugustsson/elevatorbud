@@ -1,7 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { elevatorOptions, updateElevator } from "~/server/elevator";
+import {
+  elevatorOptions,
+  updateElevator,
+  customFieldDefsOptions,
+} from "~/server/elevator";
 import { listOrganizationsOptions } from "~/server/organization";
 import { useForm } from "@tanstack/react-form";
 import { Button } from "@elevatorbud/ui/components/ui/button";
@@ -41,9 +45,16 @@ import { InspectionSection } from "../../features/elevator/components/inspection
 import { ModernizationSection } from "../../features/elevator/components/modernization-section";
 import { EmergencyPhoneSection } from "../../features/elevator/components/emergency-phone-section";
 import { CommentsSection } from "../../features/elevator/components/comments-section";
+import { CustomFieldsSection } from "../../features/elevator/components/custom-fields-section";
 import { Skeleton } from "@elevatorbud/ui/components/ui/skeleton";
 
-const tabSlugs = ["grundinfo", "teknik", "underhall", "ovrigt"] as const;
+const tabSlugs = [
+  "grundinfo",
+  "teknik",
+  "underhall",
+  "ovrigt",
+  "extrafalt",
+] as const;
 type TabSlug = (typeof tabSlugs)[number];
 
 function getInitialTab(): TabSlug {
@@ -56,6 +67,7 @@ export const Route = createFileRoute("/_authenticated/hiss/$id/redigera")({
   loader: ({ context, params }) => {
     context.queryClient.prefetchQuery(elevatorOptions(params.id));
     context.queryClient.prefetchQuery(listOrganizationsOptions());
+    context.queryClient.prefetchQuery(customFieldDefsOptions());
   },
   component: RedigeraHiss,
   pendingComponent: RedigeraSkeleton,
@@ -124,6 +136,7 @@ function RedigeraHiss() {
   const queryClient = useQueryClient();
   const { data: hiss } = useSuspenseQuery(elevatorOptions(id));
   const { data: orgs } = useSuspenseQuery(listOrganizationsOptions());
+  const { data: customFieldDefs } = useSuspenseQuery(customFieldDefsOptions());
   const updateHiss = useMutation({
     mutationFn: (input: { id: string; organizationId?: string } & ReturnType<typeof formValuesToUpdateArgs>) =>
       updateElevator({ data: input }),
@@ -332,6 +345,7 @@ function RedigeraHiss() {
               <TabsTrigger value="teknik">Teknik</TabsTrigger>
               <TabsTrigger value="underhall">Underhåll & Modernisering</TabsTrigger>
               <TabsTrigger value="ovrigt">Övrigt</TabsTrigger>
+              <TabsTrigger value="extrafalt">Extrafält</TabsTrigger>
             </TabsList>
           </div>
 
@@ -394,6 +408,17 @@ function RedigeraHiss() {
                   form={form}
                   formValues={formValues}
                   originalValues={originalValues}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="extrafalt">
+              <div className="space-y-6">
+                <CustomFieldsSection
+                  form={form}
+                  formValues={formValues}
+                  originalValues={originalValues}
+                  defs={customFieldDefs}
                 />
               </div>
             </TabsContent>

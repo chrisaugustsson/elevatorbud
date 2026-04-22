@@ -19,6 +19,7 @@ import {
   elevatorDetails,
   elevatorBudgets,
   organizations,
+  customFieldDefs,
 } from "@elevatorbud/db/schema";
 import { authMiddlewareRead } from "./auth";
 import { getContextOrgIds } from "./context";
@@ -367,4 +368,27 @@ export const exportElevatorDataOptions = (
   queryOptions({
     queryKey: ["elevator", "export", filters],
     queryFn: () => exportElevatorData({ data: filters }),
+  });
+
+// Global catalog of user-defined columns — read-only for the client app.
+// Used by the detail view to render labels for entries in
+// `elevators.customFields`.
+export const listCustomFieldDefs = createServerFn()
+  .middleware([authMiddlewareRead])
+  .handler(async ({ context }) => {
+    return context.db
+      .select({
+        id: customFieldDefs.id,
+        key: customFieldDefs.key,
+        label: customFieldDefs.label,
+        type: customFieldDefs.type,
+      })
+      .from(customFieldDefs)
+      .orderBy(asc(customFieldDefs.label));
+  });
+
+export const customFieldDefsOptions = () =>
+  queryOptions({
+    queryKey: ["customFieldDefs"],
+    queryFn: () => listCustomFieldDefs(),
   });

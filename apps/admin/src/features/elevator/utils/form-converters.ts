@@ -22,6 +22,7 @@ export function serverToFormValues(
     address: (hiss.address as string) ?? "",
     elevator_designation: (hiss.elevatorClassification as string) ?? "",
     district: (hiss.district as string) ?? "",
+    property_designation: (hiss.propertyDesignation as string) ?? "",
     elevator_type: (hiss.elevatorType as string) ?? "",
     manufacturer: (hiss.manufacturer as string) ?? "",
     build_year: hiss.buildYear != null ? String(hiss.buildYear) : "",
@@ -57,15 +58,31 @@ export function serverToFormValues(
     modernization_measures:
       (hiss.measures as string) ?? "",
     has_emergency_phone: (hiss.hasEmergencyPhone as boolean) ?? false,
-    emergency_phone_model: (hiss.emergencyPhoneModel as string) ?? "",
-    emergency_phone_type: (hiss.emergencyPhoneType as string) ?? "",
+    emergency_phone: (hiss.emergencyPhone as string) ?? "",
     needs_upgrade: (hiss.needsUpgrade as boolean) ?? false,
     emergency_phone_price:
       hiss.emergencyPhonePrice != null
         ? String(hiss.emergencyPhonePrice)
         : "",
     comments: (hiss.comments as string) ?? "",
+    custom_fields: customFieldsFromServer(hiss.customFields),
   };
+}
+
+/** Normalize the server JSONB into form-string values. Anything non-stringy
+ *  gets stringified — the form only exposes a single text input for v1,
+ *  typed inputs render per-def at the section level. */
+function customFieldsFromServer(raw: unknown): Record<string, string | null> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Record<string, string | null> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (value == null) continue;
+    if (typeof value === "boolean") out[key] = value ? "true" : "false";
+    else if (typeof value === "string" || typeof value === "number")
+      out[key] = String(value);
+    else out[key] = JSON.stringify(value);
+  }
+  return out;
 }
 
 /** Convert form values (snake_case) to mutation args (camelCase) for the tRPC API */
@@ -75,6 +92,7 @@ export function formValuesToUpdateArgs(value: HissFormValues) {
     address: toOptionalString(value.address),
     elevatorClassification: toOptionalString(value.elevator_designation),
     district: toOptionalString(value.district),
+    propertyDesignation: toOptionalString(value.property_designation),
     elevatorType: toOptionalString(value.elevator_type),
     manufacturer: toOptionalString(value.manufacturer),
     buildYear: toOptionalNumber(value.build_year),
@@ -106,13 +124,41 @@ export function formValuesToUpdateArgs(value: HissFormValues) {
     ),
     budgetAmount: toOptionalNumber(value.budget_amount),
     measures: toOptionalString(value.modernization_measures),
-    hasEmergencyPhone: value.has_emergency_phone || undefined,
-    emergencyPhoneModel: toOptionalString(value.emergency_phone_model),
-    emergencyPhoneType: toOptionalString(value.emergency_phone_type),
+    hasEmergencyPhone: value.has_emergency_phone,
+    // When the admin toggles "har nödtelefon" off, explicitly clear the
+    // description column — otherwise the DB keeps a stale "Safeline,
+    // GSM 4G, Modell, MX + GL6 4G" next to `hasEmergencyPhone: false`,
+    // which misleads every downstream view. When on, empty string maps
+    // to undefined so the DB value is left alone.
+    emergencyPhone: value.has_emergency_phone
+      ? toOptionalString(value.emergency_phone)
+      : null,
     needsUpgrade: value.needs_upgrade || undefined,
     emergencyPhonePrice: toOptionalNumber(value.emergency_phone_price),
     comments: toOptionalString(value.comments),
+    customFields: customFieldsForUpdate(value.custom_fields),
   };
+}
+
+/** Coerce form values to what the server expects on customFields:
+ *  - empty-string or all-whitespace → null (clears the key on merge)
+ *  - non-empty string → string (server stores as-is)
+ *  - null → null (explicit clear)
+ *  Omit the whole object if there are no entries so the mutation doesn't
+ *  carry noise. */
+function customFieldsForUpdate(
+  raw: Record<string, string | null>,
+): Record<string, unknown> | undefined {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (value === null) {
+      out[key] = null;
+    } else if (typeof value === "string") {
+      const trimmed = value.trim();
+      out[key] = trimmed === "" ? null : trimmed;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /** Check if a field value has changed from the original */
@@ -124,5 +170,36 @@ export function isChanged(
   const cur = current[key];
   const orig = original[key];
   if (typeof cur === "boolean") return cur !== orig;
+  if (key === "custom_fields") {
+    return isCustomFieldsChanged(
+      cur as Record<string, string | null>,
+      orig as Record<string, string | null>,
+    );
+  }
   return (cur ?? "").toString().trim() !== (orig ?? "").toString().trim();
+}
+
+/** Check if a single custom-field slot has changed. Used by the
+ *  Extrafält section to highlight individual rows. */
+export function isCustomFieldChanged(
+  slug: string,
+  current: HissFormValues,
+  original: HissFormValues,
+): boolean {
+  const cur = current.custom_fields[slug] ?? "";
+  const orig = original.custom_fields[slug] ?? "";
+  return String(cur).trim() !== String(orig).trim();
+}
+
+function isCustomFieldsChanged(
+  cur: Record<string, string | null>,
+  orig: Record<string, string | null>,
+): boolean {
+  const keys = new Set([...Object.keys(cur), ...Object.keys(orig)]);
+  for (const k of keys) {
+    const c = cur[k] ?? "";
+    const o = orig[k] ?? "";
+    if (String(c).trim() !== String(o).trim()) return true;
+  }
+  return false;
 }

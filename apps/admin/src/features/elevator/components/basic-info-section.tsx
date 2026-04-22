@@ -130,6 +130,28 @@ export function BasicInfoSection({
             isChanged("district", formValues, originalValues)
           }
         />
+
+        <FieldWrapper
+          changed={
+            !!originalValues &&
+            isChanged("property_designation", formValues, originalValues)
+          }
+        >
+          <form.Field name="property_designation">
+            {(field) => (
+              <div className="space-y-1.5">
+                <Label htmlFor="property_designation">Fastighetsbeteckning</Label>
+                <Input
+                  id="property_designation"
+                  className="h-11"
+                  placeholder="T.ex. Hagahuset 1:2..."
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              </div>
+            )}
+          </form.Field>
+        </FieldWrapper>
       </EditSection>
     </>
   );

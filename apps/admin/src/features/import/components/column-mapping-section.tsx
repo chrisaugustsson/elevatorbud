@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   TARGET_FIELDS,
+  slugifyHeader,
   type AutoMapResult,
   type ColumnMapping,
 } from "@elevatorbud/utils";
@@ -18,7 +19,10 @@ import { Label } from "@elevatorbud/ui/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@elevatorbud/ui/components/ui/select";
@@ -30,13 +34,30 @@ import {
   TableHeader,
   TableRow,
 } from "@elevatorbud/ui/components/ui/table";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
+
+export type KnownCustomFieldDef = {
+  id: string;
+  key: string;
+  label: string;
+  type: "text" | "number" | "boolean" | "date";
+  aliases?: string[] | null;
+};
+
+// Normalize a header/label string the same way the auto-mapper normalizes
+// Excel headers. Shared helper so "Verksamhet" and " verksamhet " both
+// match a def with label "Verksamhet".
+function normalize(s: string): string {
+  return s.toLowerCase().trim().replace(/\s+/g, " ");
+}
 
 export function ColumnMappingSection({
   autoMapResult,
   sheetData,
   sheetName,
   sheetProgress,
+  knownCustomFieldDefs = [],
   onConfirm,
   onHeaderRowChange,
   onBack,
@@ -46,22 +67,57 @@ export function ColumnMappingSection({
   sheetData: unknown[][];
   sheetName?: string;
   sheetProgress?: { current: number; total: number };
+  knownCustomFieldDefs?: KnownCustomFieldDef[];
   onConfirm: (mappings: ColumnMapping[]) => void;
   onHeaderRowChange: (rowIndex: number) => void;
   onBack: () => void;
   headingRef?: React.RefObject<HTMLHeadingElement | null>;
 }) {
-  // Build initial field map: sourceIndex -> field
-  const [fieldMap, setFieldMap] = useState<Record<number, string>>(() => {
+  // Pre-compute a lookup of every known (label + alias) → pinned
+  // field identifier `_custom_field:{key}` so unmapped Excel headers
+  // can be auto-promoted from "skip" to a known custom field on mount.
+  const customFieldByAlias = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const def of knownCustomFieldDefs) {
+      const pinned = `_custom_field:${def.key}`;
+      m.set(normalize(def.label), pinned);
+      m.set(normalize(def.key), pinned);
+      for (const alias of def.aliases ?? []) {
+        m.set(normalize(alias), pinned);
+      }
+    }
+    return m;
+  }, [knownCustomFieldDefs]);
+
+  // Track which columns were auto-promoted to a custom field (vs
+  // structurally auto-mapped) so the Status column can show a distinct
+  // badge. Computed alongside the initial fieldMap.
+  const initial = useMemo(() => {
     const map: Record<number, string> = {};
+    const autoCustom = new Set<number>();
     for (const m of autoMapResult.mapped) {
       map[m.sourceIndex] = m.field;
     }
     for (const idx of autoMapResult.unmappedIndices) {
-      map[idx] = "_skip";
+      const header = autoMapResult.sourceHeaders[idx];
+      const pinned = header
+        ? customFieldByAlias.get(normalize(header))
+        : undefined;
+      if (pinned) {
+        map[idx] = pinned;
+        autoCustom.add(idx);
+      } else {
+        map[idx] = "_skip";
+      }
     }
-    return map;
-  });
+    return { map, autoCustom };
+  }, [autoMapResult, customFieldByAlias]);
+
+  const [fieldMap, setFieldMap] =
+    useState<Record<number, string>>(initial.map);
+  const [autoCustomIndices, setAutoCustomIndices] = useState<Set<number>>(
+    initial.autoCustom,
+  );
 
   // All non-empty source columns
   const allColumns = autoMapResult.sourceHeaders
@@ -81,17 +137,55 @@ export function ColumnMappingSection({
     return samples;
   };
 
-  const usedFields = new Set(
-    Object.values(fieldMap).filter((f) => f !== "_skip"),
+  // For the "used elsewhere" guard we only care about structurally
+  // unique fields. `_custom_field` and `_custom_field:{key}` entries
+  // are allowed to repeat — each column maps to its own slug.
+  const usedStructuralFields = new Set(
+    Object.values(fieldMap).filter(
+      (f) => f !== "_skip" && !f.startsWith("_custom_field"),
+    ),
   );
 
   const mandatoryTargets = TARGET_FIELDS.filter((t) => t.mandatory);
   const missingMandatory = mandatoryTargets.filter(
-    (t) => !usedFields.has(t.field),
+    (t) => !usedStructuralFields.has(t.field),
   );
 
   const handleFieldChange = (sourceIndex: number, newField: string) => {
     setFieldMap((prev) => ({ ...prev, [sourceIndex]: newField }));
+    // User edited this row → no longer "auto (extrafält)" badge-eligible.
+    if (autoCustomIndices.has(sourceIndex)) {
+      setAutoCustomIndices((prev) => {
+        const next = new Set(prev);
+        next.delete(sourceIndex);
+        return next;
+      });
+    }
+  };
+
+  const skipRowCount = useMemo(
+    () => allColumns.filter((c) => (fieldMap[c.index] ?? "_skip") === "_skip")
+      .length,
+    [allColumns, fieldMap],
+  );
+
+  const markRestAsCustomFields = () => {
+    let flipped = 0;
+    setFieldMap((prev) => {
+      const next = { ...prev };
+      for (const col of allColumns) {
+        if ((next[col.index] ?? "_skip") === "_skip") {
+          next[col.index] = "_custom_field";
+          flipped++;
+        }
+      }
+      return next;
+    });
+    if (flipped > 0) {
+      toast.success(
+        `${flipped} kolumn${flipped === 1 ? "" : "er"} markerade som extrafält.`,
+      );
+    }
   };
 
   const handleConfirm = () => {
@@ -100,8 +194,11 @@ export function ColumnMappingSection({
       const field = fieldMap[col.index];
       if (!field || field === "_skip") continue;
 
+      // Pinned `_custom_field:{key}` isn't a TARGET_FIELDS entry, so
+      // TARGET_FIELDS.find misses. No parser either — server resolves
+      // the slug directly. Same for the bare `_custom_field` sentinel.
       const targetDef = TARGET_FIELDS.find((t) => t.field === field);
-      const wasAutoMatched = autoMapResult.mapped.some(
+      const wasStructurallyAutoMatched = autoMapResult.mapped.some(
         (m) => m.sourceIndex === col.index && m.field === field,
       );
 
@@ -110,14 +207,30 @@ export function ColumnMappingSection({
         sourceHeader: col.header,
         field,
         parser: targetDef?.parser,
-        autoMatched: wasAutoMatched,
+        // Custom-field auto promotions count as auto-matched too so the
+        // admin doesn't see the "Manuell" badge on a row they never
+        // touched.
+        autoMatched:
+          wasStructurallyAutoMatched || autoCustomIndices.has(col.index),
       });
     }
     onConfirm(mappings);
   };
 
   const matchedCount = autoMapResult.mapped.length;
+  const autoCustomCount = autoCustomIndices.size;
   const totalColumns = allColumns.length;
+
+  // Partition the known defs in the Select dropdown. Shown with the slug
+  // label + aliases list as a tooltip so the admin knows what's in the
+  // catalog.
+  const sortedKnownDefs = useMemo(
+    () =>
+      [...knownCustomFieldDefs].sort((a, b) =>
+        a.label.localeCompare(b.label, "sv"),
+      ),
+    [knownCustomFieldDefs],
+  );
 
   return (
     <div className="space-y-4">
@@ -169,11 +282,21 @@ export function ColumnMappingSection({
         </CardContent>
       </Card>
 
-      {/* Stats bar */}
-      <div className="flex items-center gap-3">
+      {/* Stats + bulk action row */}
+      <div className="flex flex-wrap items-center gap-3">
         <Badge variant="secondary">
           {matchedCount}/{totalColumns} kolumner matchade automatiskt
         </Badge>
+        {autoCustomCount > 0 && (
+          <Badge
+            variant="outline"
+            className="border-amber-500/40 text-amber-700 dark:text-amber-400"
+            aria-label="Extrafält auto-matchade från katalogen"
+          >
+            <Sparkles className="mr-1 h-3 w-3" aria-hidden="true" />
+            {autoCustomCount} extrafält auto-matchade
+          </Badge>
+        )}
         {autoMapResult.confidence >= 0.8 && (
           <Badge
             variant="outline"
@@ -184,6 +307,25 @@ export function ColumnMappingSection({
             Hög matchning
           </Badge>
         )}
+        <div className="ml-auto">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={markRestAsCustomFields}
+            disabled={skipRowCount === 0 || missingMandatory.length > 0}
+            title={
+              missingMandatory.length > 0
+                ? "Obligatoriska fält måste mappas först."
+                : skipRowCount === 0
+                  ? "Inga kolumner kvar att markera"
+                  : undefined
+            }
+          >
+            <Sparkles className="mr-1 h-3.5 w-3.5" />
+            Markera resten som extrafält
+          </Button>
+        </div>
       </div>
 
       {/* Missing mandatory warning — role=alert + assertive so
@@ -233,7 +375,9 @@ export function ColumnMappingSection({
           </CardTitle>
           <CardDescription>
             Koppla kolumner i filen till rätt fält. Automatiskt matchade
-            kolumner är förvalda.
+            kolumner är förvalda. Kolumner markerade som{" "}
+            <span className="font-medium">Extrafält</span> sparas på hissen
+            under kolumnrubrikens namn.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -242,23 +386,40 @@ export function ColumnMappingSection({
               <TableRow>
                 <TableHead className="w-[180px]">Kolumn i filen</TableHead>
                 <TableHead className="w-[200px]">Exempelvärden</TableHead>
-                <TableHead className="w-[220px]">Mappar till</TableHead>
-                <TableHead className="w-[100px]">Status</TableHead>
+                <TableHead className="w-[240px]">Mappar till</TableHead>
+                <TableHead className="w-[140px]">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {allColumns.map((col) => {
                 const field = fieldMap[col.index] || "_skip";
-                const isAutoMatched = autoMapResult.mapped.some(
+                const isStructurallyAutoMatched = autoMapResult.mapped.some(
                   (m) => m.sourceIndex === col.index,
                 );
-                const isManuallyMapped = !isAutoMatched && field !== "_skip";
+                const isAutoCustomField = autoCustomIndices.has(col.index);
+                const isManuallyMapped =
+                  !isStructurallyAutoMatched &&
+                  !isAutoCustomField &&
+                  field !== "_skip";
                 const samples = getSamples(col.index);
+                // New-key preview for bare _custom_field (not pinned).
+                const previewSlug =
+                  field === "_custom_field"
+                    ? slugifyHeader(col.header)
+                    : null;
 
                 return (
                   <TableRow key={col.index}>
                     <TableCell className="font-mono text-sm">
                       {col.header}
+                      {previewSlug && (
+                        <div className="mt-1 text-xs font-normal text-muted-foreground">
+                          nyckel:{" "}
+                          <span className="rounded bg-muted px-1 py-0.5 font-mono">
+                            {previewSlug}
+                          </span>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <span className="text-xs text-muted-foreground">
@@ -287,9 +448,10 @@ export function ColumnMappingSection({
                         <SelectContent>
                           {TARGET_FIELDS.map((t) => {
                             const isUsedElsewhere =
-                              usedFields.has(t.field) &&
+                              usedStructuralFields.has(t.field) &&
                               t.field !== field &&
-                              t.field !== "_skip";
+                              t.field !== "_skip" &&
+                              !t.field.startsWith("_custom_field");
                             return (
                               <SelectItem
                                 key={t.field}
@@ -301,11 +463,27 @@ export function ColumnMappingSection({
                               </SelectItem>
                             );
                           })}
+                          {sortedKnownDefs.length > 0 && (
+                            <>
+                              <SelectSeparator />
+                              <SelectGroup>
+                                <SelectLabel>Kända extrafält</SelectLabel>
+                                {sortedKnownDefs.map((def) => (
+                                  <SelectItem
+                                    key={def.key}
+                                    value={`_custom_field:${def.key}`}
+                                  >
+                                    {def.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </>
+                          )}
                         </SelectContent>
                       </Select>
                     </TableCell>
                     <TableCell>
-                      {isAutoMatched && (
+                      {isStructurallyAutoMatched && (
                         <Badge
                           variant="secondary"
                           className="text-emerald-700 dark:text-emerald-400 text-xs"
@@ -313,6 +491,16 @@ export function ColumnMappingSection({
                         >
                           <CheckCircle2 className="mr-1 h-3 w-3" aria-hidden="true" />
                           Auto
+                        </Badge>
+                      )}
+                      {isAutoCustomField && (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/40 text-amber-700 dark:text-amber-400 text-xs"
+                          aria-label="Auto-matchad som extrafält"
+                        >
+                          <Sparkles className="mr-1 h-3 w-3" aria-hidden="true" />
+                          Auto (extrafält)
                         </Badge>
                       )}
                       {isManuallyMapped && (
@@ -325,15 +513,17 @@ export function ColumnMappingSection({
                           Manuell
                         </Badge>
                       )}
-                      {!isAutoMatched && !isManuallyMapped && (
-                        <Badge
-                          variant="outline"
-                          className="text-muted-foreground text-xs"
-                          aria-label="Kolumn hoppas över"
-                        >
-                          — Hoppas över
-                        </Badge>
-                      )}
+                      {!isStructurallyAutoMatched &&
+                        !isAutoCustomField &&
+                        !isManuallyMapped && (
+                          <Badge
+                            variant="outline"
+                            className="text-muted-foreground text-xs"
+                            aria-label="Kolumn hoppas över"
+                          >
+                            — Hoppas över
+                          </Badge>
+                        )}
                     </TableCell>
                   </TableRow>
                 );
